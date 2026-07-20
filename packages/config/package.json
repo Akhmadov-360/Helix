@@ -1,0 +1,30 @@
+{
+  "name": "@helix/config",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@helix/eslint-config": "workspace:*",
+    "@helix/typescript-config": "workspace:*",
+    "@types/node": "^22.18.9",
+    "eslint": "^9.39.0",
+    "typescript": "^5.9.3"
+  }
+}

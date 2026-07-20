@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "Helix Backend Library (CJS)",
+  "extends": "./base.json",
+  "compilerOptions": {
+    // Backend-либы эмитят CommonJS: Nest-приложение собирается tsc в CJS и
+    // подключает их через require в рантайме. Единый CJS по бэкенду снимает
+    // ESM/CJS-интероп (важно на pinned Node 20, где require(ESM) ещё экспериментален).
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "verbatimModuleSyntax": false,
+
+    "declaration": true,
+    "declarationMap": true,
+    "noEmit": false
+  }
+}

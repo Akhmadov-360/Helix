@@ -1,0 +1,7 @@
+{
+  "extends": "@helix/typescript-config/library.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts"]
+}

@@ -1,0 +1,35 @@
+{
+  "name": "@helix/api",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "nest build",
+    "dev": "nest start --watch",
+    "start": "node dist/main.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@helix/api-schemas": "workspace:*",
+    "@helix/config": "workspace:*",
+    "@helix/db": "workspace:*",
+    "@nestjs/common": "^11.0.1",
+    "@nestjs/core": "^11.0.1",
+    "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/swagger": "^11.0.0",
+    "dotenv": "^16.4.7",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@helix/eslint-config": "workspace:*",
+    "@helix/typescript-config": "workspace:*",
+    "@nestjs/cli": "^11.0.0",
+    "@nestjs/schematics": "^11.0.0",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.18.9",
+    "eslint": "^9.39.0",
+    "typescript": "^5.9.3"
+  }
+}

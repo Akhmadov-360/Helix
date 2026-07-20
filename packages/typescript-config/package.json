@@ -1,0 +1,11 @@
+{
+  "name": "@helix/typescript-config",
+  "version": "0.0.0",
+  "private": true,
+  "files": [
+    "base.json",
+    "library.json",
+    "nestjs.json",
+    "vite-react.json"
+  ]
+}

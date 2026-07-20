@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "Helix NestJS",
+  "extends": "./base.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+
+    // Nest DI reads runtime type metadata; verbatim import elision can strip a
+    // type-only import that DI still needs as a value. Off for the API layer.
+    "verbatimModuleSyntax": false,
+
+    "outDir": "dist",
+    "types": ["node"]
+  }
+}

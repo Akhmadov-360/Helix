@@ -1,0 +1,360 @@
+// ============================================================================
+//  Helix — доменная модель ядра CRM
+//  Собрано из 6 проходов проектирования + ревью. Каждое нетривиальное решение
+//  задокументировано в docs/decisions.md (принципы P1–P4 + записи по сущностям).
+//
+//  ВАЖНО — точки ручного расхождения schema.prisma ↔ БД.
+//  Три инварианта НЕ выражаются в Prisma-схеме и живут в raw SQL миграциях.
+//  prisma migrate НЕ должен их пересоздавать/ронять автоматически (см. §"Manual
+//  migration points" в decisions.md):
+//    (1) Phase(workspaceId, order) — UNIQUE ... DEFERRABLE INITIALLY DEFERRED
+//    (2) Project — generated columns под range-фильтры горячих custom fields
+//    (3) ActivityEvent — иммутабельность (отзыв UPDATE/DELETE у роли приложения)
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  // pgvector включается в M4 (RAG). В M0 не используется.
+}
+
+// ─────────────────────────────── ENUMS ─────────────────────────────────────
+
+enum Role {
+  OWNER
+  ADMIN
+  MANAGER
+  MEMBER
+  VIEWER
+}
+
+enum Audience {
+  B2B
+  B2C
+  MIXED
+}
+
+enum Visibility {
+  ALL // видит все лиды воркспейса
+  ASSIGNED // видит только те, где owner/assignee
+}
+
+enum PhaseType {
+  OPEN
+  WON
+  LOST
+}
+
+enum ProjectStatus {
+  OPEN
+  WON
+  LOST
+  ARCHIVED // статус БЕЗ фазы — причина, по которой status хранится, а не выводится
+}
+
+enum FieldType {
+  text
+  longtext
+  number
+  currency
+  date
+  datetime
+  select
+  multiselect
+  boolean
+  url
+  email
+  phone
+  contactRef // ссылка по стабильному id (P1); целостность — на уровне приложения
+  companyRef
+  userRef
+}
+
+// ──────────────────────────── ОРГАНИЗАЦИЯ / ЛЮДИ ───────────────────────────
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  plan      String   @default("free")
+  settings  Json     @default("{}") // валюта по умолчанию, timezone, брендинг, AI-провайдер
+  createdAt DateTime @default(now())
+
+  memberships    Membership[]
+  workspaces     Workspace[]
+  blueprints     Blueprint[]
+  companies      Company[]
+  contacts       Contact[]
+  projects       Project[]
+  activityEvents ActivityEvent[]
+}
+
+model User {
+  id           String  @id @default(cuid())
+  email        String  @unique
+  name         String
+  passwordHash String? // null при SSO-only
+  ssoSub       String?
+
+  memberships      Membership[]
+  workspaceMembers WorkspaceMember[]
+  ownedProjects    Project[]         @relation("ProjectOwner")
+  assignments      ProjectAssignee[]
+  activityEvents   ActivityEvent[] // виртуальная back-relation (нет колонки/FK); actorId живёт на ActivityEvent
+}
+
+model Membership {
+  id     String @id @default(cuid())
+  orgId  String
+  userId String
+  role   Role // базовая роль на уровне орга
+
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, userId])
+}
+
+// ──────────────────────────── WORKSPACE / PHASE ────────────────────────────
+
+model Workspace {
+  id          String   @id @default(cuid())
+  orgId       String
+  name        String
+  audience    Audience @default(MIXED) // один тип обслуживает B2B и B2C
+  blueprintId String? // происхождение (копия, не живая ссылка — см. Blueprint)
+  settings    Json     @default("{}")
+  version     Int      @default(0) // optimistic lock для reorder фаз
+  createdAt   DateTime @default(now())
+
+  org     Organization      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  phases  Phase[]
+  members WorkspaceMember[]
+  fields  FieldDefinition[]
+  projects Project[]
+
+  // Открывает composite-FK для детей: гарантирует, что child.orgId == workspace.orgId
+  // на уровне БД (тенант-инвариант, не надежда на сервис).
+  @@unique([id, orgId])
+}
+
+model WorkspaceMember {
+  id          String     @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        Role // переопределение орг-роли на уровне воркспейса
+  visibility  Visibility @default(ALL)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+}
+
+model Phase {
+  id          String    @id @default(cuid())
+  workspaceId String
+  key         String // иммутабельный слаг ("proposal") — опора автоматизаций/блюпринтов (P1)
+  name        Json // LocalizedName {uz,ru,en} — плывёт при переименовании/i18n, key стоит (P1/P2)
+  type        PhaseType @default(OPEN)
+  order       Int
+  color       String?
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  projects  Project[] // виртуальная back-relation (нет колонки/FK); FK phaseId остаётся на Project — см. decisions.md
+  // onDelete: Restrict живёт на СТОРОНЕ Project (Project.phase) — БД запрещает сирот (FR-WS-4)
+
+  // Цель composite-FK из Project: гарантирует phase.workspaceId == project.workspaceId
+  @@unique([id, workspaceId])
+  @@unique([workspaceId, key]) // key уникален и стабилен в пределах воркспейса
+  // ВНИМАНИЕ: строгий инвариант порядка — UNIQUE(workspaceId, order) DEFERRABLE —
+  // добавляется raw SQL миграцией (Prisma не умеет DEFERRABLE). НЕ выражаем здесь,
+  // чтобы prisma migrate не создал НЕ-deferrable версию. См. decisions.md.
+  @@index([workspaceId, order])
+  // orgId НЕ несём: тенант-инвариант замкнут транзитивно через Project, потребителя нет.
+}
+
+model FieldDefinition {
+  id          String    @id @default(cuid())
+  workspaceId String
+  key         String // стабильный (P1)
+  label       Json // LocalizedName
+  type        FieldType
+  options     Json? // для select/multiselect
+  required    Boolean   @default(false)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, key])
+}
+
+// ──────────────────────────────── PROJECT (ЛИД) ────────────────────────────
+
+model Project {
+  id          String        @id @default(cuid())
+  orgId       String
+  workspaceId String
+  phaseId     String
+  title       String
+  status      ProjectStatus @default(OPEN) // хранится, не выводится из phase (ARCHIVED + стабильность к переименованию)
+
+  value    Decimal? @db.Decimal(14, 2)
+  currency String?  @db.Char(3) // ISO-4217, валидируется Zod (не enum: ~180 валют)
+  source   String? // workspace-конфигурируемое, осознанно открытое (не enum)
+
+  companyId String?
+  ownerId   String? // единственный ответственный (инвариант "ровно один"); assignees — отдельно
+
+  fields Json @default("{}") // custom values; форма — по FieldDefinition[]; валидация — Zod
+  // range-фильтры по горячим полям → generated column + btree (raw SQL, decisions.md);
+  // произвольные поля → GIN только equality/contains, без range.
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  // Composite-FK: тенант-инвариант в БД (project.orgId == workspace.orgId)
+  workspace Workspace    @relation(fields: [workspaceId, orgId], references: [id, orgId])
+  // Composite-FK: фаза обязана быть из ЭТОГО воркспейса (существование ≠ принадлежность)
+  phase     Phase        @relation(fields: [phaseId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  company   Company?     @relation(fields: [companyId, orgId], references: [id, orgId])
+  owner     User?        @relation("ProjectOwner", fields: [ownerId], references: [id])
+
+  contacts  ProjectContact[]
+  assignees ProjectAssignee[]
+  tasks     Task[]
+  activity  ActivityEvent[]
+
+  @@unique([id, orgId]) // цель composite-FK из ProjectContact(projectId, orgId) — backbone
+  @@index([workspaceId, phaseId]) // рендер доски
+  @@index([orgId, status]) // фильтры/отчёты
+}
+
+model ProjectContact {
+  projectId String
+  contactId String
+  orgId     String // мост между двумя org-поддеревьями; composite-FK на оба конца
+  roles     String[] @default([]) // роли В СДЕЛКЕ (decision-maker, champion). Массив: человек
+  //                                 легитимно несёт неск. ролей; merge = объединение множеств
+
+  project Project @relation(fields: [projectId, orgId], references: [id, orgId], onDelete: Cascade)
+  contact Contact @relation(fields: [contactId, orgId], references: [id, orgId], onDelete: Cascade)
+
+  @@id([projectId, contactId])
+}
+
+model ProjectAssignee {
+  projectId String
+  userId    String
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, userId])
+}
+
+// ──────────────────────────── CONTACT / COMPANY ────────────────────────────
+// PII живёт ЗДЕСЬ и только здесь (следствие P1 + P3) → GDPR-erasure = тумбстон одной строки.
+
+model Contact {
+  id              String  @id @default(cuid())
+  orgId           String
+  name            String // PII
+  email           String? // PII
+  phone           String? // PII
+  emailNormalized String? // канон (lowercase/trim) под дедуп-хинт + индекс
+  companyId       String?
+
+  org      Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  company  Company?         @relation(fields: [companyId, orgId], references: [id, orgId]) // nullable composite FK: при null не проверяется (B2C ок)
+  projects ProjectContact[]
+
+  // Дедуп = advisory HINT (FR-CC-4), НЕ unique: email опционален, один email легитимно
+  // на несколько человек, merge — решение пользователя. Дубль сущности терпим.
+  @@unique([id, orgId]) // цель composite-FK из ProjectContact
+  @@index([orgId, emailNormalized])
+}
+
+model Company {
+  id               String  @id @default(cuid())
+  orgId            String
+  name             String
+  domain           String?
+  domainNormalized String? // канон (strip protocol/www) под дедуп-хинт
+  industry         String?
+
+  org      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  contacts Contact[]
+  projects Project[]
+
+  @@unique([id, orgId]) // цель composite-FK из Project/Contact
+  @@index([orgId, domainNormalized])
+}
+
+// ──────────────────────────────── TASK ─────────────────────────────────────
+// High-level PM (FR-PRJ-4): чеклист, без сабтасков/зависимостей.
+
+model Task {
+  id         String    @id @default(cuid())
+  orgId      String
+  projectId  String
+  title      String
+  done       Boolean   @default(false)
+  assigneeId String?
+  dueAt      DateTime?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+// ──────────────────────────── ACTIVITY EVENT ───────────────────────────────
+// Лента ПРОЕКТА (FR-PRJ-5) + аудит. Append-only. P2 (снапшот) + P3 (минимум) + P4 (в транзакции).
+// Org-security-аудит (права/API-ключи/membership, §11.4) → отдельный AuditLog (не здесь).
+
+model ActivityEvent {
+  id            String   @id @default(cuid())
+  orgId         String // потребитель ЕСТЬ: org/workspace-аналитика + изоляция журнала
+  projectId     String
+  type          String // таксономия ("project.moved"); замкнутый словарь в api-schemas, не enum
+  schemaVersion Int      @default(1) // форма факта историческая (P2); фронт читает все поколения
+  actorId       String? // null = система/автоматизация/ИИ
+  payload       Json // СНАПШОТ: {fromPhaseKey/Name, toPhaseKey/Name, actorName, ...} — P2+P3
+  createdAt     DateTime @default(now())
+
+  org     Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  project Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actor   User?        @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  // НЕТ живого FK на Phase: событие переживает удаление фазы (P2). Фаза — в снапшоте payload.
+
+  @@index([projectId, createdAt(sort: Desc)]) // рендер ленты
+  @@index([orgId, type, createdAt]) // аудит/аналитика org-wide
+  // Иммутабельность: отзыв UPDATE/DELETE у роли приложения — raw SQL миграцией.
+}
+
+// ──────────────────────────────── BLUEPRINT ────────────────────────────────
+// Шаблон, инстанцирующий НОВЫЙ Workspace (§7.5). Копия, не живая ссылка (FR-BP-3):
+// правки блюпринта не мутируют существующие воркспейсы.
+
+model Blueprint {
+  id         String   @id @default(cuid())
+  orgId      String? // null = системный блюпринт; иначе org-private (FR-BP-4)
+  audience   Audience
+  name       String
+  definition Json // phases + fields + pageTemplates + kbSeed + automations + notificationDefaults
+  createdAt  DateTime @default(now())
+
+  org Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================================
+//  ЗА ПРЕДЕЛАМИ ЭТОГО ФАЙЛА — приходят в своих вехах, НЕ проектировались здесь:
+//    M3: Page, KBArticle, Attachment        (rich docs / KB / файлы)
+//    M4: AiThread, Message, EmbeddingChunk   (RAG — требует pgvector)
+//    M5: ApiKey, Webhook                     (публичный API + вебхуки)
+//    M6: AuditLog                            (org-security-аудит, admin-only)
+//  Добавляем осознанно на своей вехе, а не «на всякий случай» сейчас.
+// ============================================================================
