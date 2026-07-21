@@ -14,8 +14,8 @@
       "dependsOn": ["^build"]
     },
     "test": {
-      "dependsOn": ["^build"],
-      "outputs": ["coverage/**"]
+      "dependsOn": ["^build"]
+      // outputs пока нет: покрытие не собираем. Объявишь coverage — добавь "coverage/**".
     },
     "dev": {
       "cache": false,

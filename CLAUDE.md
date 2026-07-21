@@ -121,6 +121,7 @@ manual-migration-инварианты (ниже) обязательны — па
 - `packages/db/prisma/schema.prisma` — доменная модель (источник истины)
 - `packages/db/prisma/migrations/` — миграции (raw SQL для manual-points — не давать переген)
 - `docs/decisions.md` — принципы P1–P4 + решения (почему)
+- `docs/specs/*` — реализационные спеки фич (напр. `auth.md`) — читать перед постройкой фичи
 - `packages/api-schemas/src/` — Zod-схемы (`common.ts` → `ApiResponse<T>`, `LocalizedName`)
 - `packages/config/src/` — Zod-валидированный env
 - `apps/api/src/core/pipes/zod-validation.pipe.ts` — Zod-пайп

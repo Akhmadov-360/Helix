@@ -6,6 +6,8 @@
     "build": "nest build",
     "dev": "nest start --watch",
     "start": "node dist/main.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "lint": "eslint ."
   },
@@ -27,9 +29,15 @@
     "@helix/typescript-config": "workspace:*",
     "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
+    "@nestjs/testing": "^11.0.1",
+    "@swc/core": "^1.10.1",
     "@types/express": "^5.0.0",
     "@types/node": "^22.18.9",
+    "@types/supertest": "^6.0.2",
     "eslint": "^9.39.0",
-    "typescript": "^5.9.3"
+    "supertest": "^7.0.0",
+    "typescript": "^5.9.3",
+    "unplugin-swc": "^1.5.1",
+    "vitest": "^3.0.0"
   }
 }

@@ -24,9 +24,13 @@ export const envSchema = z.object({
   S3_SECRET_KEY: z.string().optional(),
   S3_BUCKET: z.string().optional(),
 
-  // ── Auth / JWT (M2) ──────────────────────────────────────────────────────────
-  JWT_SECRET: z.string().min(1).optional(),
-  JWT_EXPIRES_IN: z.string().optional(),
+  // ── Auth / JWT (M0 — см. docs/specs/auth.md) ─────────────────────────────────
+  // ОБЯЗАТЕЛЕН: auth входит в M0. Без секрета приложение не должно подниматься —
+  // иначе отказ случится на первом логине, а не на старте (ровно то, от чего
+  // boot-time валидация и защищает). min(32) — чтобы подпись не была слабой.
+  JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),
+  // TTL access-токена. §1 спеки: ~15 мин — короткий, т.к. stateless и не отзывается.
+  JWT_EXPIRES_IN: z.string().default("15m"),
 });
 
 export type Env = z.infer<typeof envSchema>;
