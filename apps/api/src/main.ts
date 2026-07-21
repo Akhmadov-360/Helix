@@ -3,6 +3,7 @@ import "dotenv/config"; // грузим apps/api/.env ДО чтения env и �
 import { Logger } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import cookieParser from "cookie-parser";
 import { getEnv } from "@helix/config";
 import { AppModule } from "./app.module";
 
@@ -14,6 +15,8 @@ async function bootstrap(): Promise<void> {
 
   // Все контроллеры под /v1 (FR-API-1). Health остаётся на /health.
   app.setGlobalPrefix("v1", { exclude: ["health"] });
+  // Нужен, чтобы прочитать httpOnly refresh-cookie на /v1/auth/refresh.
+  app.use(cookieParser());
   app.enableShutdownHooks();
 
   const swaggerConfig = new DocumentBuilder()

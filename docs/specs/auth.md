@@ -74,43 +74,31 @@ stateful в БД. Refresh холодный → поход в БД на нём д
 ## 3. RefreshSession (новая таблица в schema.prisma)
 
 ```prisma
-enum RefreshRevocationReason {
-  LOGOUT
-  REUSE // сигнал атаки — не просто диагностика, а security-телеметрия
-  PASSWORD_CHANGED
-  ADMIN
-}
-
 model RefreshSession {
-  id              String  @id @default(cuid())
+  id              String    @id @default(cuid())
   userId          String
-  tokenHash       String  @unique // SHA-256 сырого токена (НЕ argon2 — см. ниже). UNIQUE, а не
-  //                                 просто индекс: «один токен = ровно одна строка» — инвариант БД
-  familyId        String // uuid цепочки ротаций (константа на всю цепочку)
-  lastActiveOrgId String? // для какой орги переиздавать access на refresh
+  tokenHash       String    // SHA-256 сырого refresh-токена (НЕ argon2 — см. ниже)
+  familyId        String    // uuid цепочки ротаций (константа на всю цепочку)
+  lastActiveOrgId String?   // для какой орги переиздавать access на refresh
 
   // session metadata (продуктовая фича «Настройки → Сессии»; ipAddress — PII, под retention)
   ipAddress  String?
   userAgent  String?
   deviceName String?
 
-  createdAt  DateTime  @default(now())
-  lastUsedAt DateTime? // последняя активность УСТРОЙСТВА (для UI) — НЕ то же, что usedAt
-  expiresAt  DateTime  // АБСОЛЮТНЫЙ TTL от createdAt, не скользящий
-  usedAt     DateTime? // проставляется при ротации (токен «потрачен» новым в цепочке)
-  revokedAt  DateTime? // проставляется при logout / kill-family (reuse detection)
-
-  revokedReason RefreshRevocationReason? // почему убита — для инцидент-анализа
+  createdAt DateTime  @default(now())
+  lastUsedAt DateTime?
+  expiresAt DateTime
+  usedAt    DateTime? // проставляется при ротации (токен «потрачен» новым в цепочке)
+  revokedAt DateTime? // проставляется при logout / kill-family (reuse detection)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([familyId])
+  @@index([tokenHash])
 }
 ```
-
-> Блок выше синхронизирован с `packages/db/prisma/schema.prisma` (миграция
-> `20260721094404_add_refresh_session`). При расхождении источник истины — схема.
 
 Состояние строки: **active** = `usedAt IS NULL AND revokedAt IS NULL AND expiresAt > now()`.
 
@@ -226,19 +214,55 @@ Refresh в cookie → браузер шлёт её автоматически �
 
 ## 9. Эндпоинты (`/v1/auth/*`)
 
-| Метод | Путь                  | Назначение                                                               |
-| ----- | --------------------- | ------------------------------------------------------------------------ |
-| POST  | `/v1/auth/register`   | создать User (argon2 hash пароля)                                        |
-| POST  | `/v1/auth/login`      | verify (+rehash) → выдать access + refresh(cookie); activeOrgId = дефолт |
-| POST  | `/v1/auth/refresh`    | ротация refresh → новый access + новый refresh(cookie)                   |
-| POST  | `/v1/auth/logout`     | revoke текущей RefreshSession                                            |
-| POST  | `/v1/auth/logout-all` | revoke всех сессий юзера                                                 |
-| POST  | `/v1/auth/switch-org` | сменить activeOrgId (проверка membership) → новый access                 |
-| GET   | `/v1/auth/me`         | профиль (name/email из БД, НЕ из токена)                                 |
+| Метод | Путь                  | Назначение                                                                 |
+| ----- | --------------------- | -------------------------------------------------------------------------- |
+| POST  | `/v1/auth/register`   | RegistrationService: User + личная Org + Membership(OWNER) в tx → токены   |
+| POST  | `/v1/auth/login`      | verify (+rehash) → выдать access + refresh(cookie); activeOrgId = см. §9.1 |
+| POST  | `/v1/auth/refresh`    | ротация refresh → новый access + новый refresh(cookie)                     |
+| POST  | `/v1/auth/logout`     | revoke текущей RefreshSession                                              |
+| POST  | `/v1/auth/logout-all` | revoke всех сессий юзера                                                   |
+| POST  | `/v1/auth/switch-org` | сменить activeOrgId (проверка membership) → новый access                   |
+| GET   | `/v1/auth/me`         | профиль (name/email из БД, НЕ из токена)                                   |
 
 Zod-схемы для каждого — сначала в `api-schemas` (`RegisterSchema`, `LoginSchema`, `SwitchOrgSchema`, …),
 потом импорт в контроллер (schema-first). Auth-ошибки (невалидный логин/токен) → `AllExceptionsFilter` → 401
 в едином error-конверте.
+
+### 9.1 Регистрация — application-сценарий, НЕ auth-операция
+
+Свежий User ни в одной орге не состоит → на логине `activeOrgId` брать неоткуда. Решение: **регистрация
+создаёт личную оргу** (вариант A), чтобы сирот-без-орги не существовало by construction. Это убирает
+`nullable activeOrgId` из токена/guard (иначе спецслучай-`null` протёк бы во всю систему — отвергнутый
+вариант B).
+
+**Расстановка слоёв (важно — auth НЕ создаёт бизнес-сущности):**
+
+```
+RegistrationService (application/use-case слой — оркестратор сценария):
+  tx {
+    User.create()                       ← домен
+    Organization.create() (личная)      ← домен (тенантная граница, не CRM-логика)
+    Membership.create(OWNER)            ← домен
+  } commit
+  → AuthService.issueTokens(user, activeOrgId = личная орга)   ← auth
+```
+
+- **`AuthService`** занимается ТОЛЬКО аутентификацией (пароль, токены, ротация). Получает **готового** User,
+  бизнес-сущности не создаёт.
+- **`RegistrationService`** (application service) владеет **сценарием** и **транзакционной границей**;
+  вызывает домен + auth, но сам логику не реализует — координирует.
+- Граница P4: User/Org/Membership + `RefreshSession` — в транзакции (факты-состояния); будущие эффекты
+  (welcome-email, дефолтный blueprint) — после коммита, в очередь. `RegistrationService` — правильное место
+  провести эту границу, когда эффекты появятся.
+
+**Инвариант, который это даёт:** каждый User имеет ≥1 Membership всегда (от регистрации). Нет переходного
+состояния «юзер есть, орги нет» → guard одномоделен.
+
+**`activeOrgId` на логине** (юзер может быть в неск. оргах — личная + приглашённые позже):
+`= RefreshSession.lastActiveOrgId` если есть (вернулся в последнюю активную), иначе личная орга.
+
+**Отложено (UX-слой):** онбординг «создай воркспейс / прими приглашение» (вариант C) — появится с воркспейсами
+(M1) и инвайтами (позже). На M0: логин в личную оргу, воркспейсы создаются внутри неё.
 
 ---
 
@@ -257,7 +281,8 @@ Zod-схемы для каждого — сначала в `api-schemas` (`Regis
 ## 11. Порядок реализации (инкрементально, всегда рабочая система)
 
 1. `RefreshSession` в `schema.prisma` + миграция. (User/Membership уже есть.)
-2. Регистрация (argon2 hash).
+2. **Регистрация через `RegistrationService`** (§9.1): в tx создать User (argon2 hash) + личную Organization
+   - Membership(OWNER). AuthService получает готового User. (Org/Membership уже в схеме — M0-ядро.)
 3. Логин (verify + progressive rehash).
 4. Выдача access JWT. **+ скелет JwtAuthGuard** — чтобы защитить тестовый эндпоинт и доказать, что токен
    валиден (полный ALS+membership guard — шаг 11, но минимальный нужен здесь для тестируемости шагов 5–10).

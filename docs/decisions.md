@@ -256,3 +256,17 @@ refresh; access в памяти (не localStorage) → при XSS утечёт 
 
 > Полная реализационная стратегия — `docs/specs/auth.md`. RefreshSession — auth-инфра, НЕ CRM-домен;
 > не проходила 6 проходов ревью ядра — прогнать отдельно (чистка протухших сессий, лимит сессий на юзера).
+
+**Регистрация создаёт личную оргу (вариант A), НЕ nullable activeOrgId.**
+Свежий User без орги → на логине activeOrgId брать неоткуда. Решение: регистрация создаёт личную
+Organization + Membership(OWNER) → сирот-без-орги нет by construction, activeOrgId в токене всегда заполнен,
+guard одномоделен. Отвергнут вариант B (nullable activeOrgId): спецслучай-null протёк бы во весь guard/JWT-
+контракт (две модели авторизации). Инвариант: каждый User имеет ≥1 Membership всегда.
+
+**Слои регистрации: RegistrationService оркеструет, AuthService только аутентифицирует.**
+Регистрация — application-сценарий, не auth-операция. RegistrationService держит транзакцию (User + Org +
+Membership) и вызывает AuthService.issueTokens(готовый User). AuthService НЕ создаёт бизнес-сущности —
+получает готового юзера, занимается паролем/токенами/ротацией. «Личная орга» — тенантная граница онбординга,
+не CRM-логика, поэтому auth легитимно её инициирует через домен, не размывая свою ответственность.
+Граница P4: User/Org/Membership в tx; будущие эффекты (welcome-email) — после коммита. activeOrgId на логине:
+lastActiveOrgId если есть, иначе личная орга.

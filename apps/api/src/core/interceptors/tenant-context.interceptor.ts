@@ -1,37 +1,52 @@
 import { Injectable, type CallHandler, type ExecutionContext, type NestInterceptor } from "@nestjs/common";
 import { AsyncLocalStorage } from "node:async_hooks";
+import type { Role } from "@helix/db";
 import { Observable } from "rxjs";
-import type { Request } from "express";
+import type { AuthenticatedRequest } from "../../auth/auth-context";
 
 export interface TenantContext {
-  /** null = запрос без установленного тенанта (health, публичные эндпоинты). */
+  /** null на публичных ручках (health, login, register, refresh). */
+  userId: string | null;
   orgId: string | null;
+  role: Role | null;
 }
 
-/** ALS-хранилище тенант-контекста. Data-access слой (M1) будет читать orgId отсюда. */
+const ANONYMOUS: TenantContext = { userId: null, orgId: null, role: null };
+
+/** ALS-хранилище тенант-контекста запроса. */
 export const tenantStorage = new AsyncLocalStorage<TenantContext>();
 
-/** Хелпер чтения текущего orgId (вне DI). */
-export function currentOrgId(): string | null {
-  return tenantStorage.getStore()?.orgId ?? null;
+/**
+ * Текущий тенант-контекст. Data-access слой (M1) будет скоупить по нему запросы,
+ * не прокидывая orgId через все сигнатуры вручную.
+ */
+export function currentTenant(): TenantContext {
+  return tenantStorage.getStore() ?? ANONYMOUS;
 }
 
 /**
- * ЗАГЛУШКА (M0): извлекает orgId из заголовка `x-org-id` и кладёт в ALS на время
- * запроса. В M2 источником станет аутентификация (JWT/сессия), а не заголовок.
- * Смысл сейчас — зафиксировать шов: сервисы/репозитории уже могут опираться на
- * currentOrgId(), не зная, откуда он берётся.
+ * Кладёт в ALS то, что установил JwtAuthGuard.
+ *
+ * ПОРЯДОК: в Nest guards выполняются ДО интерсепторов, поэтому к моменту вызова
+ * `request.auth` уже заполнен. Сам guard положить контекст в ALS не может — он
+ * возвращает boolean и не оборачивает выполнение handler'а, а ALS требует
+ * охватывающего вызова.
+ *
+ * На незащищённых ручках контекст анонимный: это не ошибка, а честное «тенант
+ * неизвестен» — тогда data-access слой обязан отказать, а не молча взять всё.
  */
 @Injectable()
 export class TenantContextInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
-    const req = context.switchToHttp().getRequest<Request>();
-    const header = req.headers["x-org-id"];
-    const orgId = typeof header === "string" && header.length > 0 ? header : null;
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    const auth = request.auth;
 
-    // Оборачиваем подписку в ALS-контекст, чтобы он жил на всём выполнении handler'а.
+    const tenant: TenantContext = auth
+      ? { userId: auth.userId, orgId: auth.activeOrgId, role: auth.role }
+      : ANONYMOUS;
+
     return new Observable((subscriber) => {
-      tenantStorage.run({ orgId }, () => {
+      tenantStorage.run(tenant, () => {
         const sub = next.handle().subscribe(subscriber);
         return () => {
           sub.unsubscribe();

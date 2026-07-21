@@ -1,0 +1,79 @@
+/**
+ * Доменные ошибки. О HTTP тут НЕ знают ничего — ни статусов, ни заголовков.
+ *
+ * Сервис бросает семантическую ошибку («учётные данные неверны»), а решение,
+ * какой это HTTP-код, принимает единственное место — AllExceptionsFilter.
+ * Поэтому здесь нет поля `status`: если бы ошибка несла его сама, «фильтр решает»
+ * превратилось бы в фикцию, а транспортный слой протёк бы в домен.
+ *
+ * `code` — часть КОНТРАКТА с фронтом: стабильный машиночитаемый идентификатор,
+ * по которому клиент различает причины (в отличие от `message`, который для людей
+ * и может меняться/переводиться).
+ */
+export abstract class DomainError extends Error {
+  abstract readonly code: string;
+
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    // Без этого instanceof ломается при компиляции в ES5-подобные цели и
+    // stack-трейс называет базовый класс вместо конкретного.
+    this.name = new.target.name;
+    Error.captureStackTrace?.(this, new.target);
+  }
+}
+
+/** Не установлена личность: нет токена, токен негоден, пароль не подошёл. */
+export abstract class UnauthorizedError extends DomainError {}
+
+export class InvalidCredentialsError extends UnauthorizedError {
+  readonly code = "INVALID_CREDENTIALS";
+
+  constructor() {
+    // Единый текст на «нет такого email», «неверный пароль» и «SSO-only юзер»:
+    // разный текст превратил бы ответ в оракул существования аккаунта.
+    super("Invalid email or password");
+  }
+}
+
+export class InvalidTokenError extends UnauthorizedError {
+  readonly code = "INVALID_TOKEN";
+
+  constructor(message = "Access token is missing, invalid or expired", options?: { cause?: unknown }) {
+    super(message, options);
+  }
+}
+
+/** Личность установлена, но действие не разрешено. */
+export abstract class ForbiddenError extends DomainError {}
+
+/**
+ * Юзер не состоит в организации, от имени которой пришёл запрос.
+ *
+ * Именно 403, а НЕ 401: 401 означал бы «переаутентифицируйся», клиент пошёл бы на
+ * /refresh, получил новый токен для того же lastActiveOrgId и упёрся бы в тот же
+ * отказ — бесконечный цикл. 403 честно говорит «личность в порядке, эта орга недоступна»,
+ * и клиенту остаётся switch-org или логин.
+ */
+export class NotOrgMemberError extends ForbiddenError {
+  readonly code = "NOT_ORG_MEMBER";
+
+  constructor() {
+    super("You are not a member of this organization");
+  }
+}
+
+/**
+ * Отдельный код от INVALID_TOKEN: фронту нужно различать «протух access —
+ * сходи на /refresh» и «сессия мертва — показывай форму логина». Один код на
+ * оба случая загнал бы клиент в цикл бесплодных refresh-запросов.
+ *
+ * Причина непригодности (не найден / истёк / отозван / уже потрачен) наружу
+ * НЕ раскрывается: для владельца токена разницы нет, а атакующему подсказка.
+ */
+export class InvalidRefreshTokenError extends UnauthorizedError {
+  readonly code = "INVALID_REFRESH_TOKEN";
+
+  constructor() {
+    super("Refresh session is missing, invalid or expired");
+  }
+}

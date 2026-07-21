@@ -31,6 +31,14 @@ export const envSchema = z.object({
   JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),
   // TTL access-токена. §1 спеки: ~15 мин — короткий, т.к. stateless и не отзывается.
   JWT_EXPIRES_IN: z.string().default("15m"),
+
+  /**
+   * Срок жизни refresh-сессии в днях. §3 спеки: TTL АБСОЛЮТНЫЙ (от createdAt),
+   * не скользящий — сессия живёт ровно N дней несмотря на активность, то есть
+   * перелогин раз в N дней гарантирован и токенов-долгожителей не возникает.
+   * Диапазон из §1 — 7–30 дней; берём верхнюю границу как компромисс с удобством.
+   */
+  REFRESH_TTL_DAYS: z.coerce.number().int().positive().max(90).default(30),
 });
 
 export type Env = z.infer<typeof envSchema>;

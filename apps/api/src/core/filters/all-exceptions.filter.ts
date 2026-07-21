@@ -9,6 +9,26 @@ import {
 import { Prisma } from "@helix/db";
 import { z, ZodError } from "zod";
 import type { Request, Response } from "express";
+import { DomainError, ForbiddenError, UnauthorizedError } from "../errors/domain-error";
+
+/**
+ * ЕДИНСТВЕННОЕ место, где доменная ошибка превращается в HTTP-код.
+ *
+ * Контроллеры и сервисы не думают о статусах: сервис бросает семантическую ошибку,
+ * реестр ниже решает, что это 401/403/409. Добавить новый класс — одна строка здесь
+ * плюс сам класс в core/errors.
+ *
+ * ПОРЯДОК ЗНАЧИМ: проверка идёт через instanceof сверху вниз, поэтому конкретные
+ * классы должны стоять ВЫШЕ своих предков. Регистрируем базовые классы — наследники
+ * подхватывают маппинг автоматически.
+ */
+/** `abstract new` — в реестре лежат именно АБСТРАКТНЫЕ базовые классы. */
+type DomainErrorClass = abstract new (...args: never[]) => DomainError;
+
+const DOMAIN_ERROR_STATUS: ReadonlyArray<[DomainErrorClass, HttpStatus]> = [
+  [UnauthorizedError, HttpStatus.UNAUTHORIZED],
+  [ForbiddenError, HttpStatus.FORBIDDEN],
+];
 
 interface ErrorBody {
   success: false;
@@ -57,6 +77,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
     message: string;
     details?: unknown;
   } {
+    if (exception instanceof DomainError) {
+      return {
+        status: this.statusForDomainError(exception),
+        code: exception.code,
+        message: exception.message,
+      };
+    }
+
     if (exception instanceof ZodError) {
       return {
         status: HttpStatus.BAD_REQUEST,
@@ -88,6 +116,22 @@ export class AllExceptionsFilter implements ExceptionFilter {
       code: "INTERNAL_ERROR",
       message: "Internal server error",
     };
+  }
+
+  /**
+   * Незарегистрированная доменная ошибка — это дефект: кто-то завёл класс и забыл
+   * добавить строку в реестр. Отдаём 500 (безопасный дефолт: лучше «мы сломались»,
+   * чем случайно наврать клиенту про причину) и громко пишем в лог.
+   */
+  private statusForDomainError(error: DomainError): HttpStatus {
+    for (const [errorClass, status] of DOMAIN_ERROR_STATUS) {
+      if (error instanceof errorClass) return status;
+    }
+
+    this.logger.error(
+      `Domain error ${error.name} (${error.code}) has no HTTP mapping — add it to DOMAIN_ERROR_STATUS`,
+    );
+    return HttpStatus.INTERNAL_SERVER_ERROR;
   }
 
   private mapPrisma(e: Prisma.PrismaClientKnownRequestError): {
