@@ -2,11 +2,12 @@
   "extends": "@helix/typescript-config/nestjs.json",
   "compilerOptions": {
     "outDir": "dist",
-    "rootDir": "src",
+    // rootDir живёт в tsconfig.build.json: он управляет раскладкой ЭМИТА, а этот
+    // конфиг только типизирует (noEmit) и охватывает ещё и test/.
     "declaration": false,
     "declarationMap": false,
     "types": ["node", "express"]
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "test/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

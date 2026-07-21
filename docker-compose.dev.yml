@@ -22,6 +22,27 @@ services:
       timeout: 5s
       retries: 10
 
+  # Тестовая БД: отдельный инстанс, чтобы прогон тестов (TRUNCATE в beforeEach)
+  # физически не мог задеть данные разработки. Без persistence — эфемерна by design:
+  # каждый up даёт чистую БД, состояние между прогонами не накапливается.
+  helix-test-db:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: helix
+      POSTGRES_PASSWORD: helix
+      POSTGRES_DB: helix_test
+    ports:
+      - "5434:5432"
+    tmpfs:
+      # Данные в RAM: быстрее (тесты часто пишут) и гарантированно не переживают контейнер.
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U helix -d helix_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   redis:
     image: redis:7-alpine
     restart: unless-stopped

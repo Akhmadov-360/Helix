@@ -18,6 +18,8 @@ node_modules/.prisma/
 .env
 .env.*
 !.env.example
+# .env.test — не секрет (фиктивные креды тестовой БД), коммитим ради воспроизводимости прогона
+!.env.test
 
 # logs
 *.log

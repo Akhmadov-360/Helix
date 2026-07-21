@@ -104,6 +104,7 @@ model User {
   ownedProjects    Project[]         @relation("ProjectOwner")
   assignments      ProjectAssignee[]
   activityEvents   ActivityEvent[] // виртуальная back-relation (нет колонки/FK); actorId живёт на ActivityEvent
+  refreshSessions  RefreshSession[]
 }
 
 model Membership {
@@ -348,6 +349,45 @@ model Blueprint {
   createdAt  DateTime @default(now())
 
   org Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+}
+
+// ──────────────────────────── REFRESH SESSION (AUTH, M0) ───────────────────
+// Auth-инфраструктура, НЕ CRM-домен. Stateful refresh (access — stateless JWT, в БД не лежит).
+// tokenHash = SHA-256 сырого токена (высокоэнтропийный → быстрый хеш, НЕ argon2). См. docs/specs/auth.md.
+
+enum RefreshRevocationReason {
+  LOGOUT
+  REUSE // сигнал атаки — не просто диагностика, а security-телеметрия
+  PASSWORD_CHANGED
+  ADMIN
+}
+
+model RefreshSession {
+  id              String  @id @default(cuid())
+  userId          String
+  tokenHash       String  @unique // идентификатор refresh: ищем по нему → уникален (инвариант, не просто индекс)
+  familyId        String // uuid цепочки ротаций — reuse detection убивает всю семью
+  lastActiveOrgId String? // для какой орги переиздавать access на refresh
+
+  // session metadata (продуктовая фича «Настройки → Сессии»; ipAddress — PII, под retention)
+  ipAddress  String?
+  userAgent  String?
+  deviceName String?
+
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime? // последняя активность УСТРОЙСТВА/сессии (для UI «онлайн N мин назад») — НЕ то же, что usedAt
+  expiresAt  DateTime // АБСОЛЮТНЫЙ TTL: N дней от createdAt, не скользящий (перелогин раз в N несмотря на активность)
+  usedAt     DateTime? // момент, когда ЭТОТ refresh ротирован/потрачен (смерть токена); повторный приход → reuse
+  revokedAt  DateTime? // logout / kill-family. active = usedAt IS NULL AND revokedAt IS NULL AND expiresAt > now()
+
+  revokedReason RefreshRevocationReason? // почему сессия убита — для инцидент-анализа (REUSE = атака)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  // Кандидат на составной @@index([familyId, revokedAt]) под горячий kill-family/выборку живых —
+  // НЕ добавляю без профиля запросов (преждевременная оптимизация). Держу в голове.
 }
 
 // ============================================================================

@@ -1,10 +1,10 @@
 import { PrismaClient } from "@prisma/client";
 
-// `Prisma` — namespace значений (классы ошибок: PrismaClientKnownRequestError и т.п.).
-// Реэкспортим отсюда, чтобы @helix/db оставался единственной точкой доступа к БД-слою
-// (глобальный exception filter в apps/api ловит доменные ошибки именно через него).
-export { PrismaClient, Prisma } from "@prisma/client";
-export type * from "@prisma/client";
+// Полный реэкспорт сгенерированного клиента: типы, namespace `Prisma` (классы ошибок
+// для exception filter), доменные enum'ы как ЗНАЧЕНИЯ (Role, ProjectStatus, PhaseType…)
+// и Prisma.TransactionClient для репозиториев, принимающих транзакцию (P4).
+// @helix/db остаётся единственной точкой доступа к БД-слою.
+export * from "@prisma/client";
 
 /**
  * Single PrismaClient instance for the whole process.
@@ -21,11 +21,16 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
+/**
+ * В тестах молчим: негативные сценарии (дубль email, reuse-detection) намеренно
+ * доводят запрос до ошибки БД, и лог Prisma засоряет вывод — настоящее падение
+ * теряется среди ожидаемых. Тест проверяет брошенное исключение, а не лог.
+ */
+const logLevels: Array<"warn" | "error"> =
+  process.env.NODE_ENV === "test" ? [] : process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"];
+
 export const prisma: PrismaClient =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
-  });
+  globalForPrisma.prisma ?? new PrismaClient({ log: logLevels });
 
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;
