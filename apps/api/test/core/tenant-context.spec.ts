@@ -1,7 +1,7 @@
 import type { CallHandler, ExecutionContext } from "@nestjs/common";
 import { Observable, lastValueFrom } from "rxjs";
 import { describe, expect, it } from "vitest";
-import type { AuthContext } from "../../src/auth/auth-context";
+import type { AuthContext } from "../../src/core/auth-context";
 import {
   TenantContextInterceptor,
   currentTenant,

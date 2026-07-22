@@ -1,6 +1,6 @@
 import { Controller, Get } from "@nestjs/common";
 import { ApiOkResponse, ApiTags } from "@nestjs/swagger";
-import { PrismaService } from "../core/prisma/prisma.service";
+import { PrismaService } from "../../core/prisma/prisma.service";
 
 interface HealthStatus {
   status: "ok" | "degraded";

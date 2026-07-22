@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ARGON2_POLICY, PasswordService } from "../../src/auth/password.service";
+import { ARGON2_POLICY, PasswordService } from "../../src/modules/auth/password.service";
 
 /**
  * Unit-уровень: чистая криптообвязка, без БД и сети.

@@ -6,11 +6,11 @@ import {
   InvalidRefreshTokenError,
   InvalidTokenError,
   NotOrgMemberError,
-} from "../core/errors/domain-error";
+} from "../../core/errors/domain-error";
 import { OrganizationsRepository } from "../organizations/organizations.repository";
 import { UsersRepository } from "../users/users.repository";
 import { PasswordService } from "./password.service";
-import { RefreshSessionService, type SessionMetadata } from "./refresh-session.service";
+import { RefreshSessionService, type SessionMetadata } from "./sessions/refresh-session.service";
 import { TokenService } from "./token.service";
 
 /**

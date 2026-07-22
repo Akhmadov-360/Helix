@@ -2,9 +2,9 @@ import { Body, Controller, Post, Req, Res } from "@nestjs/common";
 import { ApiCreatedResponse, ApiTags } from "@nestjs/swagger";
 import { registerSchema, type AuthResult, type RegisterInput } from "@helix/api-schemas";
 import type { Request, Response } from "express";
-import { RefreshCookieService } from "../auth/refresh-cookie.service";
-import { sessionMetadataFrom } from "../auth/refresh-session.service";
-import { ZodValidationPipe } from "../core/pipes/zod-validation.pipe";
+import { RefreshCookieService } from "../auth/sessions/refresh-cookie.service";
+import { sessionMetadataFrom } from "../auth/sessions/refresh-session.service";
+import { ZodValidationPipe } from "../../core/pipes/zod-validation.pipe";
 import { RegistrationService } from "./registration.service";
 
 /**

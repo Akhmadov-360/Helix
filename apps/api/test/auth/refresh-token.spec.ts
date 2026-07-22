@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { generateRefreshToken, hashRefreshToken } from "../../src/auth/refresh-token";
+import { generateRefreshToken, hashRefreshToken } from "../../src/modules/auth/sessions/refresh-token";
 
 describe("refresh-token", () => {
   it("каждый вызов даёт новый токен", () => {

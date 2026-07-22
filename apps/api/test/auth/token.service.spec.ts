@@ -1,7 +1,7 @@
 import { JwtService, type JwtSignOptions } from "@nestjs/jwt";
 import { describe, expect, it } from "vitest";
 import { InvalidTokenError } from "../../src/core/errors/domain-error";
-import { TokenService } from "../../src/auth/token.service";
+import { TokenService } from "../../src/modules/auth/token.service";
 
 const SECRET = "test-only-secret-not-for-production-0123456789";
 

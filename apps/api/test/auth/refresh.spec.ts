@@ -2,7 +2,7 @@ import type { INestApplication } from "@nestjs/common";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "@helix/db";
-import { REFRESH_COOKIE_NAME } from "../../src/auth/refresh-cookie.service";
+import { REFRESH_COOKIE_NAME } from "../../src/modules/auth/sessions/refresh-cookie.service";
 import { createTestApp } from "../helpers/create-test-app";
 
 const REGISTRATION = {

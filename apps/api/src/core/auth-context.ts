@@ -2,7 +2,7 @@ import { createParamDecorator, type ExecutionContext } from "@nestjs/common";
 import type { Role } from "@helix/db";
 import type { Role as ContractRole } from "@helix/api-schemas";
 import type { Request } from "express";
-import { InvalidTokenError } from "../core/errors/domain-error";
+import { InvalidTokenError } from "./errors/domain-error";
 
 /**
  * Страж от расхождения источников. `Role` объявлен дважды: в schema.prisma (домен,

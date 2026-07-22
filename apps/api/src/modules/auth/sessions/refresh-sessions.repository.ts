@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import type { Prisma, RefreshRevocationReason, RefreshSession } from "@helix/db";
-import { PrismaService } from "../core/prisma/prisma.service";
+import { PrismaService } from "../../../core/prisma/prisma.service";
 
 export interface CreateRefreshSessionData {
   userId: string;

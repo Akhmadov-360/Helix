@@ -2,7 +2,7 @@ import { Injectable, type CallHandler, type ExecutionContext, type NestIntercept
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { Role } from "@helix/db";
 import { Observable } from "rxjs";
-import type { AuthenticatedRequest } from "../../auth/auth-context";
+import type { AuthenticatedRequest } from "../auth-context";
 
 export interface TenantContext {
   /** null на публичных ручках (health, login, register, refresh). */
