@@ -3,7 +3,7 @@ import { hash as argon2Hash } from "@node-rs/argon2";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "@helix/db";
-import { ARGON2_POLICY } from "../../src/auth/password.service";
+import { ARGON2_POLICY } from "../../src/modules/auth/password.service";
 import { createTestApp } from "../helpers/create-test-app";
 
 const CREDENTIALS = {

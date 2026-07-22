@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Injectable } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
-import { InvalidTokenError } from "../core/errors/domain-error";
+import { InvalidTokenError } from "../../core/errors/domain-error";
 
 /**
  * Полезная нагрузка access-токена — МИНИМАЛЬНАЯ (§1 спеки).

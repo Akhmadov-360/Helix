@@ -2,8 +2,8 @@ import type { INestApplication } from "@nestjs/common";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "@helix/db";
-import { REFRESH_COOKIE_NAME, REFRESH_COOKIE_PATH } from "../../src/auth/refresh-cookie.service";
-import { hashRefreshToken } from "../../src/auth/refresh-token";
+import { REFRESH_COOKIE_NAME, REFRESH_COOKIE_PATH } from "../../src/modules/auth/sessions/refresh-cookie.service";
+import { hashRefreshToken } from "../../src/modules/auth/sessions/refresh-token";
 import { createTestApp } from "../helpers/create-test-app";
 
 const REGISTRATION = {

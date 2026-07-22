@@ -3,9 +3,9 @@ import { Inject, Injectable } from "@nestjs/common";
 import type { Prisma } from "@helix/db";
 import type { Env } from "@helix/config";
 import type { Request } from "express";
-import { ENV } from "../core/config/config.module";
-import { InvalidRefreshTokenError } from "../core/errors/domain-error";
-import { PrismaService } from "../core/prisma/prisma.service";
+import { ENV } from "../../../core/config/config.module";
+import { InvalidRefreshTokenError } from "../../../core/errors/domain-error";
+import { PrismaService } from "../../../core/prisma/prisma.service";
 import { RefreshSessionsRepository } from "./refresh-sessions.repository";
 import { generateRefreshToken, hashRefreshToken } from "./refresh-token";
 

@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import type { Prisma } from "@helix/db";
 import type { UserProfile } from "@helix/api-schemas";
-import { PrismaService } from "../core/prisma/prisma.service";
+import { PrismaService } from "../../core/prisma/prisma.service";
 
 /**
  * Явный select вместо возврата всей строки: `passwordHash` не должен покидать

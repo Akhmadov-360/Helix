@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import type { Env } from "@helix/config";
 import type { Response } from "express";
-import { ENV } from "../core/config/config.module";
+import { ENV } from "../../../core/config/config.module";
 
 export const REFRESH_COOKIE_NAME = "helix_refresh";
 

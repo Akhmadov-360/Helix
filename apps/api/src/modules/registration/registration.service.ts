@@ -3,8 +3,8 @@ import { Role } from "@helix/db";
 import type { RegisterInput } from "@helix/api-schemas";
 import { AuthService, type IssuedAuth } from "../auth/auth.service";
 import { PasswordService } from "../auth/password.service";
-import type { SessionMetadata } from "../auth/refresh-session.service";
-import { PrismaService } from "../core/prisma/prisma.service";
+import type { SessionMetadata } from "../auth/sessions/refresh-session.service";
+import { PrismaService } from "../../core/prisma/prisma.service";
 import { OrganizationsRepository } from "../organizations/organizations.repository";
 import { UsersRepository } from "../users/users.repository";
 

@@ -19,14 +19,14 @@ import {
   type SwitchOrgInput,
 } from "@helix/api-schemas";
 import type { Request, Response } from "express";
-import { InvalidRefreshTokenError, InvalidTokenError } from "../core/errors/domain-error";
-import { ZodValidationPipe } from "../core/pipes/zod-validation.pipe";
+import { InvalidRefreshTokenError, InvalidTokenError } from "../../core/errors/domain-error";
+import { ZodValidationPipe } from "../../core/pipes/zod-validation.pipe";
 import { UsersRepository } from "../users/users.repository";
-import { CurrentAuth, type AuthContext } from "./auth-context";
+import { CurrentAuth, type AuthContext } from "../../core/auth-context";
 import { AuthService } from "./auth.service";
 import { JwtAuthGuard } from "./jwt-auth.guard";
-import { REFRESH_COOKIE_NAME, RefreshCookieService } from "./refresh-cookie.service";
-import { sessionMetadataFrom } from "./refresh-session.service";
+import { REFRESH_COOKIE_NAME, RefreshCookieService } from "./sessions/refresh-cookie.service";
+import { sessionMetadataFrom } from "./sessions/refresh-session.service";
 
 @ApiTags("auth")
 @Controller("auth")

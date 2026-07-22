@@ -1,7 +1,7 @@
 import { Injectable, type CanActivate, type ExecutionContext } from "@nestjs/common";
-import { InvalidTokenError, NotOrgMemberError } from "../core/errors/domain-error";
+import { InvalidTokenError, NotOrgMemberError } from "../../core/errors/domain-error";
 import { OrganizationsRepository } from "../organizations/organizations.repository";
-import type { AuthenticatedRequest } from "./auth-context";
+import type { AuthenticatedRequest } from "../../core/auth-context";
 import { TokenService } from "./token.service";
 
 const BEARER_PREFIX = "Bearer ";

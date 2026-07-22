@@ -1,16 +1,16 @@
 import { Module } from "@nestjs/common";
 import { JwtModule, type JwtSignOptions } from "@nestjs/jwt";
 import type { Env } from "@helix/config";
-import { ENV } from "../core/config/config.module";
+import { ENV } from "../../core/config/config.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { UsersModule } from "../users/users.module";
 import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
 import { JwtAuthGuard } from "./jwt-auth.guard";
 import { PasswordModule } from "./password.module";
-import { RefreshCookieService } from "./refresh-cookie.service";
-import { RefreshSessionService } from "./refresh-session.service";
-import { RefreshSessionsRepository } from "./refresh-sessions.repository";
+import { RefreshCookieService } from "./sessions/refresh-cookie.service";
+import { RefreshSessionService } from "./sessions/refresh-session.service";
+import { RefreshSessionsRepository } from "./sessions/refresh-sessions.repository";
 import { TokenService } from "./token.service";
 
 @Module({

@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import type { Prisma, Role } from "@helix/db";
-import { PrismaService } from "../core/prisma/prisma.service";
+import { PrismaService } from "../../core/prisma/prisma.service";
 
 export interface OrganizationRef {
   id: string;
