@@ -3,15 +3,19 @@ import { AuthzModule } from "../../core/authz/authz.module";
 import { AuthModule } from "../auth/auth.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { PhasesModule } from "../phases/phases.module";
+import { PhasesController } from "./phases.controller";
+import { PhasesService } from "./phases.service";
 import { WorkspacesController } from "./workspaces.controller";
 import { WorkspacesRepository } from "./workspaces.repository";
 import { WorkspacesService } from "./workspaces.service";
 
-// OrganizationsModule нужен, чтобы JwtAuthGuard (используется тут через @UseGuards)
-// резолвил свою зависимость OrganizationsRepository в контексте этого модуля.
+// Фазы — часть агрегата воркспейса (создание фазы бампает version доски), поэтому
+// PhasesController/Service объявлены здесь, а не в PhasesModule (тот — чистый data-access).
+// Так зависимость идёт только workspaces → phases, без цикла модулей.
+// OrganizationsModule нужен, чтобы JwtAuthGuard резолвил OrganizationsRepository здесь.
 @Module({
   imports: [AuthModule, OrganizationsModule, PhasesModule, AuthzModule],
-  controllers: [WorkspacesController],
-  providers: [WorkspacesService, WorkspacesRepository],
+  controllers: [WorkspacesController, PhasesController],
+  providers: [WorkspacesService, WorkspacesRepository, PhasesService],
 })
 export class WorkspacesModule {}

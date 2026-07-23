@@ -38,6 +38,14 @@ export class WorkspacesRepository {
     });
   }
 
+  // version двигается при любом изменении состава/порядка фаз (§4): create/delete/reorder.
+  async bumpVersion(id: string, tx?: Prisma.TransactionClient): Promise<void> {
+    await (tx ?? this.prisma.client).workspace.update({
+      where: { id },
+      data: { version: { increment: 1 } },
+    });
+  }
+
   // Tenant-scope в самом WHERE: чужой/несуществующий id → null → 404 (§8, защита от IDOR).
   findByIdInOrg(id: string, orgId: string, tx?: Prisma.TransactionClient) {
     return (tx ?? this.prisma.client).workspace.findFirst({

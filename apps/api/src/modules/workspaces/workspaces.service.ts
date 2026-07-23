@@ -8,6 +8,7 @@ import type {
 } from "@helix/api-schemas";
 import { ResourceNotFoundError } from "../../core/errors/domain-error";
 import { PrismaService } from "../../core/prisma/prisma.service";
+import { toPhaseResponse } from "../phases/phase.mapper";
 import { PhasesRepository } from "../phases/phases.repository";
 import { WorkspacesRepository } from "./workspaces.repository";
 
@@ -28,16 +29,6 @@ interface WorkspaceRow {
   settings: Prisma.JsonValue;
   version: number;
   createdAt: Date;
-}
-
-interface PhaseRow {
-  id: string;
-  workspaceId: string;
-  key: string;
-  name: Prisma.JsonValue;
-  type: PhaseResponse["type"];
-  order: number;
-  color: string | null;
 }
 
 @Injectable()
@@ -87,18 +78,6 @@ export class WorkspacesService {
     if (!ws) throw new ResourceNotFoundError("Workspace not found");
     return toWorkspaceResponse(ws, { phases: ws.phases.map(toPhaseResponse) });
   }
-}
-
-function toPhaseResponse(p: PhaseRow): PhaseResponse {
-  return {
-    id: p.id,
-    workspaceId: p.workspaceId,
-    key: p.key,
-    name: p.name as LocalizedName, // jsonb колонка; форма гарантируется на записи через Zod
-    type: p.type,
-    order: p.order,
-    color: p.color,
-  };
 }
 
 function toWorkspaceResponse(
