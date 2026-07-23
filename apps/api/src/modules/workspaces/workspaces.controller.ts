@@ -1,8 +1,10 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import {
   createWorkspaceSchema,
+  reorderPhasesSchema,
   type CreateWorkspaceInput,
+  type ReorderPhasesInput,
   type WorkspaceResponse,
 } from "@helix/api-schemas";
 import { CurrentAuth, type AuthContext } from "../../core/auth-context";
@@ -41,5 +43,18 @@ export class WorkspacesController {
     @Param("id") id: string,
   ): Promise<WorkspaceResponse> {
     return this.workspaces.getById(auth.activeOrgId, id);
+  }
+
+  // Переупорядочивание — не создание ресурса → 200. Политика "update Phase":
+  // reorder меняет порядок фаз (O/A/M), не сам воркспейс.
+  @Post(":id/phases/reorder")
+  @HttpCode(HttpStatus.OK)
+  @CheckPolicy("update", "Phase")
+  reorderPhases(
+    @CurrentAuth() auth: AuthContext,
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(reorderPhasesSchema)) dto: ReorderPhasesInput,
+  ): Promise<WorkspaceResponse> {
+    return this.workspaces.reorderPhases(auth.activeOrgId, id, dto);
   }
 }

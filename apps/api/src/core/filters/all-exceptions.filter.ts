@@ -10,6 +10,8 @@ import { Prisma } from "@helix/db";
 import { z, ZodError } from "zod";
 import type { Request, Response } from "express";
 import {
+  BadRequestError,
+  ConflictError,
   DomainError,
   ForbiddenError,
   ResourceNotFoundError,
@@ -34,6 +36,8 @@ const DOMAIN_ERROR_STATUS: ReadonlyArray<[DomainErrorClass, HttpStatus]> = [
   [UnauthorizedError, HttpStatus.UNAUTHORIZED],
   [ForbiddenError, HttpStatus.FORBIDDEN],
   [ResourceNotFoundError, HttpStatus.NOT_FOUND],
+  [BadRequestError, HttpStatus.BAD_REQUEST],
+  [ConflictError, HttpStatus.CONFLICT],
 ];
 
 interface ErrorBody {

@@ -44,4 +44,10 @@ export class PhasesRepository {
   ): Promise<PhaseRow> {
     return (tx ?? this.prisma.client).phase.update({ where: { id }, data, select: PHASE_SELECT });
   }
+
+  // Только order — для перенумерации при reorder. Промежуточные дубли order внутри
+  // транзакции допустимы (constraint DEFERRABLE, проверяется на COMMIT).
+  async setOrder(id: string, order: number, tx?: Prisma.TransactionClient): Promise<void> {
+    await (tx ?? this.prisma.client).phase.update({ where: { id }, data: { order } });
+  }
 }

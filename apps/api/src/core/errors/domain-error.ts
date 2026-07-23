@@ -55,6 +55,36 @@ export class ResourceNotFoundError extends DomainError {
   }
 }
 
+/** Запрос корректен по форме (Zod), но нарушает бизнес-правило. */
+export abstract class BadRequestError extends DomainError {}
+
+/**
+ * Присланный набор phaseIds не совпадает с фазами воркспейса (неполный, чужие или
+ * дубли). Reorder оперирует ПОЛНЫМ порядком — частичный список неоднозначен (§3).
+ */
+export class InvalidPhaseSetError extends BadRequestError {
+  readonly code = "INCOMPLETE_PHASE_SET";
+
+  constructor() {
+    super("phaseIds must contain exactly the workspace's phases");
+  }
+}
+
+/** Конфликт состояния — оптимистическая блокировка не сошлась и т.п. */
+export abstract class ConflictError extends DomainError {}
+
+/**
+ * Клиент прислал reorder со старым version: доска изменилась под ним (§4, lost update).
+ * → refetch и повтор. Отдельный код, чтобы фронт отличал от прочих 409.
+ */
+export class WorkspaceVersionConflictError extends ConflictError {
+  readonly code = "WORKSPACE_VERSION_CONFLICT";
+
+  constructor() {
+    super("Workspace was modified concurrently; refetch and retry");
+  }
+}
+
 /** Личность установлена, но действие не разрешено. */
 export abstract class ForbiddenError extends DomainError {}
 

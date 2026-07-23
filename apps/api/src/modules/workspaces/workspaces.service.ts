@@ -4,9 +4,14 @@ import type {
   CreateWorkspaceInput,
   LocalizedName,
   PhaseResponse,
+  ReorderPhasesInput,
   WorkspaceResponse,
 } from "@helix/api-schemas";
-import { ResourceNotFoundError } from "../../core/errors/domain-error";
+import {
+  InvalidPhaseSetError,
+  ResourceNotFoundError,
+  WorkspaceVersionConflictError,
+} from "../../core/errors/domain-error";
 import { PrismaService } from "../../core/prisma/prisma.service";
 import { toPhaseResponse } from "../phases/phase.mapper";
 import { PhasesRepository } from "../phases/phases.repository";
@@ -77,6 +82,46 @@ export class WorkspacesService {
     const ws = await this.workspaces.findByIdInOrg(id, orgId);
     if (!ws) throw new ResourceNotFoundError("Workspace not found");
     return toWorkspaceResponse(ws, { phases: ws.phases.map(toPhaseResponse) });
+  }
+
+  // Reorder = ПОЛНЫЙ желаемый порядок → нормализация в плотные 1..n (§3). Один примитив
+  // на reorder/delete/import вместо инкрементальных дельт.
+  async reorderPhases(
+    orgId: string,
+    workspaceId: string,
+    input: ReorderPhasesInput,
+  ): Promise<WorkspaceResponse> {
+    const full = await this.prisma.client.$transaction(async (tx) => {
+      const ws = await this.workspaces.findByIdInOrg(workspaceId, orgId, tx);
+      if (!ws) throw new ResourceNotFoundError("Workspace not found");
+
+      // Version ПЕРЕД проверкой набора (§4): устаревший version = доска изменилась под
+      // клиентом → 409 refetch. Иначе конкурентно добавленная фаза выглядела бы как
+      // «неполный набор» (400) и клиент не понял бы, что нужно перечитать.
+      if ((await this.workspaces.bumpVersionIf(workspaceId, input.version, tx)) === 0) {
+        throw new WorkspaceVersionConflictError();
+      }
+
+      // phaseIds обязан быть ровно множеством фаз воркспейса (без дублей, без чужих).
+      const current = new Set(ws.phases.map((p) => p.id));
+      const given = input.phaseIds;
+      const sameSet =
+        given.length === current.size &&
+        new Set(given).size === given.length &&
+        given.every((id) => current.has(id));
+      if (!sameSet) throw new InvalidPhaseSetError();
+
+      // Плотные 1..n в присланном порядке. DEFERRABLE-констрейнт терпит промежуточные
+      // дубли order — проверка на COMMIT, когда порядок уже целостен.
+      for (const [index, id] of given.entries()) {
+        await this.phases.setOrder(id, index + 1, tx);
+      }
+
+      return this.workspaces.findByIdInOrg(workspaceId, orgId, tx);
+    });
+
+    if (!full) throw new ResourceNotFoundError("Workspace not found");
+    return toWorkspaceResponse(full, { phases: full.phases.map(toPhaseResponse) });
   }
 }
 

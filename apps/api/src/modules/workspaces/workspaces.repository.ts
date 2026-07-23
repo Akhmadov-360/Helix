@@ -46,6 +46,20 @@ export class WorkspacesRepository {
     });
   }
 
+  // Оптимистическая блокировка (§4): инкремент только если version совпал с ожидаемым.
+  // 0 обновлённых строк → доска изменилась под клиентом → 409.
+  async bumpVersionIf(
+    id: string,
+    expectedVersion: number,
+    tx?: Prisma.TransactionClient,
+  ): Promise<number> {
+    const { count } = await (tx ?? this.prisma.client).workspace.updateMany({
+      where: { id, version: expectedVersion },
+      data: { version: { increment: 1 } },
+    });
+    return count;
+  }
+
   // Tenant-scope в самом WHERE: чужой/несуществующий id → null → 404 (§8, защита от IDOR).
   findByIdInOrg(id: string, orgId: string, tx?: Prisma.TransactionClient) {
     return (tx ?? this.prisma.client).workspace.findFirst({
