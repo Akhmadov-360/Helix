@@ -43,6 +43,18 @@ export class InvalidTokenError extends UnauthorizedError {
   }
 }
 
+/**
+ * Ресурс не найден ИЛИ принадлежит чужой орге — намеренно неразличимо (§8 спеки):
+ * 403 на чужой ресурс подтвердил бы его существование. Оба случая → 404.
+ */
+export class ResourceNotFoundError extends DomainError {
+  readonly code = "NOT_FOUND";
+
+  constructor(message = "Resource not found") {
+    super(message);
+  }
+}
+
 /** Личность установлена, но действие не разрешено. */
 export abstract class ForbiddenError extends DomainError {}
 
