@@ -12,6 +12,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@casl/ability": "^6.7.3",
     "@helix/api-schemas": "workspace:*",
     "@helix/config": "workspace:*",
     "@helix/db": "workspace:*",

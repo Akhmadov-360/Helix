@@ -29,7 +29,7 @@ describe("Workspaces (unit B: create / list / get)", () => {
     await app.close();
   });
 
-  const create = (token: string, body: unknown) =>
+  const create = (token: string, body: Record<string, unknown>) =>
     request(app.getHttpServer()).post("/v1/workspaces").set("Authorization", `Bearer ${token}`).send(body);
 
   describe("POST /v1/workspaces", () => {

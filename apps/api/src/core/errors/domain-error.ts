@@ -74,6 +74,15 @@ export class NotOrgMemberError extends ForbiddenError {
   }
 }
 
+/** Член орги, но роль не позволяет действие (CASL-политика отказала). */
+export class ForbiddenActionError extends ForbiddenError {
+  readonly code = "FORBIDDEN";
+
+  constructor(message = "Your role does not allow this action") {
+    super(message);
+  }
+}
+
 /**
  * Отдельный код от INVALID_TOKEN: фронту нужно различать «протух access —
  * сходи на /refresh» и «сессия мертва — показывай форму логина». Один код на

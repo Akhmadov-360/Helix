@@ -6,20 +6,23 @@ import {
   type WorkspaceResponse,
 } from "@helix/api-schemas";
 import { CurrentAuth, type AuthContext } from "../../core/auth-context";
+import { CheckPolicy } from "../../core/authz/check-policy.decorator";
+import { PoliciesGuard } from "../../core/authz/policies.guard";
 import { ZodValidationPipe } from "../../core/pipes/zod-validation.pipe";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { WorkspacesService } from "./workspaces.service";
 
 // orgId берётся ТОЛЬКО из ALS-контекста (токена), никогда из тела/query — иначе
-// клиент создал бы ресурс в чужой орге (§1 спеки). Ролевое ограничение O/A/M — единица C.
+// клиент создал бы ресурс в чужой орге (§1 спеки). Ролевые ограничения — через @CheckPolicy.
 @ApiTags("workspaces")
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PoliciesGuard)
 @Controller("workspaces")
 export class WorkspacesController {
   constructor(private readonly workspaces: WorkspacesService) {}
 
   @Post()
+  @CheckPolicy("create", "Workspace")
   create(
     @CurrentAuth() auth: AuthContext,
     @Body(new ZodValidationPipe(createWorkspaceSchema)) dto: CreateWorkspaceInput,
