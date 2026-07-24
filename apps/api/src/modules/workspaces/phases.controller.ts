@@ -1,9 +1,11 @@
-import { Body, Controller, Param, Patch, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import {
   createPhaseSchema,
+  deletePhaseQuerySchema,
   updatePhaseSchema,
   type CreatePhaseInput,
+  type DeletePhaseQuery,
   type PhaseResponse,
   type UpdatePhaseInput,
 } from "@helix/api-schemas";
@@ -41,5 +43,17 @@ export class PhasesController {
     @Body(new ZodValidationPipe(updatePhaseSchema)) dto: UpdatePhaseInput,
   ): Promise<PhaseResponse> {
     return this.phases.update(auth.activeOrgId, id, dto);
+  }
+
+  // Пустая фаза → удаляется сразу; непустая без reassignTo → 409 PHASE_NOT_EMPTY.
+  @Delete("phases/:id")
+  @CheckPolicy("delete", "Phase")
+  async remove(
+    @CurrentAuth() auth: AuthContext,
+    @Param("id") id: string,
+    @Query(new ZodValidationPipe(deletePhaseQuerySchema)) query: DeletePhaseQuery,
+  ): Promise<null> {
+    await this.phases.remove(auth.activeOrgId, id, query.reassignTo);
+    return null;
   }
 }

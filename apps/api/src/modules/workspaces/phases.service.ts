@@ -1,11 +1,16 @@
 import { Injectable } from "@nestjs/common";
 import type { Prisma } from "@helix/db";
 import type { CreatePhaseInput, PhaseResponse, UpdatePhaseInput } from "@helix/api-schemas";
-import { ResourceNotFoundError } from "../../core/errors/domain-error";
+import {
+  InvalidReassignTargetError,
+  PhaseNotEmptyError,
+  ResourceNotFoundError,
+} from "../../core/errors/domain-error";
 import { PrismaService } from "../../core/prisma/prisma.service";
 import { ensureUniquePhaseKey, generatePhaseKeyBase } from "../phases/phase-key";
 import { toPhaseResponse } from "../phases/phase.mapper";
 import { PhasesRepository } from "../phases/phases.repository";
+import { ProjectsRepository } from "../projects/projects.repository";
 import { WorkspacesRepository } from "./workspaces.repository";
 
 @Injectable()
@@ -14,6 +19,7 @@ export class PhasesService {
     private readonly prisma: PrismaService,
     private readonly workspaces: WorkspacesRepository,
     private readonly phases: PhasesRepository,
+    private readonly projects: ProjectsRepository,
   ) {}
 
   // Новая фаза всегда в конец (§5): order = max+1. version++ доски (§4). Всё в транзакции —
@@ -56,5 +62,40 @@ export class PhasesService {
       color: input.color,
     });
     return toPhaseResponse(updated);
+  }
+
+  // Удаление с переносом проектов В ТОЙ ЖЕ транзакции (§6): между «перенести» и
+  // «удалить» не должно быть окна, в котором кто-то создаст лид в удаляемой фазе.
+  // onDelete: Restrict на стороне Project — страховка БД, если сервис ошибётся.
+  async remove(orgId: string, id: string, reassignTo?: string): Promise<void> {
+    await this.prisma.client.$transaction(async (tx) => {
+      const phase = await this.phases.findByIdInOrg(id, orgId, tx);
+      if (!phase) throw new ResourceNotFoundError("Phase not found");
+
+      if ((await this.projects.countByPhase(id, tx)) > 0) {
+        if (!reassignTo) {
+          const candidates = (await this.phases.listByWorkspaceOrdered(phase.workspaceId, tx))
+            .filter((p) => p.id !== id)
+            .map(toPhaseResponse);
+          throw new PhaseNotEmptyError(candidates);
+        }
+        if (reassignTo === id) throw new InvalidReassignTargetError();
+        const target = await this.phases.findByIdInOrg(reassignTo, orgId, tx);
+        if (!target || target.workspaceId !== phase.workspaceId) {
+          throw new InvalidReassignTargetError();
+        }
+        await this.projects.reassignPhase(id, reassignTo, tx);
+      }
+
+      await this.phases.delete(id, tx);
+
+      // Уплотняем оставшиеся в 1..n (удаление оставило дырку).
+      const remaining = await this.phases.listByWorkspaceOrdered(phase.workspaceId, tx);
+      for (const [index, p] of remaining.entries()) {
+        if (p.order !== index + 1) await this.phases.setOrder(p.id, index + 1, tx);
+      }
+
+      await this.workspaces.bumpVersion(phase.workspaceId, tx);
+    });
   }
 }

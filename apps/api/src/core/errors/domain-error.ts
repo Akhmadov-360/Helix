@@ -12,6 +12,8 @@
  */
 export abstract class DomainError extends Error {
   abstract readonly code: string;
+  /** Доп. данные для клиента (напр. список фаз-кандидатов при PHASE_NOT_EMPTY). */
+  readonly details?: unknown;
 
   constructor(message: string, options?: { cause?: unknown }) {
     super(message, options);
@@ -70,6 +72,15 @@ export class InvalidPhaseSetError extends BadRequestError {
   }
 }
 
+/** reassignTo не существует, из другого воркспейса или равен удаляемой фазе. */
+export class InvalidReassignTargetError extends BadRequestError {
+  readonly code = "INVALID_REASSIGN_TARGET";
+
+  constructor() {
+    super("reassignTo must be another phase of the same workspace");
+  }
+}
+
 /** Конфликт состояния — оптимистическая блокировка не сошлась и т.п. */
 export abstract class ConflictError extends DomainError {}
 
@@ -82,6 +93,18 @@ export class WorkspaceVersionConflictError extends ConflictError {
 
   constructor() {
     super("Workspace was modified concurrently; refetch and retry");
+  }
+}
+
+/**
+ * Удаляемая фаза содержит проекты, а reassignTo не передан (§6). В details —
+ * фазы-кандидаты, чтобы фронт показал выбор «куда перенести».
+ */
+export class PhaseNotEmptyError extends ConflictError {
+  readonly code = "PHASE_NOT_EMPTY";
+
+  constructor(override readonly details: unknown) {
+    super("Phase has projects; provide reassignTo to move them");
   }
 }
 

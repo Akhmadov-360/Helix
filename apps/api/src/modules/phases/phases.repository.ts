@@ -45,9 +45,21 @@ export class PhasesRepository {
     return (tx ?? this.prisma.client).phase.update({ where: { id }, data, select: PHASE_SELECT });
   }
 
-  // Только order — для перенумерации при reorder. Промежуточные дубли order внутри
-  // транзакции допустимы (constraint DEFERRABLE, проверяется на COMMIT).
+  // Только order — для перенумерации при reorder/delete. Промежуточные дубли order
+  // внутри транзакции допустимы (constraint DEFERRABLE, проверяется на COMMIT).
   async setOrder(id: string, order: number, tx?: Prisma.TransactionClient): Promise<void> {
     await (tx ?? this.prisma.client).phase.update({ where: { id }, data: { order } });
+  }
+
+  async delete(id: string, tx?: Prisma.TransactionClient): Promise<void> {
+    await (tx ?? this.prisma.client).phase.delete({ where: { id } });
+  }
+
+  listByWorkspaceOrdered(workspaceId: string, tx?: Prisma.TransactionClient): Promise<PhaseRow[]> {
+    return (tx ?? this.prisma.client).phase.findMany({
+      where: { workspaceId },
+      orderBy: { order: "asc" },
+      select: PHASE_SELECT,
+    });
   }
 }

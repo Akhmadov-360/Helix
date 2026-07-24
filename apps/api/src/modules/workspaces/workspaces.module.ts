@@ -3,6 +3,7 @@ import { AuthzModule } from "../../core/authz/authz.module";
 import { AuthModule } from "../auth/auth.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { PhasesModule } from "../phases/phases.module";
+import { ProjectsModule } from "../projects/projects.module";
 import { PhasesController } from "./phases.controller";
 import { PhasesService } from "./phases.service";
 import { WorkspacesController } from "./workspaces.controller";
@@ -14,7 +15,7 @@ import { WorkspacesService } from "./workspaces.service";
 // Так зависимость идёт только workspaces → phases, без цикла модулей.
 // OrganizationsModule нужен, чтобы JwtAuthGuard резолвил OrganizationsRepository здесь.
 @Module({
-  imports: [AuthModule, OrganizationsModule, PhasesModule, AuthzModule],
+  imports: [AuthModule, OrganizationsModule, PhasesModule, ProjectsModule, AuthzModule],
   controllers: [WorkspacesController, PhasesController],
   providers: [WorkspacesService, WorkspacesRepository, PhasesService],
 })

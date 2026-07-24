@@ -30,6 +30,19 @@ export class WorkspacesRepository {
     return (tx ?? this.prisma.client).workspace.create({ data, select: WORKSPACE_SELECT });
   }
 
+  update(
+    id: string,
+    data: { name?: string; audience?: Audience; settings?: Prisma.InputJsonValue },
+    tx?: Prisma.TransactionClient,
+  ) {
+    return (tx ?? this.prisma.client).workspace.update({ where: { id }, data, select: WORKSPACE_SELECT });
+  }
+
+  // Каскад по FK удалит фазы (Phase.workspace onDelete: Cascade).
+  async delete(id: string, tx?: Prisma.TransactionClient): Promise<void> {
+    await (tx ?? this.prisma.client).workspace.delete({ where: { id } });
+  }
+
   listByOrg(orgId: string, tx?: Prisma.TransactionClient) {
     return (tx ?? this.prisma.client).workspace.findMany({
       where: { orgId },

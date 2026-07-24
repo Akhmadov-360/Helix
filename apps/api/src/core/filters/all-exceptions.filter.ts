@@ -92,6 +92,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         status: this.statusForDomainError(exception),
         code: exception.code,
         message: exception.message,
+        details: exception.details,
       };
     }
 

@@ -5,6 +5,7 @@ import type {
   LocalizedName,
   PhaseResponse,
   ReorderPhasesInput,
+  UpdateWorkspaceInput,
   WorkspaceResponse,
 } from "@helix/api-schemas";
 import {
@@ -122,6 +123,27 @@ export class WorkspacesService {
 
     if (!full) throw new ResourceNotFoundError("Workspace not found");
     return toWorkspaceResponse(full, { phases: full.phases.map(toPhaseResponse) });
+  }
+
+  async update(orgId: string, id: string, input: UpdateWorkspaceInput): Promise<WorkspaceResponse> {
+    if (!(await this.workspaces.findByIdInOrg(id, orgId))) {
+      throw new ResourceNotFoundError("Workspace not found");
+    }
+    await this.workspaces.update(id, {
+      name: input.name,
+      audience: input.audience,
+      settings: input.settings as Prisma.InputJsonValue | undefined,
+    });
+    const full = await this.workspaces.findByIdInOrg(id, orgId);
+    if (!full) throw new ResourceNotFoundError("Workspace not found");
+    return toWorkspaceResponse(full, { phases: full.phases.map(toPhaseResponse) });
+  }
+
+  async remove(orgId: string, id: string): Promise<void> {
+    if (!(await this.workspaces.findByIdInOrg(id, orgId))) {
+      throw new ResourceNotFoundError("Workspace not found");
+    }
+    await this.workspaces.delete(id);
   }
 }
 
