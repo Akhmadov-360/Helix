@@ -4,13 +4,14 @@ import { ConfigModule } from "./core/config/config.module";
 import { PrismaModule } from "./core/prisma/prisma.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { RegistrationModule } from "./modules/registration/registration.module";
+import { WorkspacesModule } from "./modules/workspaces/workspaces.module";
 import { HealthModule } from "./modules/health/health.module";
 import { AllExceptionsFilter } from "./core/filters/all-exceptions.filter";
 import { ResponseTransformInterceptor } from "./core/interceptors/response-transform.interceptor";
 import { TenantContextInterceptor } from "./core/interceptors/tenant-context.interceptor";
 
 @Module({
-  imports: [ConfigModule, PrismaModule, AuthModule, RegistrationModule, HealthModule],
+  imports: [ConfigModule, PrismaModule, AuthModule, RegistrationModule, WorkspacesModule, HealthModule],
   providers: [
     // Глобальные cross-cutting провайдеры через APP_* (DI-friendly).
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

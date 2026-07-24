@@ -12,6 +12,8 @@
  */
 export abstract class DomainError extends Error {
   abstract readonly code: string;
+  /** Доп. данные для клиента (напр. список фаз-кандидатов при PHASE_NOT_EMPTY). */
+  readonly details?: unknown;
 
   constructor(message: string, options?: { cause?: unknown }) {
     super(message, options);
@@ -43,6 +45,69 @@ export class InvalidTokenError extends UnauthorizedError {
   }
 }
 
+/**
+ * Ресурс не найден ИЛИ принадлежит чужой орге — намеренно неразличимо (§8 спеки):
+ * 403 на чужой ресурс подтвердил бы его существование. Оба случая → 404.
+ */
+export class ResourceNotFoundError extends DomainError {
+  readonly code = "NOT_FOUND";
+
+  constructor(message = "Resource not found") {
+    super(message);
+  }
+}
+
+/** Запрос корректен по форме (Zod), но нарушает бизнес-правило. */
+export abstract class BadRequestError extends DomainError {}
+
+/**
+ * Присланный набор phaseIds не совпадает с фазами воркспейса (неполный, чужие или
+ * дубли). Reorder оперирует ПОЛНЫМ порядком — частичный список неоднозначен (§3).
+ */
+export class InvalidPhaseSetError extends BadRequestError {
+  readonly code = "INCOMPLETE_PHASE_SET";
+
+  constructor() {
+    super("phaseIds must contain exactly the workspace's phases");
+  }
+}
+
+/** reassignTo не существует, из другого воркспейса или равен удаляемой фазе. */
+export class InvalidReassignTargetError extends BadRequestError {
+  readonly code = "INVALID_REASSIGN_TARGET";
+
+  constructor() {
+    super("reassignTo must be another phase of the same workspace");
+  }
+}
+
+/** Конфликт состояния — оптимистическая блокировка не сошлась и т.п. */
+export abstract class ConflictError extends DomainError {}
+
+/**
+ * Клиент прислал reorder со старым version: доска изменилась под ним (§4, lost update).
+ * → refetch и повтор. Отдельный код, чтобы фронт отличал от прочих 409.
+ */
+export class WorkspaceVersionConflictError extends ConflictError {
+  readonly code = "WORKSPACE_VERSION_CONFLICT";
+
+  constructor() {
+    super("Workspace was modified concurrently; refetch and retry");
+  }
+}
+
+/**
+ * Удаляемая фаза содержит проекты, а reassignTo не передан (§6). В details —
+ * фазы-кандидаты, чтобы фронт показал выбор «куда перенести».
+ */
+export class PhaseNotEmptyError extends ConflictError {
+  readonly code = "PHASE_NOT_EMPTY";
+
+  constructor(override readonly details: unknown) {
+    super("Phase has projects; provide reassignTo to move them");
+  }
+}
+
 /** Личность установлена, но действие не разрешено. */
 export abstract class ForbiddenError extends DomainError {}
 
@@ -59,6 +124,15 @@ export class NotOrgMemberError extends ForbiddenError {
 
   constructor() {
     super("You are not a member of this organization");
+  }
+}
+
+/** Член орги, но роль не позволяет действие (CASL-политика отказала). */
+export class ForbiddenActionError extends ForbiddenError {
+  readonly code = "FORBIDDEN";
+
+  constructor(message = "Your role does not allow this action") {
+    super(message);
   }
 }
 

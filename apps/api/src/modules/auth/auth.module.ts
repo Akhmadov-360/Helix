@@ -44,7 +44,7 @@ import { TokenService } from "./token.service";
     RefreshCookieService,
   ],
   // AuthService нужен RegistrationService'у (§9.1: регистрация просит токены у auth),
-  // RefreshCookieService — её контроллеру, чтобы поставить ту же cookie.
-  exports: [AuthService, TokenService, RefreshCookieService],
+  // RefreshCookieService — её контроллеру; JwtAuthGuard — другим модулям (@UseGuards).
+  exports: [AuthService, TokenService, RefreshCookieService, JwtAuthGuard],
 })
 export class AuthModule {}

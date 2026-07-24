@@ -9,7 +9,14 @@ import {
 import { Prisma } from "@helix/db";
 import { z, ZodError } from "zod";
 import type { Request, Response } from "express";
-import { DomainError, ForbiddenError, UnauthorizedError } from "../errors/domain-error";
+import {
+  BadRequestError,
+  ConflictError,
+  DomainError,
+  ForbiddenError,
+  ResourceNotFoundError,
+  UnauthorizedError,
+} from "../errors/domain-error";
 
 /**
  * ЕДИНСТВЕННОЕ место, где доменная ошибка превращается в HTTP-код.
@@ -28,6 +35,9 @@ type DomainErrorClass = abstract new (...args: never[]) => DomainError;
 const DOMAIN_ERROR_STATUS: ReadonlyArray<[DomainErrorClass, HttpStatus]> = [
   [UnauthorizedError, HttpStatus.UNAUTHORIZED],
   [ForbiddenError, HttpStatus.FORBIDDEN],
+  [ResourceNotFoundError, HttpStatus.NOT_FOUND],
+  [BadRequestError, HttpStatus.BAD_REQUEST],
+  [ConflictError, HttpStatus.CONFLICT],
 ];
 
 interface ErrorBody {
@@ -82,6 +92,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         status: this.statusForDomainError(exception),
         code: exception.code,
         message: exception.message,
+        details: exception.details,
       };
     }
 

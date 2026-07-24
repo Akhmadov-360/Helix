@@ -26,17 +26,17 @@ Small agencies, studios, real-estate teams, consultancies, and B2C service busin
 
 ### 2.1 Goals
 
-|#|Goal|
-|---|---|
-|G1|Let a user spin up a working, opinionated CRM in minutes via **blueprints** (B2B / B2C).|
-|G2|Treat each lead as a **project workspace** with pages, KB, files, tasks, and contacts.|
-|G3|Provide **configurable phases** (Kanban columns) per workspace.|
-|G4|Ship **talk-to-project AI** grounded in that project's own data (RAG + tool use).|
-|G5|Enforce **RBAC** at org, workspace, and record level.|
-|G6|Notify the right people **by email** when leads arrive or change.|
-|G7|Expose a **public REST API + webhooks** so external apps can create/read leads and react to events.|
-|G8|Run **anywhere** (Docker Compose / any container host) with a **first-class AWS** reference deployment.|
-|G9|Serve both **B2C** (person-centric) and **B2B** (company-and-contacts) use cases from one data model.|
+| #   | Goal                                                                                                    |
+| --- | ------------------------------------------------------------------------------------------------------- |
+| G1  | Let a user spin up a working, opinionated CRM in minutes via **blueprints** (B2B / B2C).                |
+| G2  | Treat each lead as a **project workspace** with pages, KB, files, tasks, and contacts.                  |
+| G3  | Provide **configurable phases** (Kanban columns) per workspace.                                         |
+| G4  | Ship **talk-to-project AI** grounded in that project's own data (RAG + tool use).                       |
+| G5  | Enforce **RBAC** at org, workspace, and record level.                                                   |
+| G6  | Notify the right people **by email** when leads arrive or change.                                       |
+| G7  | Expose a **public REST API + webhooks** so external apps can create/read leads and react to events.     |
+| G8  | Run **anywhere** (Docker Compose / any container host) with a **first-class AWS** reference deployment. |
+| G9  | Serve both **B2C** (person-centric) and **B2B** (company-and-contacts) use cases from one data model.   |
 
 ### 2.2 Non-Goals (v1)
 
@@ -51,14 +51,14 @@ Small agencies, studios, real-estate teams, consultancies, and B2C service busin
 
 ## 3. Personas
 
-|Persona|Context|Primary need|
-|---|---|---|
-|**Studio owner (B2B)** — "Max"|Runs a software agency / venture studio. Wants leads → discovery → planning → contract in one place, dogfoodable.|Structure, oversight, AI summaries, contracts/files per lead.|
-|**Sales manager (B2B/B2C)** — "Dana"|Oversees a small team; assigns and reassigns leads; watches conversion.|RBAC, visibility, reassignment, reporting.|
-|**Agent / Rep** — "Sam"|Works individual leads day-to-day.|Fast lead entry, phase moves, AI drafts, file uploads.|
-|**Realtor (B2C)** — "Priya"|Person-centric leads (buyers/sellers), each a "project" from inquiry to close.|Lightweight per-person workspace, KB of listings/process.|
-|**Ops / Admin** — "Leo"|Configures workspaces, blueprints, integrations, roles.|Blueprint config, API keys, webhooks, permissions.|
-|**External system**|An accounting app, website form, Zapier/n8n flow.|Programmatic lead creation + event subscription.|
+| Persona                              | Context                                                                                                           | Primary need                                                  |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| **Studio owner (B2B)** — "Max"       | Runs a software agency / venture studio. Wants leads → discovery → planning → contract in one place, dogfoodable. | Structure, oversight, AI summaries, contracts/files per lead. |
+| **Sales manager (B2B/B2C)** — "Dana" | Oversees a small team; assigns and reassigns leads; watches conversion.                                           | RBAC, visibility, reassignment, reporting.                    |
+| **Agent / Rep** — "Sam"              | Works individual leads day-to-day.                                                                                | Fast lead entry, phase moves, AI drafts, file uploads.        |
+| **Realtor (B2C)** — "Priya"          | Person-centric leads (buyers/sellers), each a "project" from inquiry to close.                                    | Lightweight per-person workspace, KB of listings/process.     |
+| **Ops / Admin** — "Leo"              | Configures workspaces, blueprints, integrations, roles.                                                           | Blueprint config, API keys, webhooks, permissions.            |
+| **External system**                  | An accounting app, website form, Zapier/n8n flow.                                                                 | Programmatic lead creation + event subscription.              |
 
 ---
 
@@ -66,15 +66,15 @@ Small agencies, studios, real-estate teams, consultancies, and B2C service busin
 
 The requirements overload the word "project," so we fix precise terms here. The UI can still surface friendlier labels.
 
-|Term|Definition|UI label options|
-|---|---|---|
-|**Organization (Org / Tenant)**|The top-level account boundary. All data is isolated per org.|"Organization"|
-|**Workspace**|A single project-based CRM: one board, one set of phases, its own members, blueprint origin, and settings. An org can have many.|"CRM", "Pipeline", "Board", "Project-CRM"|
-|**Phase**|A configurable column/stage within a workspace (e.g., _Call Request → Discovery → Planning → Contract_).|"Phase", "Column", "Stage"|
-|**Project**|**A single lead**, rendered as a card in a phase, but backed by a full workspace of pages/KB/files/tasks/AI. This is the "lead-as-project."|"Lead", "Project", "Deal"|
-|**Contact**|A person.|"Contact"|
-|**Company**|An organization the lead belongs to (B2B).|"Company", "Account"|
-|**Blueprint**|A reusable template that instantiates a Workspace (phases + field schema + page templates + seed KB + automations + notification defaults), tagged **B2B** or **B2C**.|"Blueprint", "Template"|
+| Term                            | Definition                                                                                                                                                             | UI label options                          |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| **Organization (Org / Tenant)** | The top-level account boundary. All data is isolated per org.                                                                                                          | "Organization"                            |
+| **Workspace**                   | A single project-based CRM: one board, one set of phases, its own members, blueprint origin, and settings. An org can have many.                                       | "CRM", "Pipeline", "Board", "Project-CRM" |
+| **Phase**                       | A configurable column/stage within a workspace (e.g., _Call Request → Discovery → Planning → Contract_).                                                               | "Phase", "Column", "Stage"                |
+| **Project**                     | **A single lead**, rendered as a card in a phase, but backed by a full workspace of pages/KB/files/tasks/AI. This is the "lead-as-project."                            | "Lead", "Project", "Deal"                 |
+| **Contact**                     | A person.                                                                                                                                                              | "Contact"                                 |
+| **Company**                     | An organization the lead belongs to (B2B).                                                                                                                             | "Company", "Account"                      |
+| **Blueprint**                   | A reusable template that instantiates a Workspace (phases + field schema + page templates + seed KB + automations + notification defaults), tagged **B2B** or **B2C**. | "Blueprint", "Template"                   |
 
 > **Mapping to the requested flow.** The requirement _"'New project' → 'Start with blueprint?' → B2C/B2B → general form"_ maps to **creating a new Workspace**, because a blueprint defines _phases_, which are workspace-level. The "general project-specific form" collects the **Workspace** name and a few settings. Individual leads inside that workspace are **Projects**. (A lighter, optional "Project template" concept for pre-filling a single lead is noted in §7.5.4.)
 
@@ -203,37 +203,36 @@ Requirements use `MUST` / `SHOULD` / `MAY` (RFC-2119 sense). IDs are stable refe
 ### 7.5 Blueprints — "Start with a blueprint"
 
 - **FR-BP-1 (MUST)** Ship a library of **system blueprints**, each tagged **B2B** or **B2C**, each with a **preview** (phases, sample fields, sample pages).
-    
+
 - **FR-BP-2 (MUST)** Blueprint creation flow (matching the requested UX):
-    
-    ```
-    New Workspace
-      └─ "Start with a blueprint?"
-           ├─ No  → blank workspace (define phases yourself)
-           └─ Yes → choose "B2C" or "B2B"
-                      └─ pick a blueprint (grid of cards with previews)
-                           └─ "General form": Workspace name, currency, timezone, members
-                                └─ Instantiate: phases + field schema + page templates
-                                   + seed KB + automations + notification defaults
-    ```
-    
+
+  ```
+  New Workspace
+    └─ "Start with a blueprint?"
+         ├─ No  → blank workspace (define phases yourself)
+         └─ Yes → choose "B2C" or "B2B"
+                    └─ pick a blueprint (grid of cards with previews)
+                         └─ "General form": Workspace name, currency, timezone, members
+                              └─ Instantiate: phases + field schema + page templates
+                                 + seed KB + automations + notification defaults
+  ```
+
 - **FR-BP-3 (MUST)** Instantiating a blueprint is a **copy**, not a live link — later edits to the blueprint don't mutate existing workspaces.
-    
+
 - **FR-BP-4 (SHOULD)** Users can **save any existing Workspace as a custom blueprint** (org-private).
-    
+
 - **FR-BP-5 (MAY)** Per-lead **Project templates** (a lighter blueprint that pre-fills a single Project's pages/tasks/fields on creation).
-    
 
 **Sample system blueprints**
 
-|Audience|Blueprint|Phases|
-|---|---|---|
-|B2B|Software Agency Client Pipeline|Call Request → Discovery → Planning → Contract → Won/Lost|
-|B2B|SaaS Sales|Inbound → Qualify → Demo → Proposal → Negotiation → Closed|
-|B2B|Consulting Engagement|Intro Call → Scoping → SOW → Kickoff → Delivery|
-|B2C|Real Estate Buyer|Inquiry → Pre-qualified → Viewing → Offer → Closing|
-|B2C|Home Services|Request → Quote → Scheduled → In Progress → Paid|
-|B2C|Coaching / Wellness|Lead → Consult → Package → Onboarding → Active|
+| Audience | Blueprint                       | Phases                                                     |
+| -------- | ------------------------------- | ---------------------------------------------------------- |
+| B2B      | Software Agency Client Pipeline | Call Request → Discovery → Planning → Contract → Won/Lost  |
+| B2B      | SaaS Sales                      | Inbound → Qualify → Demo → Proposal → Negotiation → Closed |
+| B2B      | Consulting Engagement           | Intro Call → Scoping → SOW → Kickoff → Delivery            |
+| B2C      | Real Estate Buyer               | Inquiry → Pre-qualified → Viewing → Offer → Closing        |
+| B2C      | Home Services                   | Request → Quote → Scheduled → In Progress → Paid           |
+| B2C      | Coaching / Wellness             | Lead → Consult → Package → Onboarding → Active             |
 
 **Sample blueprint definition (excerpt)**
 
@@ -245,28 +244,31 @@ Requirements use `MUST` / `SHOULD` / `MAY` (RFC-2119 sense). IDs are stable refe
   "preview": { "thumbnail": "…", "summary": "Lead-gen for dev shops." },
   "phases": [
     { "key": "call_request", "name": "Call Request", "order": 1, "type": "OPEN" },
-    { "key": "discovery",     "name": "Discovery",    "order": 2, "type": "OPEN" },
-    { "key": "planning",      "name": "Planning",     "order": 3, "type": "OPEN" },
-    { "key": "contract",      "name": "Contract",     "order": 4, "type": "OPEN" },
-    { "key": "won",           "name": "Won",          "order": 5, "type": "WON" },
-    { "key": "lost",          "name": "Lost",         "order": 6, "type": "LOST" }
+    { "key": "discovery", "name": "Discovery", "order": 2, "type": "OPEN" },
+    { "key": "planning", "name": "Planning", "order": 3, "type": "OPEN" },
+    { "key": "contract", "name": "Contract", "order": 4, "type": "OPEN" },
+    { "key": "won", "name": "Won", "order": 5, "type": "WON" },
+    { "key": "lost", "name": "Lost", "order": 6, "type": "LOST" }
   ],
   "projectFields": [
-    { "key": "budget",       "label": "Budget",        "type": "currency" },
-    { "key": "tech_stack",   "label": "Preferred Stack","type": "multiselect", "options": ["TS","Python","Go"] },
-    { "key": "timeline",     "label": "Target Start",  "type": "date" }
+    { "key": "budget", "label": "Budget", "type": "currency" },
+    { "key": "tech_stack", "label": "Preferred Stack", "type": "multiselect", "options": ["TS", "Python", "Go"] },
+    { "key": "timeline", "label": "Target Start", "type": "date" }
   ],
   "pageTemplates": [
-    { "title": "Discovery Notes",  "contentJson": { "…": "…" } },
-    { "title": "Proposal Draft",   "contentJson": { "…": "…" } }
+    { "title": "Discovery Notes", "contentJson": { "…": "…" } },
+    { "title": "Proposal Draft", "contentJson": { "…": "…" } }
   ],
-  "kbSeed": [
-    { "title": "Our Delivery Process", "contentJson": { "…": "…" } }
-  ],
+  "kbSeed": [{ "title": "Our Delivery Process", "contentJson": { "…": "…" } }],
   "automations": [
-    { "on": "phase.enter", "phase": "contract", "do": "task.create", "with": { "title": "Send contract for signature" } }
+    {
+      "on": "phase.enter",
+      "phase": "contract",
+      "do": "task.create",
+      "with": { "title": "Send contract for signature" }
+    }
   ],
-  "notificationDefaults": { "newLead": { "email": true, "recipients": ["workspace_owner","assignees"] } }
+  "notificationDefaults": { "newLead": { "email": true, "recipients": ["workspace_owner", "assignees"] } }
 }
 ```
 
@@ -369,17 +371,17 @@ Format: **Actor → Preconditions → Flow → Outcome.**
 
 ## 9. Non-Functional Requirements
 
-|Category|Requirement|
-|---|---|
-|**Performance**|Board loads < 1.5s for ≤500 cards; AI first token < 2s (streamed).|
-|**Scalability**|Stateless API horizontally scalable; queues absorb email/AI/ingest spikes.|
-|**Availability**|Target 99.9% for API; graceful degradation if the AI provider is down (core CRM unaffected).|
-|**Reliability**|Async jobs are retried with backoff and dead-letter queues; webhooks retried ≥5×.|
-|**Portability**|Runs via Docker Compose on any host; no hard AWS lock-in (abstractions for storage/email/AI).|
-|**Observability**|Structured logs, request tracing, metrics, error tracking (§13).|
-|**Accessibility**|WCAG 2.1 AA for core flows; keyboard-navigable Kanban.|
-|**i18n**|Locale-ready; RTL-capable; multi-currency. (English first; architecture supports RU/UZ etc.)|
-|**Cost control**|Configurable AI model tiers; caching of embeddings; token budgets per org.|
+| Category          | Requirement                                                                                   |
+| ----------------- | --------------------------------------------------------------------------------------------- |
+| **Performance**   | Board loads < 1.5s for ≤500 cards; AI first token < 2s (streamed).                            |
+| **Scalability**   | Stateless API horizontally scalable; queues absorb email/AI/ingest spikes.                    |
+| **Availability**  | Target 99.9% for API; graceful degradation if the AI provider is down (core CRM unaffected).  |
+| **Reliability**   | Async jobs are retried with backoff and dead-letter queues; webhooks retried ≥5×.             |
+| **Portability**   | Runs via Docker Compose on any host; no hard AWS lock-in (abstractions for storage/email/AI). |
+| **Observability** | Structured logs, request tracing, metrics, error tracking (§13).                              |
+| **Accessibility** | WCAG 2.1 AA for core flows; keyboard-navigable Kanban.                                        |
+| **i18n**          | Locale-ready; RTL-capable; multi-currency. (English first; architecture supports RU/UZ etc.)  |
+| **Cost control**  | Configurable AI model tiers; caching of embeddings; token budgets per org.                    |
 
 ---
 
@@ -484,20 +486,20 @@ Queues: `email`, `ingest-embeddings`, `webhook-delivery`, `ai-tasks`, `virus-sca
 
 ### 13.2 AWS reference architecture (the "big plus")
 
-|Concern|AWS service|
-|---|---|
-|Frontend hosting|**S3 + CloudFront** (or Amplify Hosting)|
-|API compute|**ECS Fargate** (or App Runner for simplicity; EKS at scale)|
-|Database|**RDS PostgreSQL** (pgvector enabled) or Aurora PostgreSQL|
-|Cache / queues|**ElastiCache for Redis**|
-|Object storage|**S3** (SSE-KMS, presigned URLs)|
-|Email|**Amazon SES**|
-|AI / LLM + embeddings|**Amazon Bedrock** (Claude) — VPC-private, region-pinned|
-|Secrets|**Secrets Manager / SSM Parameter Store**|
-|Networking|VPC, private subnets for RDS/Redis, ALB in front of Fargate|
-|Observability|CloudWatch logs/metrics/alarms; X-Ray tracing|
-|IaC|**AWS CDK** or **Terraform**|
-|CI/CD|**GitHub Actions** → build → **ECR** → deploy Fargate; DB migrations as a task|
+| Concern               | AWS service                                                                    |
+| --------------------- | ------------------------------------------------------------------------------ |
+| Frontend hosting      | **S3 + CloudFront** (or Amplify Hosting)                                       |
+| API compute           | **ECS Fargate** (or App Runner for simplicity; EKS at scale)                   |
+| Database              | **RDS PostgreSQL** (pgvector enabled) or Aurora PostgreSQL                     |
+| Cache / queues        | **ElastiCache for Redis**                                                      |
+| Object storage        | **S3** (SSE-KMS, presigned URLs)                                               |
+| Email                 | **Amazon SES**                                                                 |
+| AI / LLM + embeddings | **Amazon Bedrock** (Claude) — VPC-private, region-pinned                       |
+| Secrets               | **Secrets Manager / SSM Parameter Store**                                      |
+| Networking            | VPC, private subnets for RDS/Redis, ALB in front of Fargate                    |
+| Observability         | CloudWatch logs/metrics/alarms; X-Ray tracing                                  |
+| IaC                   | **AWS CDK** or **Terraform**                                                   |
+| CI/CD                 | **GitHub Actions** → build → **ECR** → deploy Fargate; DB migrations as a task |
 
 ```
 [CloudFront] → S3 (web static)
@@ -526,16 +528,16 @@ Queues: `email`, `ingest-embeddings`, `webhook-delivery`, `ai-tasks`, `virus-sca
 
 ## 14. Roadmap / Milestones
 
-|Milestone|Scope|
-|---|---|
-|**M0 — Foundation**|Turborepo scaffold, auth, orgs/tenancy, Prisma+pgvector, Docker Compose, CI.|
-|**M1 — Core CRM (MVP)**|Workspaces, phases, Projects (leads-as-projects), Kanban drag-drop, contacts/companies (B2C+B2B), tasks, activity feed, **basic RBAC**.|
-|**M2 — Blueprints + Notifications**|Blueprint library + "Start with blueprint" flow, custom fields, SES email on new lead (BullMQ).|
-|**M3 — Pages, KB & Files**|TipTap pages, KB, S3/MinIO attachments, text extraction + embedding ingest.|
-|**M4 — Talk-to-Project AI**|RAG chat with citations (SSE), provider adapter incl. Bedrock, one-tap helpers.|
-|**M5 — API & Integrations**|Public REST + OpenAPI, API keys/scopes, lead-intake endpoint, signed webhooks, rate limiting.|
-|**M6 — Hardening**|Record-level visibility, custom roles, audit trail, RLS, AWS reference deploy (CDK/Terraform), observability.|
-|**v2 (post-launch)**|AI tool-use actions, workspace/org-level AI, digests, saved reports, semantic search, k8s Helm chart, mobile-optimized PWA.|
+| Milestone                           | Scope                                                                                                                                   |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **M0 — Foundation**                 | Turborepo scaffold, auth, orgs/tenancy, Prisma+pgvector, Docker Compose, CI.                                                            |
+| **M1 — Core CRM (MVP)**             | Workspaces, phases, Projects (leads-as-projects), Kanban drag-drop, contacts/companies (B2C+B2B), tasks, activity feed, **basic RBAC**. |
+| **M2 — Blueprints + Notifications** | Blueprint library + "Start with blueprint" flow, custom fields, SES email on new lead (BullMQ).                                         |
+| **M3 — Pages, KB & Files**          | TipTap pages, KB, S3/MinIO attachments, text extraction + embedding ingest.                                                             |
+| **M4 — Talk-to-Project AI**         | RAG chat with citations (SSE), provider adapter incl. Bedrock, one-tap helpers.                                                         |
+| **M5 — API & Integrations**         | Public REST + OpenAPI, API keys/scopes, lead-intake endpoint, signed webhooks, rate limiting.                                           |
+| **M6 — Hardening**                  | Record-level visibility, custom roles, audit trail, RLS, AWS reference deploy (CDK/Terraform), observability.                           |
+| **v2 (post-launch)**                | AI tool-use actions, workspace/org-level AI, digests, saved reports, semantic search, k8s Helm chart, mobile-optimized PWA.             |
 
 ---
 
@@ -560,21 +562,21 @@ Queues: `email`, `ingest-embeddings`, `webhook-delivery`, `ai-tasks`, `virus-sca
 
 ## Appendix A — Sample API surface (`/v1`)
 
-|Method|Path|Auth|Purpose|
-|---|---|---|---|
-|POST|`/v1/workspaces`|user|Create workspace (optionally `blueprintId`)|
-|GET|`/v1/workspaces/:id`|user|Get workspace + phases|
-|POST|`/v1/workspaces/:id/phases`|user|Add phase|
-|PATCH|`/v1/phases/:id`|user|Rename/reorder/recolor|
-|GET|`/v1/workspaces/:id/projects`|user|List leads (RBAC/visibility filtered)|
-|POST|`/v1/projects`|user/key|Create lead|
-|POST|`/v1/public/leads`|api-key `leads:write`|Public intake → lead + notify|
-|POST|`/v1/projects/:id/move`|user|Move to phase (fires events)|
-|POST|`/v1/projects/:id/files`|user|Get presigned upload URL|
-|POST|`/v1/projects/:id/ai/chat`|user|Talk-to-project (SSE)|
-|GET|`/v1/blueprints?audience=B2B`|user|List blueprints w/ previews|
-|POST|`/v1/api-keys`|admin|Mint scoped key|
-|POST|`/v1/webhooks`|admin|Register webhook + events|
+| Method | Path                          | Auth                  | Purpose                                     |
+| ------ | ----------------------------- | --------------------- | ------------------------------------------- |
+| POST   | `/v1/workspaces`              | user                  | Create workspace (optionally `blueprintId`) |
+| GET    | `/v1/workspaces/:id`          | user                  | Get workspace + phases                      |
+| POST   | `/v1/workspaces/:id/phases`   | user                  | Add phase                                   |
+| PATCH  | `/v1/phases/:id`              | user                  | Rename/reorder/recolor                      |
+| GET    | `/v1/workspaces/:id/projects` | user                  | List leads (RBAC/visibility filtered)       |
+| POST   | `/v1/projects`                | user/key              | Create lead                                 |
+| POST   | `/v1/public/leads`            | api-key `leads:write` | Public intake → lead + notify               |
+| POST   | `/v1/projects/:id/move`       | user                  | Move to phase (fires events)                |
+| POST   | `/v1/projects/:id/files`      | user                  | Get presigned upload URL                    |
+| POST   | `/v1/projects/:id/ai/chat`    | user                  | Talk-to-project (SSE)                       |
+| GET    | `/v1/blueprints?audience=B2B` | user                  | List blueprints w/ previews                 |
+| POST   | `/v1/api-keys`                | admin                 | Mint scoped key                             |
+| POST   | `/v1/webhooks`                | admin                 | Register webhook + events                   |
 
 **Webhook events:** `lead.created`, `lead.updated`, `lead.phase_changed`, `lead.won`, `lead.lost`, `task.created`, `task.completed`, `file.uploaded`, `contact.created`.
 
@@ -582,23 +584,23 @@ Queues: `email`, `ingest-embeddings`, `webhook-delivery`, `ai-tasks`, `virus-sca
 
 Subjects × actions (✔ = allow · △ = own/assigned only, subject to visibility scope · — = deny):
 
-|Capability|Owner|Admin|Manager|Member|Viewer|
-|---|:-:|:-:|:-:|:-:|:-:|
-|Org settings / billing|✔|—|—|—|—|
-|Manage members & roles|✔|✔|—|—|—|
-|Manage blueprints|✔|✔|—|—|—|
-|Manage API keys / webhooks|✔|✔|—|—|—|
-|Create / configure workspaces & phases|✔|✔|✔|—|—|
-|View leads|✔|✔|✔ (all)|△ (scope)|✔ (read)|
-|Create / edit leads|✔|✔|✔|△|—|
-|Move phases|✔|✔|✔|△|—|
-|Reassign leads|✔|✔|✔|—|—|
-|Upload files / edit pages|✔|✔|✔|△|—|
-|Use AI (read)|✔|✔|✔|✔|✔*|
-|AI actions (side-effecting)|✔|✔|✔|△|—|
-|Export data|✔|✔|✔|—|—|
+| Capability                             | Owner | Admin | Manager |  Member   |  Viewer  |
+| -------------------------------------- | :---: | :---: | :-----: | :-------: | :------: |
+| Org settings / billing                 |   ✔   |   —   |    —    |     —     |    —     |
+| Manage members & roles                 |   ✔   |   ✔   |    —    |     —     |    —     |
+| Manage blueprints                      |   ✔   |   ✔   |    —    |     —     |    —     |
+| Manage API keys / webhooks             |   ✔   |   ✔   |    —    |     —     |    —     |
+| Create / configure workspaces & phases |   ✔   |   ✔   |    ✔    |     —     |    —     |
+| View leads                             |   ✔   |   ✔   | ✔ (all) | △ (scope) | ✔ (read) |
+| Create / edit leads                    |   ✔   |   ✔   |    ✔    |     △     |    —     |
+| Move phases                            |   ✔   |   ✔   |    ✔    |     △     |    —     |
+| Reassign leads                         |   ✔   |   ✔   |    ✔    |     —     |    —     |
+| Upload files / edit pages              |   ✔   |   ✔   |    ✔    |     △     |    —     |
+| Use AI (read)                          |   ✔   |   ✔   |    ✔    |     ✔     |    ✔*    |
+| AI actions (side-effecting)            |   ✔   |   ✔   |    ✔    |     △     |    —     |
+| Export data                            |   ✔   |   ✔   |    ✔    |     —     |    —     |
 
-* Viewer AI access is read-only and can be disabled per org.
+- Viewer AI access is read-only and can be disabled per org.
 
 ## Appendix C — Custom field types
 
