@@ -140,8 +140,68 @@ pnpm build                                        # сборка
 ```
 
 Порты: api `3000` · web `5173` · **postgres `5433`** (не 5432 — избегаем конфликта с системным PG) ·
-redis `6379` · minio `9000/9001`. Env: `apps/api/.env` (DATABASE_URL, REDIS_URL, JWT-секреты, S3) —
-валидируется через `packages/config` на старте.
+redis `6379` · minio `9000/9001` · тестовая БД `5434` · prisma studio `5555`. Env: `apps/api/.env`
+(DATABASE_URL, REDIS_URL, JWT-секреты, S3) — валидируется через `packages/config` на старте.
+
+## Команды проекта (что и когда)
+
+Единственный источник — `package.json` каждого пакета. Ниже — что реально есть сейчас и когда применять.
+
+**Оркестрация (turbo, из корня — по всем пакетам с учётом графа):**
+
+| Команда | Что / когда |
+| --- | --- |
+| `pnpm build` | Собрать монорепо (либы → apps). Перед первым `pnpm dev` и перед показом/коммитом. |
+| `pnpm typecheck` | `tsc --noEmit` по всем. **Обязательно отдельно** — SWC/vitest типы НЕ проверяют. |
+| `pnpm lint` | ESLint (flat) по всем. |
+| `pnpm test` | turbo → vitest в `apps/api`. Требует поднятую тестовую БД (5434). |
+| `pnpm dev` | Все dev-серверы параллельно (persistent). Перед первым разом — `pnpm build`. |
+
+**Инфра (docker):**
+
+| Команда | Что / когда |
+| --- | --- |
+| `pnpm infra:up` / `pnpm infra:down` | Поднять/остановить postgres(5433)+redis+minio. `down` сохраняет тома. |
+| `docker compose -f docker-compose.dev.yml up -d helix-test-db` | Только тестовая БД (5434, эфемерная, tmpfs). |
+| `docker compose -f docker-compose.dev.yml ps` | Статус + health. |
+| `docker compose -f docker-compose.dev.yml down -v` | ⚠️ Снести **с томами** (чистый старт, стирает данные). |
+
+**БД / Prisma (после правки `schema.prisma`):**
+
+| Команда | Что / когда |
+| --- | --- |
+| `pnpm db:migrate` | Создать + применить миграцию (dev). Основная при изменении схемы. |
+| `pnpm db:generate` | Перегенерить Prisma Client. |
+| `pnpm --filter @helix/db exec prisma migrate status` | «БД в актуальном состоянии?». |
+| `pnpm --filter @helix/db migrate:deploy` | Только применить существующие (прод/CI, не создаёт новых). |
+| `pnpm --filter @helix/db studio` | GUI на данные (5555). |
+| `... prisma migrate dev --create-only --name X` | Пустая миграция под **manual-migration point** (raw SQL заполняем руками; НЕ давать prisma переген). |
+
+**apps/api (Nest):**
+
+| Команда | Что / когда |
+| --- | --- |
+| `pnpm --filter @helix/api dev` | `nest start --watch` (3000). |
+| `pnpm --filter @helix/api build` / `start` | `nest build` → `dist` / `node dist/main.js` (после build). |
+| `pnpm --filter @helix/api test` · `test:watch` | vitest run / watch. |
+| `pnpm --filter @helix/api exec vitest run test/<файл>.spec.ts` | Прогнать один спек-файл. |
+
+**apps/web (Vite):** `pnpm --filter @helix/web dev` (5173) · `build` · `preview` (прод-сборка локально).
+
+**Пакеты `db` / `api-schemas` / `config`:** `build` (tsc → `dist`), `dev` (`tsc -w`), `typecheck`, `lint`.
+`@helix/db build` дополнительно делает `prisma generate`.
+
+**Типовые цепочки:**
+
+- Первый запуск: `pnpm infra:up` → `pnpm install` → `pnpm db:migrate` → `pnpm build` → `pnpm dev`.
+- После правки схемы: `pnpm db:migrate`.
+- Перед коммитом: `pnpm typecheck && pnpm lint && pnpm test && pnpm build`.
+
+**Предупреждения:**
+
+- vitest трансформит через **SWC → типы не проверяет**; латентные type-ошибки ловит только `pnpm typecheck`.
+- Тесты бьют по БД на **5434** (не dev 5433); global-setup: `migrate deploy` + `beforeEach TRUNCATE`.
+- Перед первым `pnpm dev` — `pnpm build` (либы должны эмитить `dist`, иначе гонка на старте).
 
 ## Gotchas (пополняем по ходу)
 
