@@ -72,6 +72,22 @@ export class ProjectsController {
     return this.projects.move(auth.activeOrgId, auth.userId, id, dto);
   }
 
+  @Post("projects/:id/archive")
+  @HttpCode(HttpStatus.OK)
+  @CheckPolicy("update", "Project")
+  @ApiOkResponse({ description: "Лид отправлен в архив" })
+  archive(@CurrentAuth() auth: AuthContext, @Param("id") id: string): Promise<ProjectResponse> {
+    return this.projects.archive(auth.activeOrgId, auth.userId, id);
+  }
+
+  @Post("projects/:id/restore")
+  @HttpCode(HttpStatus.OK)
+  @CheckPolicy("update", "Project")
+  @ApiOkResponse({ description: "Лид возвращён на доску (новый ранг наверх)" })
+  restore(@CurrentAuth() auth: AuthContext, @Param("id") id: string): Promise<ProjectResponse> {
+    return this.projects.restore(auth.activeOrgId, auth.userId, id);
+  }
+
   @Get("phases/:phaseId/projects")
   @CheckPolicy("read", "Project")
   column(

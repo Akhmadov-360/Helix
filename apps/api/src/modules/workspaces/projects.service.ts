@@ -149,6 +149,57 @@ export class ProjectsService {
     return toProjectResponse(updated);
   }
 
+  // Архивация (§7): status → ARCHIVED, карточка физически остаётся в фазе (phaseId NOT NULL),
+  // из доски фильтруется (§8). Идемпотентно: повторная архивация не плодит событие.
+  async archive(orgId: string, userId: string, projectId: string): Promise<ProjectResponse> {
+    const row = await this.prisma.client.$transaction(async (tx) => {
+      const project = await this.projects.findByIdInOrg(projectId, orgId, tx);
+      if (!project) throw new ResourceNotFoundError("Project not found");
+      if (project.status === "ARCHIVED") return project;
+
+      const updated = await this.projects.updateStatus(projectId, "ARCHIVED", tx);
+      const actor = await this.users.findProfileById(userId);
+      await this.activity.record(tx, {
+        orgId,
+        projectId,
+        actorId: userId,
+        event: { type: "project.archived", schemaVersion: 1, payload: { actorName: actor?.name ?? null } },
+      });
+      return updated;
+    });
+    return toProjectResponse(row);
+  }
+
+  // Восстановление (§7.3): возвращается в свою фазу, но ВСЕГДА с новым рангом наверх —
+  // старый мог устареть после рекомпакции. status → тип фазы. Идемпотентно.
+  async restore(orgId: string, userId: string, projectId: string): Promise<ProjectResponse> {
+    const row = await this.prisma.client.$transaction(async (tx) => {
+      const project = await this.projects.findByIdInOrg(projectId, orgId, tx);
+      if (!project) throw new ResourceNotFoundError("Project not found");
+      if (project.status !== "ARCHIVED") return project;
+
+      await this.projects.lockPhase(project.phaseId, tx); // ранговая операция → лок фазы
+      const phase = await this.phases.findByIdInOrg(project.phaseId, orgId, tx);
+      if (!phase) throw new ResourceNotFoundError("Phase not found");
+
+      const rank = rankBetween(null, await this.projects.findTopRank(project.phaseId, tx));
+      const updated = await this.projects.updatePosition(
+        projectId,
+        { phaseId: project.phaseId, rank, status: statusForPhaseType(phase.type) },
+        tx,
+      );
+      const actor = await this.users.findProfileById(userId);
+      await this.activity.record(tx, {
+        orgId,
+        projectId,
+        actorId: userId,
+        event: { type: "project.restored", schemaVersion: 1, payload: { actorName: actor?.name ?? null } },
+      });
+      return updated;
+    });
+    return toProjectResponse(row);
+  }
+
   // Соседи задаются по id (§4.1). Нет соседей → наверх (§4.1, консистентно с созданием).
   private async resolveNeighbors(
     tx: Prisma.TransactionClient,

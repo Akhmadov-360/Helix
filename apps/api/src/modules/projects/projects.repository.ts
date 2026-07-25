@@ -78,6 +78,14 @@ export class ProjectsRepository {
     await (tx ?? this.prisma.client).project.update({ where: { id }, data: { rank } });
   }
 
+  updateStatus(
+    id: string,
+    status: ProjectStatus,
+    tx?: Prisma.TransactionClient,
+  ): Promise<ProjectRow> {
+    return (tx ?? this.prisma.client).project.update({ where: { id }, data: { status }, select: PROJECT_SELECT });
+  }
+
   // Все id колонки в порядке (rank, id) — для рекомпакции (§4.4).
   phaseProjectIdsOrdered(
     phaseId: string,
