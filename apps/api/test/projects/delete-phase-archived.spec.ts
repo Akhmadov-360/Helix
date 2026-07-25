@@ -46,7 +46,7 @@ describe("§12 retro: delete-phase переносит архивные прое�
 
   const archivedProject = (orgId: string, workspaceId: string, phaseId: string) =>
     prisma.project.create({
-      data: { orgId, workspaceId, phaseId, title: "Archived Lead", status: "ARCHIVED" },
+      data: { orgId, workspaceId, phaseId, title: "Archived Lead", status: "ARCHIVED", rank: "a0" },
     });
 
   it("фаза с одним архивным лидом без reassignTo → 409 + кандидаты (не выглядит пустой)", async () => {

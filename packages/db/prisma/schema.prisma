@@ -209,6 +209,11 @@ model Project {
   companyId String?
   ownerId   String? // единственный ответственный (инвариант "ровно один"); assignees — отдельно
 
+  // Строковый fractional index порядка карточек (base62, fractional-indexing). НЕ уникален
+  // (tie-break по id). Байтовая коллация COLLATE "C" — raw SQL миграцией (manual point #4),
+  // Prisma её не выражает; правка @db.VarChar сбросит коллацию молча (см. decisions.md).
+  rank String @db.VarChar(64)
+
   fields Json @default("{}") // custom values; форма — по FieldDefinition[]; валидация — Zod
   // range-фильтры по горячим полям → generated column + btree (raw SQL, decisions.md);
   // произвольные поля → GIN только equality/contains, без range.
@@ -232,6 +237,7 @@ model Project {
   @@unique([id, orgId]) // цель composite-FK из ProjectContact(projectId, orgId) — backbone
   @@index([workspaceId, phaseId]) // рендер доски
   @@index([orgId, status]) // фильтры/отчёты
+  @@index([phaseId, rank, id]) // рендер колонки + keyset-курсор (id → полный порядок при tie-break)
 }
 
 model ProjectContact {

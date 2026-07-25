@@ -46,7 +46,7 @@ describe("DELETE /v1/phases/:id", () => {
   };
 
   const addProject = (orgId: string, workspaceId: string, phaseId: string) =>
-    prisma.project.create({ data: { orgId, workspaceId, phaseId, title: "Lead" } });
+    prisma.project.create({ data: { orgId, workspaceId, phaseId, title: "Lead", rank: "a0" } });
 
   describe("пустая фаза", () => {
     it("удаляется сразу, оставшиеся уплотняются в 1..n, version++", async () => {
