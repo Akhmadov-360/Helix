@@ -81,3 +81,11 @@ export const boardResponseSchema = z.object({
   phases: z.array(boardColumnSchema),
 });
 export type BoardResponse = z.infer<typeof boardResponseSchema>;
+
+// Догрузка колонки: страница карточек + hasMore. Курсор для следующей — (rank, id)
+// последней карточки страницы (клиент берёт из неё).
+export const columnResponseSchema = z.object({
+  projects: z.array(projectResponseSchema),
+  hasMore: z.boolean(),
+});
+export type ColumnResponse = z.infer<typeof columnResponseSchema>;

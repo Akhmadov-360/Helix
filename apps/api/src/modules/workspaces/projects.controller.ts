@@ -1,6 +1,16 @@
-import { Body, Controller, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiCreatedResponse, ApiTags } from "@nestjs/swagger";
-import { createProjectSchema, type CreateProjectInput, type ProjectResponse } from "@helix/api-schemas";
+import {
+  boardQuerySchema,
+  columnQuerySchema,
+  createProjectSchema,
+  type BoardQuery,
+  type BoardResponse,
+  type ColumnQuery,
+  type ColumnResponse,
+  type CreateProjectInput,
+  type ProjectResponse,
+} from "@helix/api-schemas";
 import { CurrentAuth, type AuthContext } from "../../core/auth-context";
 import { CheckPolicy } from "../../core/authz/check-policy.decorator";
 import { PoliciesGuard } from "../../core/authz/policies.guard";
@@ -25,5 +35,25 @@ export class ProjectsController {
     @Body(new ZodValidationPipe(createProjectSchema)) dto: CreateProjectInput,
   ): Promise<ProjectResponse> {
     return this.projects.create(auth.activeOrgId, auth.userId, workspaceId, dto);
+  }
+
+  @Get("workspaces/:workspaceId/board")
+  @CheckPolicy("read", "Project")
+  board(
+    @CurrentAuth() auth: AuthContext,
+    @Param("workspaceId") workspaceId: string,
+    @Query(new ZodValidationPipe(boardQuerySchema)) query: BoardQuery,
+  ): Promise<BoardResponse> {
+    return this.projects.getBoard(auth.activeOrgId, workspaceId, query.limitPerPhase);
+  }
+
+  @Get("phases/:phaseId/projects")
+  @CheckPolicy("read", "Project")
+  column(
+    @CurrentAuth() auth: AuthContext,
+    @Param("phaseId") phaseId: string,
+    @Query(new ZodValidationPipe(columnQuerySchema)) query: ColumnQuery,
+  ): Promise<ColumnResponse> {
+    return this.projects.getColumn(auth.activeOrgId, phaseId, query);
   }
 }

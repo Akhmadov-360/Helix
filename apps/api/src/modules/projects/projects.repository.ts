@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import type { ProjectStatus as DbProjectStatus, Prisma } from "@helix/db";
+import type { Prisma, ProjectStatus as DbProjectStatus } from "@helix/db";
 import type { ProjectStatus } from "@helix/api-schemas";
 import { PrismaService } from "../../core/prisma/prisma.service";
 import type { ProjectRow } from "./project.mapper";
@@ -70,5 +70,54 @@ export class ProjectsRepository {
       select: { rank: true },
     });
     return top?.rank ?? null;
+  }
+
+  // Доска: первые N карточек КАЖДОЙ фазы одним запросом (§8). Цикл по фазам = N+1;
+  // один WHERE workspaceId = 10×500 строк. LATERAL с LIMIT на колонку — Prisma не
+  // выражает → $queryRaw (4-й выход за ORM: запрос, не DDL). Воркспейс уже проверен
+  // на принадлежность орге в сервисе, поэтому фильтр по workspaceId достаточен.
+  boardRows(workspaceId: string, limitPerPhase: number): Promise<ProjectRow[]> {
+    return this.prisma.client.$queryRaw<ProjectRow[]>`
+      SELECT p.* FROM "Phase" ph
+      CROSS JOIN LATERAL (
+        SELECT * FROM "Project"
+        WHERE "phaseId" = ph.id AND "status" <> 'ARCHIVED'
+        ORDER BY "rank", "id"
+        LIMIT ${limitPerPhase}
+      ) p
+      WHERE ph."workspaceId" = ${workspaceId}
+      ORDER BY ph."order", p."rank", p."id"
+    `;
+  }
+
+  // Счётчик карточек по фазам — отдельный COUNT (§8: из ограниченной выборки не выводится).
+  async columnTotals(workspaceId: string): Promise<Map<string, number>> {
+    const rows = await this.prisma.client.$queryRaw<Array<{ phaseId: string; total: number }>>`
+      SELECT "phaseId", COUNT(*)::int AS total FROM "Project"
+      WHERE "workspaceId" = ${workspaceId} AND "status" <> 'ARCHIVED'
+      GROUP BY "phaseId"
+    `;
+    return new Map(rows.map((r) => [r.phaseId, Number(r.total)]));
+  }
+
+  // Keyset-пагинация колонки (§8): (rank, id) > (cursor). Не OFFSET — при неуникальном
+  // ранге offset недетерминирован. Курсор null → первая страница.
+  columnPage(
+    phaseId: string,
+    cursorRank: string | null,
+    cursorId: string | null,
+    limit: number,
+  ): Promise<ProjectRow[]> {
+    return this.prisma.client.$queryRaw<ProjectRow[]>`
+      SELECT * FROM "Project"
+      WHERE "phaseId" = ${phaseId} AND "status" <> 'ARCHIVED'
+        AND (
+          ${cursorRank}::text IS NULL
+          OR "rank" > ${cursorRank}
+          OR ("rank" = ${cursorRank} AND "id" > ${cursorId})
+        )
+      ORDER BY "rank", "id"
+      LIMIT ${limit}
+    `;
   }
 }
