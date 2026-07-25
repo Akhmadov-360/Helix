@@ -13,12 +13,15 @@ import { ApiBearerAuth, ApiCreatedResponse, ApiTags } from "@nestjs/swagger";
 import {
   contactQuerySchema,
   createContactSchema,
+  dedupCheckSchema,
   updateContactSchema,
   type ContactListResponse,
   type ContactQuery,
   type ContactResponse,
   type CreateContactInput,
   type CreateContactResponse,
+  type DedupCheckQuery,
+  type DedupHint,
   type UpdateContactInput,
 } from "@helix/api-schemas";
 import { CurrentAuth, type AuthContext } from "../../core/auth-context";
@@ -53,6 +56,16 @@ export class ContactsController {
     @Query(new ZodValidationPipe(contactQuerySchema)) query: ContactQuery,
   ): Promise<ContactListResponse> {
     return this.contacts.list(auth.activeOrgId, query);
+  }
+
+  // ВАЖНО: объявлено ДО GET :id, иначе "dedup-check" перехватится как :id (порядок роутов).
+  @Get("dedup-check")
+  @CheckPolicy("create", "Contact")
+  dedupCheck(
+    @CurrentAuth() auth: AuthContext,
+    @Query(new ZodValidationPipe(dedupCheckSchema)) query: DedupCheckQuery,
+  ): Promise<DedupHint> {
+    return this.contacts.dedupCheck(auth.activeOrgId, query.email);
   }
 
   @Get(":id")

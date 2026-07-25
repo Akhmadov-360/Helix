@@ -5,6 +5,7 @@ import type {
   ContactResponse,
   CreateContactInput,
   CreateContactResponse,
+  DedupHint,
   UpdateContactInput,
 } from "@helix/api-schemas";
 import { ResourceNotFoundError } from "../../core/errors/domain-error";
@@ -16,18 +17,39 @@ import { normalizeEmail } from "./normalize";
 export class ContactsService {
   constructor(private readonly contacts: ContactsRepository) {}
 
-  // POST → контакт + dedupHint (§4.2). Хинт-lookup подключается в единице 6; форма ответа
-  // ({contact, dedupHint}) фиксируется здесь, чтобы контракт не менялся между единицами.
+  // POST → контакт + dedupHint (§4.2). Кандидаты ищутся ДО создания (существующие дубли),
+  // поэтому новый контакт не попадает в собственный хинт. Не блокируем — решение за оператором.
   async create(orgId: string, input: CreateContactInput): Promise<CreateContactResponse> {
+    const emailNormalized = normalizeEmail(input.email);
+    const dedupHint = await this.dedupByNormalized(orgId, emailNormalized);
     const row = await this.contacts.create({
       orgId,
       name: input.name,
       email: input.email,
-      emailNormalized: normalizeEmail(input.email),
+      emailNormalized,
       phone: input.phone,
       companyId: input.companyId,
     });
-    return { contact: toContactResponse(row), dedupHint: { candidates: [] } };
+    return { contact: toContactResponse(row), dedupHint };
+  }
+
+  // Явная проверка перед сохранением (§4.2): кандидаты по email, ничего не создаёт.
+  async dedupCheck(orgId: string, email: string): Promise<DedupHint> {
+    return this.dedupByNormalized(orgId, normalizeEmail(email));
+  }
+
+  // email пуст → канон null → в дедупе не участвует (§4.2), пустой хинт без запроса.
+  private async dedupByNormalized(orgId: string, emailNormalized: string | null): Promise<DedupHint> {
+    if (emailNormalized === null) return { candidates: [] };
+    const rows = await this.contacts.findDedupCandidates(orgId, emailNormalized);
+    return {
+      candidates: rows.map((c) => ({
+        id: c.id,
+        name: c.name,
+        email: c.email,
+        ...(c.company ? { companyName: c.company.name } : {}),
+      })),
+    };
   }
 
   async list(orgId: string, query: ContactQuery): Promise<ContactListResponse> {

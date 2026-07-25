@@ -44,6 +44,22 @@ export class ContactsRepository {
     return (tx ?? this.prisma.client).contact.findFirst({ where: { id, orgId }, select: CONTACT_SELECT });
   }
 
+  // Дедуп-lookup (§4.2): активные контакты орги с тем же emailNormalized. Индекс
+  // [orgId, emailNormalized] покрывает. mergedIntoId IS NULL — тумбстоны не кандидаты.
+  // companyName денормализуем сразу (§3 DedupHint) — без второго запроса на фронте.
+  // Не транзакционно (§4.2 by design). limit 20 — хинт, не полный список.
+  findDedupCandidates(
+    orgId: string,
+    emailNormalized: string,
+  ): Promise<Array<{ id: string; name: string; email: string | null; company: { name: string } | null }>> {
+    return this.prisma.client.contact.findMany({
+      where: { orgId, emailNormalized, mergedIntoId: null },
+      select: { id: true, name: true, email: true, company: { select: { name: true } } },
+      orderBy: { id: "asc" },
+      take: 20,
+    });
+  }
+
   // Keyset по id (§2). Смёрженные (тумбстоны) скрыты. q — по name/email (insensitive),
   // companyId — фильтр по компании.
   listByOrg(
