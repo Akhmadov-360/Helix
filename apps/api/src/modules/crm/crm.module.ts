@@ -5,12 +5,15 @@ import { OrganizationsModule } from "../organizations/organizations.module";
 import { CompaniesController } from "./companies.controller";
 import { CompaniesRepository } from "./companies.repository";
 import { CompaniesService } from "./companies.service";
+import { ContactsController } from "./contacts.controller";
+import { ContactsRepository } from "./contacts.repository";
+import { ContactsService } from "./contacts.service";
 
 // CRM: справочник контактов и компаний (org-scoped). AuthModule → JwtAuthGuard,
 // OrganizationsModule → его зависимость (резолв роли), AuthzModule → PoliciesGuard.
 @Module({
   imports: [AuthModule, OrganizationsModule, AuthzModule],
-  controllers: [CompaniesController],
-  providers: [CompaniesService, CompaniesRepository],
+  controllers: [CompaniesController, ContactsController],
+  providers: [CompaniesService, CompaniesRepository, ContactsService, ContactsRepository],
 })
 export class CrmModule {}

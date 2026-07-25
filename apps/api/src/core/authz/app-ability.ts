@@ -38,6 +38,16 @@ export function defineAbilityForRole(role: Role): AppAbility {
       can("update", "Contact");
       break;
     case "MEMBER":
+      can("read", "Workspace");
+      can("read", "Phase");
+      can("read", "Project");
+      can("read", "Company");
+      // Контакты — общая адресная книга (contacts.md §10): Member заводит и правит контакты,
+      // но НЕ удаляет и НЕ мёржит (delete/merge = O/A). Компании create/update Member не может (§2).
+      can("read", "Contact");
+      can("create", "Contact");
+      can("update", "Contact");
+      break;
     case "VIEWER":
       can("read", "Workspace");
       can("read", "Phase");
