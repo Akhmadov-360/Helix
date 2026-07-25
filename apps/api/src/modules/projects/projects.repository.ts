@@ -62,6 +62,40 @@ export class ProjectsRepository {
     return (tx ?? this.prisma.client).project.create({ data, select: PROJECT_SELECT });
   }
 
+  findByIdInOrg(id: string, orgId: string, tx?: Prisma.TransactionClient): Promise<ProjectRow | null> {
+    return (tx ?? this.prisma.client).project.findFirst({ where: { id, orgId }, select: PROJECT_SELECT });
+  }
+
+  updatePosition(
+    id: string,
+    data: { phaseId: string; rank: string; status: ProjectStatus },
+    tx?: Prisma.TransactionClient,
+  ): Promise<ProjectRow> {
+    return (tx ?? this.prisma.client).project.update({ where: { id }, data, select: PROJECT_SELECT });
+  }
+
+  async setRank(id: string, rank: string, tx?: Prisma.TransactionClient): Promise<void> {
+    await (tx ?? this.prisma.client).project.update({ where: { id }, data: { rank } });
+  }
+
+  // Все id колонки в порядке (rank, id) — для рекомпакции (§4.4).
+  phaseProjectIdsOrdered(
+    phaseId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Array<{ id: string }>> {
+    return (tx ?? this.prisma.client).project.findMany({
+      where: { phaseId },
+      orderBy: [{ rank: "asc" }, { id: "asc" }],
+      select: { id: true },
+    });
+  }
+
+  // Advisory xact-lock на фазу (§4.3): namespace 4242 разводит от коллизий hashtext
+  // между разными фазами. Освобождается на commit/rollback.
+  async lockPhase(phaseId: string, tx: Prisma.TransactionClient): Promise<void> {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(4242, hashtext(${phaseId}))`;
+  }
+
   // Верхний (минимальный) ранг колонки — для вставки нового лида наверх (§3.3).
   async findTopRank(phaseId: string, tx?: Prisma.TransactionClient): Promise<string | null> {
     const top = await (tx ?? this.prisma.client).project.findFirst({

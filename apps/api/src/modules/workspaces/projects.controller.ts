@@ -1,14 +1,26 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
-import { ApiBearerAuth, ApiCreatedResponse, ApiTags } from "@nestjs/swagger";
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from "@nestjs/common";
+import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import {
   boardQuerySchema,
   columnQuerySchema,
   createProjectSchema,
+  moveProjectSchema,
   type BoardQuery,
   type BoardResponse,
   type ColumnQuery,
   type ColumnResponse,
   type CreateProjectInput,
+  type MoveProjectInput,
   type ProjectResponse,
 } from "@helix/api-schemas";
 import { CurrentAuth, type AuthContext } from "../../core/auth-context";
@@ -45,6 +57,19 @@ export class ProjectsController {
     @Query(new ZodValidationPipe(boardQuerySchema)) query: BoardQuery,
   ): Promise<BoardResponse> {
     return this.projects.getBoard(auth.activeOrgId, workspaceId, query.limitPerPhase);
+  }
+
+  // Смена фазы/позиции — не создание → 200. Политика update Project (O/A/M).
+  @Post("projects/:id/move")
+  @HttpCode(HttpStatus.OK)
+  @CheckPolicy("update", "Project")
+  @ApiOkResponse({ description: "Карточка перемещена (фаза/позиция)" })
+  move(
+    @CurrentAuth() auth: AuthContext,
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(moveProjectSchema)) dto: MoveProjectInput,
+  ): Promise<ProjectResponse> {
+    return this.projects.move(auth.activeOrgId, auth.userId, id, dto);
   }
 
   @Get("phases/:phaseId/projects")
