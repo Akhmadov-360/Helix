@@ -279,6 +279,8 @@ model Contact {
   emailNormalized String? // канон (lowercase/trim) под дедуп-хинт + индекс
   companyId       String?
   mergedIntoId    String? // D1 (§7.3): NULL = активный; заполнен = смёржен в этот target
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   org      Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
   // D3 (§6): SetNull — распустили компанию, люди остались. ⚠ composite-FK + orgId NOT NULL → §9.1.
@@ -302,6 +304,8 @@ model Company {
   domain           String?
   domainNormalized String? // канон (strip protocol/www) под дедуп-хинт
   industry         String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   org      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   contacts Contact[]
