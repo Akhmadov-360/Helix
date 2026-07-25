@@ -86,6 +86,27 @@ export class ProjectsRepository {
     return (tx ?? this.prisma.client).project.update({ where: { id }, data: { status }, select: PROJECT_SELECT });
   }
 
+  // PATCH: только редактируемые поля (не phaseId/rank/status — их меняет move/archive).
+  updateFields(
+    id: string,
+    data: {
+      title?: string;
+      value?: number;
+      currency?: string;
+      source?: string;
+      companyId?: string;
+      ownerId?: string;
+    },
+    tx?: Prisma.TransactionClient,
+  ): Promise<ProjectRow> {
+    return (tx ?? this.prisma.client).project.update({ where: { id }, data, select: PROJECT_SELECT });
+  }
+
+  async delete(id: string, tx?: Prisma.TransactionClient): Promise<void> {
+    // Каскад: Task, ActivityEvent (onDelete: Cascade со стороны Project).
+    await (tx ?? this.prisma.client).project.delete({ where: { id } });
+  }
+
   // Все id колонки в порядке (rank, id) — для рекомпакции (§4.4).
   phaseProjectIdsOrdered(
     phaseId: string,

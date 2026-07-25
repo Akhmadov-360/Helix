@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import type { PhaseType } from "@helix/db";
 import type { Prisma } from "@helix/db";
 import type {
+  ActivityEventResponse,
   BoardResponse,
   ColumnQuery,
   ColumnResponse,
@@ -10,6 +11,7 @@ import type {
   MoveProjectInput,
   ProjectResponse,
   ProjectStatus,
+  UpdateProjectInput,
 } from "@helix/api-schemas";
 import {
   ResourceNotFoundError,
@@ -18,6 +20,7 @@ import {
 } from "../../core/errors/domain-error";
 import { PrismaService } from "../../core/prisma/prisma.service";
 import { ActivityRecorder } from "../activity/activity-recorder";
+import { ActivityRepository } from "../activity/activity.repository";
 import { toPhaseResponse } from "../phases/phase.mapper";
 import { PhasesRepository } from "../phases/phases.repository";
 import { toProjectResponse } from "../projects/project.mapper";
@@ -43,7 +46,71 @@ export class ProjectsService {
     private readonly projects: ProjectsRepository,
     private readonly users: UsersRepository,
     private readonly activity: ActivityRecorder,
+    private readonly activityLog: ActivityRepository,
   ) {}
+
+  async getById(orgId: string, projectId: string): Promise<ProjectResponse> {
+    const project = await this.projects.findByIdInOrg(projectId, orgId);
+    if (!project) throw new ResourceNotFoundError("Project not found");
+    return toProjectResponse(project);
+  }
+
+  // PATCH: редактируемые поля. status/phaseId/rank не принимаются (отсечены схемой).
+  // Событие project.updated — только на ЗНАЧИМЫЕ поля (value, owner) — §6.3.
+  async update(
+    orgId: string,
+    userId: string,
+    projectId: string,
+    input: UpdateProjectInput,
+  ): Promise<ProjectResponse> {
+    const row = await this.prisma.client.$transaction(async (tx) => {
+      const before = await this.projects.findByIdInOrg(projectId, orgId, tx);
+      if (!before) throw new ResourceNotFoundError("Project not found");
+
+      const updated = await this.projects.updateFields(projectId, input, tx);
+
+      const changed: string[] = [];
+      if (input.value !== undefined && Number(before.value ?? NaN) !== input.value) changed.push("value");
+      if (input.ownerId !== undefined && before.ownerId !== input.ownerId) changed.push("owner");
+      if (changed.length > 0) {
+        const actor = await this.users.findProfileById(userId);
+        await this.activity.record(tx, {
+          orgId,
+          projectId,
+          actorId: userId,
+          event: {
+            type: "project.updated",
+            schemaVersion: 1,
+            payload: { changed, actorName: actor?.name ?? null },
+          },
+        });
+      }
+      return updated;
+    });
+    return toProjectResponse(row);
+  }
+
+  async remove(orgId: string, projectId: string): Promise<void> {
+    const project = await this.projects.findByIdInOrg(projectId, orgId);
+    if (!project) throw new ResourceNotFoundError("Project not found");
+    await this.projects.delete(projectId);
+  }
+
+  // Лента проекта (§6). Tenant-скоуп: сначала проверяем проект по орге (404), затем события.
+  async getActivity(orgId: string, projectId: string): Promise<ActivityEventResponse[]> {
+    const project = await this.projects.findByIdInOrg(projectId, orgId);
+    if (!project) throw new ResourceNotFoundError("Project not found");
+
+    const events = await this.activityLog.listByProject(projectId);
+    return events.map((e) => ({
+      id: e.id,
+      type: e.type,
+      schemaVersion: e.schemaVersion,
+      actorId: e.actorId,
+      payload: e.payload,
+      createdAt: e.createdAt.toISOString(),
+    }));
+  }
 
   // Доска: фазы + первые N карточек каждой (§8). Воркспейс проверяем на принадлежность
   // орге ЗДЕСЬ (404), дальше raw-запрос по workspaceId уже безопасен.

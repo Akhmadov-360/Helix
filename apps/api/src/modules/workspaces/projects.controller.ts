@@ -1,10 +1,12 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -15,6 +17,8 @@ import {
   columnQuerySchema,
   createProjectSchema,
   moveProjectSchema,
+  updateProjectSchema,
+  type ActivityEventResponse,
   type BoardQuery,
   type BoardResponse,
   type ColumnQuery,
@@ -22,6 +26,7 @@ import {
   type CreateProjectInput,
   type MoveProjectInput,
   type ProjectResponse,
+  type UpdateProjectInput,
 } from "@helix/api-schemas";
 import { CurrentAuth, type AuthContext } from "../../core/auth-context";
 import { CheckPolicy } from "../../core/authz/check-policy.decorator";
@@ -96,5 +101,38 @@ export class ProjectsController {
     @Query(new ZodValidationPipe(columnQuerySchema)) query: ColumnQuery,
   ): Promise<ColumnResponse> {
     return this.projects.getColumn(auth.activeOrgId, phaseId, query);
+  }
+
+  @Get("projects/:id")
+  @CheckPolicy("read", "Project")
+  getById(@CurrentAuth() auth: AuthContext, @Param("id") id: string): Promise<ProjectResponse> {
+    return this.projects.getById(auth.activeOrgId, id);
+  }
+
+  @Get("projects/:id/activity")
+  @CheckPolicy("read", "Project")
+  activity(
+    @CurrentAuth() auth: AuthContext,
+    @Param("id") id: string,
+  ): Promise<ActivityEventResponse[]> {
+    return this.projects.getActivity(auth.activeOrgId, id);
+  }
+
+  @Patch("projects/:id")
+  @CheckPolicy("update", "Project")
+  update(
+    @CurrentAuth() auth: AuthContext,
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(updateProjectSchema)) dto: UpdateProjectInput,
+  ): Promise<ProjectResponse> {
+    return this.projects.update(auth.activeOrgId, auth.userId, id, dto);
+  }
+
+  // DELETE — только O/A (§1): MANAGER не имеет delete Project.
+  @Delete("projects/:id")
+  @CheckPolicy("delete", "Project")
+  async remove(@CurrentAuth() auth: AuthContext, @Param("id") id: string): Promise<null> {
+    await this.projects.remove(auth.activeOrgId, id);
+    return null;
   }
 }
