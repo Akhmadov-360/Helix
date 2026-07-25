@@ -63,4 +63,20 @@ describe("contacts — ссылочная целостность (§6, manual-po
       await expect(prisma.contact.delete({ where: { id: contact.id } })).resolves.toBeDefined();
     });
   });
+
+  // §6/§10: Organization — tenant-boundary. Cascade сносит всё поддерево орги, включая
+  // справочник (контакты/компании) и org-аудит.
+  describe("каскад Organization → контакты/компании/аудит", () => {
+    it("удаление орги удаляет её контакты, компании и AuditLog", async () => {
+      const company = await prisma.company.create({ data: { orgId, name: "Acme" } });
+      const contact = await prisma.contact.create({ data: { orgId, name: "John", companyId: company.id } });
+      await prisma.auditLog.create({ data: { orgId, action: "contact.merged", payload: {} } });
+
+      await prisma.organization.delete({ where: { id: orgId } });
+
+      expect(await prisma.contact.findUnique({ where: { id: contact.id } })).toBeNull();
+      expect(await prisma.company.findUnique({ where: { id: company.id } })).toBeNull();
+      expect(await prisma.auditLog.count({ where: { orgId } })).toBe(0);
+    });
+  });
 });
