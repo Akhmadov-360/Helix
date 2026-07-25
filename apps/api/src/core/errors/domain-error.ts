@@ -97,6 +97,18 @@ export class WorkspaceVersionConflictError extends ConflictError {
 }
 
 /**
+ * Соседи (after/before) при move устарели: их переставили/убрали, пара перевёрнута
+ * или сосед ушёл в другую фазу (§4.5). 409 = «запрос был верен, мир изменился», не 400.
+ */
+export class StaleNeighborsError extends ConflictError {
+  readonly code = "STALE_NEIGHBORS";
+
+  constructor() {
+    super("Neighbour cards changed; refetch and retry the move");
+  }
+}
+
+/**
  * Удаляемая фаза содержит проекты, а reassignTo не передан (§6). В details —
  * фазы-кандидаты, чтобы фронт показал выбор «куда перенести».
  */
@@ -105,6 +117,15 @@ export class PhaseNotEmptyError extends ConflictError {
 
   constructor(override readonly details: unknown) {
     super("Phase has projects; provide reassignTo to move them");
+  }
+}
+
+/** Нельзя создать лид в доске без фаз (§10): Project.phaseId NOT NULL, класть некуда. */
+export class WorkspaceHasNoPhasesError extends ConflictError {
+  readonly code = "WORKSPACE_HAS_NO_PHASES";
+
+  constructor() {
+    super("Workspace has no phases; create a phase before adding leads");
   }
 }
 
