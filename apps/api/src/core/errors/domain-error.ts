@@ -108,6 +108,15 @@ export class PhaseNotEmptyError extends ConflictError {
   }
 }
 
+/** Нельзя создать лид в доске без фаз (§10): Project.phaseId NOT NULL, класть некуда. */
+export class WorkspaceHasNoPhasesError extends ConflictError {
+  readonly code = "WORKSPACE_HAS_NO_PHASES";
+
+  constructor() {
+    super("Workspace has no phases; create a phase before adding leads");
+  }
+}
+
 /** Личность установлена, но действие не разрешено. */
 export abstract class ForbiddenError extends DomainError {}
 

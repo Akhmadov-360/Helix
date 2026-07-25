@@ -1,22 +1,34 @@
 import { Module } from "@nestjs/common";
 import { AuthzModule } from "../../core/authz/authz.module";
+import { ActivityModule } from "../activity/activity.module";
 import { AuthModule } from "../auth/auth.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { PhasesModule } from "../phases/phases.module";
 import { ProjectsModule } from "../projects/projects.module";
+import { UsersModule } from "../users/users.module";
 import { PhasesController } from "./phases.controller";
 import { PhasesService } from "./phases.service";
+import { ProjectsController } from "./projects.controller";
+import { ProjectsService } from "./projects.service";
 import { WorkspacesController } from "./workspaces.controller";
 import { WorkspacesRepository } from "./workspaces.repository";
 import { WorkspacesService } from "./workspaces.service";
 
-// Фазы — часть агрегата воркспейса (создание фазы бампает version доски), поэтому
-// PhasesController/Service объявлены здесь, а не в PhasesModule (тот — чистый data-access).
-// Так зависимость идёт только workspaces → phases, без цикла модулей.
-// OrganizationsModule нужен, чтобы JwtAuthGuard резолвил OrganizationsRepository здесь.
+// Агрегат доски: workspaces + phases + projects. Sub-resource контроллеры/сервисы объявлены
+// здесь, репозитории — в своих leaf-модулях (phases/projects), поэтому зависимости идут
+// в одну сторону (workspaces → phases/projects), без цикла модулей.
+// OrganizationsModule — чтобы JwtAuthGuard резолвил OrganizationsRepository здесь.
 @Module({
-  imports: [AuthModule, OrganizationsModule, PhasesModule, ProjectsModule, AuthzModule],
-  controllers: [WorkspacesController, PhasesController],
-  providers: [WorkspacesService, WorkspacesRepository, PhasesService],
+  imports: [
+    AuthModule,
+    OrganizationsModule,
+    PhasesModule,
+    ProjectsModule,
+    UsersModule,
+    ActivityModule,
+    AuthzModule,
+  ],
+  controllers: [WorkspacesController, PhasesController, ProjectsController],
+  providers: [WorkspacesService, WorkspacesRepository, PhasesService, ProjectsService],
 })
 export class WorkspacesModule {}
