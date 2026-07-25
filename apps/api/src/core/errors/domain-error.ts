@@ -129,6 +129,43 @@ export class WorkspaceHasNoPhasesError extends ConflictError {
   }
 }
 
+/** Реализация раздваивает семантику merge: source ≠ target — форменное нарушение (§7.1). */
+export class SelfMergeError extends BadRequestError {
+  readonly code = "SELF_MERGE";
+
+  constructor() {
+    super("Cannot merge a contact into itself");
+  }
+}
+
+/**
+ * Merge требует, чтобы И source, И target были активны (§7.1/§7.4). Уже смёрженный участник
+ * → 409: создавать цепочку A→B→C нельзя (инвариант «ровно один хоп»). Отличается от 410
+ * (§7.5): 410 — про чтение/правку смёрженного по его id; здесь — про попытку merge с ним.
+ */
+export class ContactNotActiveError extends ConflictError {
+  readonly code = "CONTACT_NOT_ACTIVE";
+
+  constructor() {
+    super("Both contacts must be active (not already merged)");
+  }
+}
+
+/**
+ * Ресурс существовал, но погашен и более недоступен по этому id (§7.5). Именно 410, не 404:
+ * ссылка исторически валидна, клиент должен узнать новый id и обновиться. В details —
+ * mergedIntoId (куда смотреть).
+ */
+export abstract class GoneError extends DomainError {}
+
+export class ContactMergedError extends GoneError {
+  readonly code = "CONTACT_MERGED";
+
+  constructor(override readonly details: { mergedIntoId: string }) {
+    super("Contact was merged into another contact");
+  }
+}
+
 /** Личность установлена, но действие не разрешено. */
 export abstract class ForbiddenError extends DomainError {}
 

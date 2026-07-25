@@ -3,17 +3,20 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Patch,
   Post,
   Query,
   UseGuards,
 } from "@nestjs/common";
-import { ApiBearerAuth, ApiCreatedResponse, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import {
   contactQuerySchema,
   createContactSchema,
   dedupCheckSchema,
+  mergeContactSchema,
   updateContactSchema,
   type ContactListResponse,
   type ContactQuery,
@@ -22,6 +25,7 @@ import {
   type CreateContactResponse,
   type DedupCheckQuery,
   type DedupHint,
+  type MergeContactInput,
   type UpdateContactInput,
 } from "@helix/api-schemas";
 import { CurrentAuth, type AuthContext } from "../../core/auth-context";
@@ -90,5 +94,18 @@ export class ContactsController {
   async remove(@CurrentAuth() auth: AuthContext, @Param("id") id: string): Promise<null> {
     await this.contacts.remove(auth.activeOrgId, id);
     return null;
+  }
+
+  // Слить sourceId в :id (target). Деструктив → политика delete Contact (O/A, §2). Не создание → 200.
+  @Post(":id/merge")
+  @HttpCode(HttpStatus.OK)
+  @CheckPolicy("delete", "Contact")
+  @ApiOkResponse({ description: "source влит в target, source погашен (§7)" })
+  merge(
+    @CurrentAuth() auth: AuthContext,
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(mergeContactSchema)) dto: MergeContactInput,
+  ): Promise<ContactResponse> {
+    return this.contacts.merge(auth.activeOrgId, auth.userId, id, dto.sourceId);
   }
 }

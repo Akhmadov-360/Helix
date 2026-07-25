@@ -25,6 +25,14 @@ export interface ContactRow {
   updatedAt: Date;
 }
 
+// Для мутирующих путей: те же поля + mergedIntoId (410-гейт §7.5). mergedIntoId в ответ не
+// уходит — toContactResponse его игнорирует (лишнее поле в объекте TS допускает).
+export const CONTACT_INTERNAL_SELECT = { ...CONTACT_SELECT, mergedIntoId: true } as const;
+
+export interface ContactInternalRow extends ContactRow {
+  mergedIntoId: string | null;
+}
+
 export function toContactResponse(c: ContactRow): ContactResponse {
   return {
     id: c.id,
