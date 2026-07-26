@@ -143,22 +143,28 @@ describe("Company CRUD (§2, unit 4)", () => {
     });
   });
 
-  describe("authz (§2)", () => {
-    it("MEMBER: create → 403", async () => {
+  // Матрица (ADR blast-radius): create=Member+, read=Member+/Viewer, update/delete=Manager+.
+  describe("authz", () => {
+    it("MEMBER: create → 201, read → 200, update/delete → 403", async () => {
+      const co = (await create({ name: "Acme" }).expect(201)).body.data;
       await prisma.membership.updateMany({ data: { role: "MEMBER" } });
-      await create({ name: "Acme" }).expect(403);
-    });
-
-    it("MEMBER: read → 200", async () => {
-      await prisma.membership.updateMany({ data: { role: "MEMBER" } });
+      await create({ name: "New" }).expect(201); // create — Member+
       await list().expect(200);
+      await patch(co.id).send({ name: "X" }).expect(403); // update — Manager+
+      await del(co.id).expect(403); // delete — Manager+
     });
 
-    it("MANAGER: create/update → 200, delete → 403", async () => {
+    it("MANAGER: create/update/delete → все разрешены", async () => {
       const co = (await create({ name: "Acme" }).expect(201)).body.data;
       await prisma.membership.updateMany({ data: { role: "MANAGER" } });
       await patch(co.id).send({ name: "Renamed" }).expect(200);
-      await del(co.id).expect(403);
+      await del(co.id).expect(200); // delete — Manager+ (было O/A)
+    });
+
+    it("VIEWER: read → 200, create → 403", async () => {
+      await prisma.membership.updateMany({ data: { role: "VIEWER" } });
+      await list().expect(200);
+      await create({ name: "X" }).expect(403);
     });
   });
 });

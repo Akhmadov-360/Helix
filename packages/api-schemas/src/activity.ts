@@ -9,6 +9,7 @@ export const projectEventTypeSchema = z.enum([
   "project.archived",
   "project.restored",
   "project.updated",
+  "project.reassigned",
 ]);
 export type ProjectEventType = z.infer<typeof projectEventTypeSchema>;
 
@@ -25,7 +26,16 @@ const movedPayload = z.object({
 });
 
 const updatedPayload = z.object({
-  changed: z.array(z.string()), // имена значимых полей (value, owner) — §6.3
+  changed: z.array(z.string()), // значимые поля (value; owner вынесен в project.reassigned) — §6.3
+  actorName: z.string().nullable(),
+});
+
+// reassign — именованный бизнес-факт (project-links.md §6.3), не «изменил поле owner». Снапшот
+// ИМЁН (P2/P3), не id: событие читается через год, когда User мог быть погашен. fromOwnerName
+// nullable = лид был в пуле («взят из пула»), toOwnerName nullable = возвращён в пул.
+const reassignedPayload = z.object({
+  fromOwnerName: z.string().nullable(),
+  toOwnerName: z.string().nullable(),
   actorName: z.string().nullable(),
 });
 
@@ -36,6 +46,7 @@ export const projectEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("project.archived"), schemaVersion: z.literal(1), payload: actorOnlyPayload }),
   z.object({ type: z.literal("project.restored"), schemaVersion: z.literal(1), payload: actorOnlyPayload }),
   z.object({ type: z.literal("project.updated"), schemaVersion: z.literal(1), payload: updatedPayload }),
+  z.object({ type: z.literal("project.reassigned"), schemaVersion: z.literal(1), payload: reassignedPayload }),
 ]);
 export type ProjectEvent = z.infer<typeof projectEventSchema>;
 

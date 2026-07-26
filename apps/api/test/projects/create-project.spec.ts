@@ -108,10 +108,18 @@ describe("POST /v1/workspaces/:id/projects", () => {
       await create(token, board.id, { title: "x", currency: "usd" }).expect(400);
     });
 
-    it("MEMBER → 403", async () => {
+    // Матрица: «Create/edit leads» Member△ → capability allow (scope=ORG в M1). Viewer — deny.
+    it("MEMBER → 201 (create lead — capability allow)", async () => {
       const { token } = await signUp(app);
       const board = await makeBoard(token);
       await prisma.membership.updateMany({ data: { role: "MEMBER" } });
+      await create(token, board.id, { title: "x" }).expect(201);
+    });
+
+    it("VIEWER → 403", async () => {
+      const { token } = await signUp(app);
+      const board = await makeBoard(token);
+      await prisma.membership.updateMany({ data: { role: "VIEWER" } });
       await create(token, board.id, { title: "x" }).expect(403);
     });
 

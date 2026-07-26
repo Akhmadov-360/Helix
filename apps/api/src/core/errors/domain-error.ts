@@ -72,6 +72,19 @@ export class InvalidPhaseSetError extends BadRequestError {
   }
 }
 
+/**
+ * Назначаемый на лид пользователь (owner при reassign / co-worker при assignee) НЕ член орги
+ * (project-links.md §6.3). 400, не 404: id валиден как User, но не принадлежит тенанту — это
+ * дыра tenant-изоляции, которую composite-FK не ловит (Project.owner → User(id), не Membership).
+ */
+export class UserNotOrgMemberError extends BadRequestError {
+  readonly code = "USER_NOT_ORG_MEMBER";
+
+  constructor() {
+    super("User is not a member of this organization");
+  }
+}
+
 /** reassignTo не существует, из другого воркспейса или равен удаляемой фазе. */
 export class InvalidReassignTargetError extends BadRequestError {
   readonly code = "INVALID_REASSIGN_TARGET";
@@ -117,6 +130,37 @@ export class PhaseNotEmptyError extends ConflictError {
 
   constructor(override readonly details: unknown) {
     super("Phase has projects; provide reassignTo to move them");
+  }
+}
+
+/**
+ * Нельзя привязать смёрженный контакт к сделке (project-links.md §5.1). 409, не 410: 410 — про
+ * доступ к смёрженному по ЕГО id; здесь — про попытку сослаться на него из связи. В details —
+ * mergedIntoId (подсказка «привяжите target»).
+ */
+export class LinkMergedContactError extends ConflictError {
+  readonly code = "CONTACT_MERGED";
+
+  constructor(override readonly details: { mergedIntoId: string }) {
+    super("Contact was merged; link the target contact instead");
+  }
+}
+
+/** Контакт уже привязан к этой сделке (§5.2): PK (projectId, contactId). Роли меняют через PATCH. */
+export class ContactAlreadyLinkedError extends ConflictError {
+  readonly code = "CONTACT_ALREADY_LINKED";
+
+  constructor() {
+    super("Contact is already linked to this project; use PATCH to change roles");
+  }
+}
+
+/** Пользователь уже назначен co-worker'ом на сделку: PK (projectId, userId). Идемпотентность — 409. */
+export class AssigneeAlreadyExistsError extends ConflictError {
+  readonly code = "ASSIGNEE_ALREADY_EXISTS";
+
+  constructor() {
+    super("User is already assigned to this project");
   }
 }
 

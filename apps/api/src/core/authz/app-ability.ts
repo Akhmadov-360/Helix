@@ -1,16 +1,36 @@
 import { AbilityBuilder, createMongoAbility, type MongoAbility } from "@casl/ability";
 import type { Role } from "@helix/db";
 
-export type AppAction = "manage" | "create" | "read" | "update" | "delete";
-export type AppSubject = "Workspace" | "Phase" | "Project" | "Company" | "Contact" | "all";
+// merge — отдельный action (не delete): merge=Owner/Admin, а delete Contact/Company=Manager+.
+// Если бы merge гейтился через "delete", Manager получил бы merge — нарушение матрицы.
+// reassign — отдельный action (не update): смена ownerId лида = Manager+ (матрица «Reassign
+// leads»), тогда как edit лида = Member+. Поле-в-PATCH не выразило бы разные права (action-level
+// CASL не видит полей) → отдельная операция POST /:id/reassign, как move вынесен из PATCH.
+export type AppAction = "manage" | "create" | "read" | "update" | "delete" | "merge" | "reassign";
+export type AppSubject =
+  | "Workspace"
+  | "Phase"
+  | "Project"
+  | "Company"
+  | "Contact"
+  | "ProjectContact"
+  | "ProjectAssignee"
+  | "all";
 export type AppAbility = MongoAbility<[AppAction, AppSubject]>;
 
 /**
- * Права по org-роли (§8 спеки, Appendix B). Строятся из роли, прочитанной guard'ом
- * из Membership на КАЖДОМ запросе — поэтому всегда актуальны.
+ * Права по org-роли (PRD Appendix B + decisions.md ADR «RBAC — две оси»).
+ * Строятся из роли, прочитанной guard'ом из Membership на КАЖДОМ запросе.
  *
- * DELETE workspace — только OWNER/ADMIN (`manage all`); MANAGER правит доски и
- * полностью владеет фазами, но доску не удаляет; MEMBER/VIEWER — только чтение.
+ * ДВЕ ОСИ (decisions.md): capability (разрешено ли действие роли) и scope (над какими
+ * объектами: ALL/ASSIGNED). M1 реализует ТОЛЬКО capability; scope временно = ORG. △-строки
+ * матрицы (Member «own/assigned») в M1 = capability allow, сужение до assigned — M6 (условие
+ * на объект в CASL, БЕЗ переписывания capability). Поэтому тесты M1 проверяют capability
+ * («Member может X»), а НЕ org-wide видимость — последнее временно и не контракт.
+ *
+ * blast-radius асимметрия для Contact/Company (shared org-ресурс, правка видна всем):
+ * create=Member+, read=Member+ (Viewer тоже — глобальный read-only), update/delete=Manager+,
+ * merge=Owner/Admin (необратим по связям, §7.7).
  */
 export function defineAbilityForRole(role: Role): AppAbility {
   const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
@@ -18,42 +38,57 @@ export function defineAbilityForRole(role: Role): AppAbility {
   switch (role) {
     case "OWNER":
     case "ADMIN":
-      can("manage", "all");
+      can("manage", "all"); // включает merge/delete/reassign по всем сущностям
       break;
     case "MANAGER":
       can("read", "Workspace");
       can("create", "Workspace");
       can("update", "Workspace");
       can("manage", "Phase");
-      // Проекты: create/read/update (move/archive/restore — это update), но НЕ delete (§1: delete = O/A).
+      // Лиды: create/read/update (move/archive/restore — update) + reassign, но НЕ delete (O/A).
       can("read", "Project");
       can("create", "Project");
       can("update", "Project");
-      // Контакты/компании: create/read/update, но НЕ delete и НЕ merge (contacts.md §2: delete/merge = O/A).
+      can("reassign", "Project"); // «Reassign leads» = Manager+ (Member — нет)
+      can("manage", "ProjectContact"); // состав сделки — Manager+ тоже (⊃ Member+)
+      can("manage", "ProjectAssignee"); // co-workers — управленческое действие, Manager+
+      // Contact/Company: полный CRUD-мутатор (update/delete=Manager+), но НЕ merge (=O/A).
       can("read", "Company");
       can("create", "Company");
       can("update", "Company");
+      can("delete", "Company");
       can("read", "Contact");
       can("create", "Contact");
       can("update", "Contact");
+      can("delete", "Contact");
       break;
     case "MEMBER":
       can("read", "Workspace");
       can("read", "Phase");
+      // Лиды: create/edit/move — Member△ (PRD «Create/edit leads», «Move phases»). Scope=ORG в M1.
+      // NB: reassign (смена ownerId) по матрице = Manager+, но это field-level различие внутри
+      // update — не выражается action-level CASL. Отложено (field-level policy, M6-adjacent).
       can("read", "Project");
+      can("create", "Project");
+      can("update", "Project");
+      // Contact/Company: create — да (добавление не ломает чужое), update/delete — нет (Manager+).
       can("read", "Company");
-      // Контакты — общая адресная книга (contacts.md §10): Member заводит и правит контакты,
-      // но НЕ удаляет и НЕ мёржит (delete/merge = O/A). Компании create/update Member не может (§2).
+      can("create", "Company");
       can("read", "Contact");
       can("create", "Contact");
-      can("update", "Contact");
+      // Состав сделки — часть «edit leads» (§2): Member привязывает/правит роли/отвязывает.
+      can("manage", "ProjectContact");
+      can("read", "ProjectAssignee"); // видит co-workers, но назначение — Manager+ (§2)
       break;
     case "VIEWER":
+      // Глобальный read-only: видит всё, не меняет ничего.
       can("read", "Workspace");
       can("read", "Phase");
       can("read", "Project");
       can("read", "Company");
       can("read", "Contact");
+      can("read", "ProjectContact");
+      can("read", "ProjectAssignee");
       break;
   }
 
