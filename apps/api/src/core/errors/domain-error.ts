@@ -155,6 +155,15 @@ export class ContactAlreadyLinkedError extends ConflictError {
   }
 }
 
+/** Пользователь уже назначен co-worker'ом на сделку: PK (projectId, userId). Идемпотентность — 409. */
+export class AssigneeAlreadyExistsError extends ConflictError {
+  readonly code = "ASSIGNEE_ALREADY_EXISTS";
+
+  constructor() {
+    super("User is already assigned to this project");
+  }
+}
+
 /** Нельзя создать лид в доске без фаз (§10): Project.phaseId NOT NULL, класть некуда. */
 export class WorkspaceHasNoPhasesError extends ConflictError {
   readonly code = "WORKSPACE_HAS_NO_PHASES";

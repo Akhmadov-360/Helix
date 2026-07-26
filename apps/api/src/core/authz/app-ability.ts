@@ -14,6 +14,7 @@ export type AppSubject =
   | "Company"
   | "Contact"
   | "ProjectContact"
+  | "ProjectAssignee"
   | "all";
 export type AppAbility = MongoAbility<[AppAction, AppSubject]>;
 
@@ -50,6 +51,7 @@ export function defineAbilityForRole(role: Role): AppAbility {
       can("update", "Project");
       can("reassign", "Project"); // «Reassign leads» = Manager+ (Member — нет)
       can("manage", "ProjectContact"); // состав сделки — Manager+ тоже (⊃ Member+)
+      can("manage", "ProjectAssignee"); // co-workers — управленческое действие, Manager+
       // Contact/Company: полный CRUD-мутатор (update/delete=Manager+), но НЕ merge (=O/A).
       can("read", "Company");
       can("create", "Company");
@@ -76,6 +78,7 @@ export function defineAbilityForRole(role: Role): AppAbility {
       can("create", "Contact");
       // Состав сделки — часть «edit leads» (§2): Member привязывает/правит роли/отвязывает.
       can("manage", "ProjectContact");
+      can("read", "ProjectAssignee"); // видит co-workers, но назначение — Manager+ (§2)
       break;
     case "VIEWER":
       // Глобальный read-only: видит всё, не меняет ничего.
@@ -85,6 +88,7 @@ export function defineAbilityForRole(role: Role): AppAbility {
       can("read", "Company");
       can("read", "Contact");
       can("read", "ProjectContact");
+      can("read", "ProjectAssignee");
       break;
   }
 
