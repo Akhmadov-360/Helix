@@ -204,24 +204,37 @@ describe("project CRUD (§1, units 10-11)", () => {
   // reassign — отдельная операция (Manager+), не поле PATCH. Закрывает field-level дыру:
   // Member (update Project) не может переназначить владельца → обхода visibility-scope (M6) нет.
   describe("POST /:id/reassign", () => {
-    it("назначает владельца → 200 + событие project.updated {changed:[owner]}", async () => {
-      const p = await seed("a0");
+    it("назначает владельца → 200 + событие project.reassigned {from:null, to:name} (§6.3)", async () => {
+      const p = await seed("a0"); // owner=null (в пуле)
       const res = await reassign(p.id).send({ ownerId: userId }).expect(200);
       expect(res.body.data.ownerId).toBe(userId);
-      const ev = await prisma.activityEvent.findFirst({ where: { projectId: p.id, type: "project.updated" } });
-      expect((ev?.payload as { changed: string[] }).changed).toEqual(["owner"]);
+      const ev = await prisma.activityEvent.findFirst({ where: { projectId: p.id, type: "project.reassigned" } });
+      const payload = ev?.payload as { fromOwnerName: string | null; toOwnerName: string | null };
+      expect(payload.fromOwnerName).toBeNull(); // взят из пула
+      expect(payload.toOwnerName).toBe("Crud"); // снапшот имени нового владельца
     });
 
-    it("null снимает владельца", async () => {
+    it("null снимает владельца (лид в пул, §6.3)", async () => {
       const p = await seed("a0", { ownerId: userId });
       const res = await reassign(p.id).send({ ownerId: null }).expect(200);
       expect(res.body.data.ownerId).toBeNull();
+      const ev = await prisma.activityEvent.findFirst({ where: { projectId: p.id, type: "project.reassigned" } });
+      expect((ev?.payload as { toOwnerName: string | null }).toOwnerName).toBeNull(); // возвращён в пул
     });
 
     it("без фактической смены владельца → события нет", async () => {
       const p = await seed("a0");
       await reassign(p.id).send({ ownerId: null }).expect(200); // был null, остаётся null
-      expect(await eventCount(p.id, "project.updated")).toBe(0);
+      expect(await eventCount(p.id, "project.reassigned")).toBe(0);
+    });
+
+    it("владелец не член орги → 400 (tenant, §6.3)", async () => {
+      const p = await seed("a0");
+      const stranger = await signUp(app); // член ДРУГОЙ орги
+      const foreignUserId = JSON.parse(
+        Buffer.from(stranger.token.split(".")[1] ?? "", "base64url").toString(),
+      ).sub;
+      await reassign(p.id).send({ ownerId: foreignUserId }).expect(400);
     });
 
     it("несуществующий → 404", async () => {

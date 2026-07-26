@@ -26,7 +26,9 @@ import { PhasesRepository } from "../phases/phases.repository";
 import { toProjectResponse } from "../projects/project.mapper";
 import { ProjectsRepository } from "../projects/projects.repository";
 import { denseRanks, rankBetween } from "../projects/rank";
+import { OrganizationsRepository } from "../organizations/organizations.repository";
 import { UsersRepository } from "../users/users.repository";
+import { assertOrgMember } from "./assert-org-member";
 import { WorkspacesRepository } from "./workspaces.repository";
 
 // §4.4/§5: длиннее — триггер рекомпакции (проверяется ДО записи, иначе 500 "value too long").
@@ -47,6 +49,7 @@ export class ProjectsService {
     private readonly users: UsersRepository,
     private readonly activity: ActivityRecorder,
     private readonly activityLog: ActivityRepository,
+    private readonly orgs: OrganizationsRepository,
   ) {}
 
   async getById(orgId: string, projectId: string): Promise<ProjectResponse> {
@@ -88,8 +91,8 @@ export class ProjectsService {
   }
 
   // Reassign владельца (Manager+, матрица «Reassign leads») — первоклассная операция, не PATCH-поле:
-  // меняет ответственность и будущий scope (visibility=ASSIGNED, M6). Событие project.updated
-  // {changed:[owner]} — только при фактической смене (§6.3).
+  // меняет ответственность и будущий scope (visibility=ASSIGNED, M6). ownerId=null → лид в пул
+  // (§6.3, именованное состояние). Событие project.reassigned{from,to names} — только при смене.
   async reassign(
     orgId: string,
     userId: string,
@@ -100,18 +103,32 @@ export class ProjectsService {
       const before = await this.projects.findByIdInOrg(projectId, orgId, tx);
       if (!before) throw new ResourceNotFoundError("Project not found");
 
+      // Новый владелец обязан быть членом ЭТОЙ орги (§6.3) — composite-FK не ловит (owner → User(id),
+      // не Membership). Нет членства → 400. null (пул) проверять не нужно.
+      if (ownerId !== null) await assertOrgMember(this.orgs, ownerId, orgId, tx);
+
       const updated = await this.projects.reassignOwner(projectId, ownerId, tx);
 
       if (before.ownerId !== ownerId) {
-        const actor = await this.users.findProfileById(userId);
+        // Снапшот ИМЁН (P2/P3): from — прежний владелец (null = был в пуле), to — новый (null =
+        // возвращён в пул), actor — кто переназначил.
+        const [actor, fromOwner, toOwner] = await Promise.all([
+          this.users.findProfileById(userId),
+          before.ownerId ? this.users.findProfileById(before.ownerId) : Promise.resolve(null),
+          ownerId ? this.users.findProfileById(ownerId) : Promise.resolve(null),
+        ]);
         await this.activity.record(tx, {
           orgId,
           projectId,
           actorId: userId,
           event: {
-            type: "project.updated",
+            type: "project.reassigned",
             schemaVersion: 1,
-            payload: { changed: ["owner"], actorName: actor?.name ?? null },
+            payload: {
+              fromOwnerName: fromOwner?.name ?? null,
+              toOwnerName: toOwner?.name ?? null,
+              actorName: actor?.name ?? null,
+            },
           },
         });
       }
