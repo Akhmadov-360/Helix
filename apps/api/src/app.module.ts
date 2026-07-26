@@ -7,6 +7,7 @@ import { RegistrationModule } from "./modules/registration/registration.module";
 import { WorkspacesModule } from "./modules/workspaces/workspaces.module";
 import { CrmModule } from "./modules/crm/crm.module";
 import { ProjectLinksModule } from "./modules/project-links/project-links.module";
+import { TasksModule } from "./modules/tasks/tasks.module";
 import { HealthModule } from "./modules/health/health.module";
 import { AllExceptionsFilter } from "./core/filters/all-exceptions.filter";
 import { ResponseTransformInterceptor } from "./core/interceptors/response-transform.interceptor";
@@ -21,6 +22,7 @@ import { TenantContextInterceptor } from "./core/interceptors/tenant-context.int
     WorkspacesModule,
     CrmModule,
     ProjectLinksModule,
+    TasksModule,
     HealthModule,
   ],
   providers: [

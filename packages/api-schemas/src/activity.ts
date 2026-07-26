@@ -10,6 +10,8 @@ export const projectEventTypeSchema = z.enum([
   "project.restored",
   "project.updated",
   "project.reassigned",
+  "task.created",
+  "task.completed",
 ]);
 export type ProjectEventType = z.infer<typeof projectEventTypeSchema>;
 
@@ -39,6 +41,15 @@ const reassignedPayload = z.object({
   actorName: z.string().nullable(),
 });
 
+// task.created/completed (tasks.md §5). Снапшот (P2/P3): taskTitle + assigneeName, без живого FK.
+// taskId — для «перейти к задаче» из ленты позже, без миграции payload. assigneeName nullable.
+const taskEventPayload = z.object({
+  taskId: z.string(),
+  taskTitle: z.string(),
+  assigneeName: z.string().nullable(),
+  actorName: z.string().nullable(),
+});
+
 // Discriminated union по (type, schemaVersion) — писательский контракт ActivityRecorder.
 export const projectEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("project.created"), schemaVersion: z.literal(1), payload: actorOnlyPayload }),
@@ -47,6 +58,8 @@ export const projectEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("project.restored"), schemaVersion: z.literal(1), payload: actorOnlyPayload }),
   z.object({ type: z.literal("project.updated"), schemaVersion: z.literal(1), payload: updatedPayload }),
   z.object({ type: z.literal("project.reassigned"), schemaVersion: z.literal(1), payload: reassignedPayload }),
+  z.object({ type: z.literal("task.created"), schemaVersion: z.literal(1), payload: taskEventPayload }),
+  z.object({ type: z.literal("task.completed"), schemaVersion: z.literal(1), payload: taskEventPayload }),
 ]);
 export type ProjectEvent = z.infer<typeof projectEventSchema>;
 

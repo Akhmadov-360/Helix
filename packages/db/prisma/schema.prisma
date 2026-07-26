@@ -102,6 +102,7 @@ model Organization {
   projects       Project[]
   activityEvents ActivityEvent[]
   auditLogs      AuditLog[]
+  tasks          Task[]
 }
 
 model User {
@@ -117,6 +118,7 @@ model User {
   assignments      ProjectAssignee[]
   activityEvents   ActivityEvent[] // виртуальная back-relation (нет колонки/FK); actorId живёт на ActivityEvent
   auditLogs        AuditLog[] // back-relation; actorId живёт на AuditLog
+  tasks            Task[] // back-relation для assignee (Task.assigneeId → User, SetNull)
   refreshSessions  RefreshSession[]
 }
 
@@ -356,12 +358,20 @@ model Task {
   projectId  String
   title      String
   done       Boolean   @default(false)
-  assigneeId String?
-  dueAt      DateTime?
+  assigneeId String? // nullable: таск без исполнителя легален (§3)
+  dueAt      DateTime? @db.Timestamptz // абсолютный момент (§4): overdue = dueAt < now(); НЕ календарный день
+  createdAt  DateTime  @default(now()) @db.Timestamptz
+  updatedAt  DateTime  @default(now()) @updatedAt @db.Timestamptz // оба: @default (initial) + @updatedAt (авто на write)
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  // composite-FK (projectId, orgId) — TENANT-МОСТ: гарантирует, что таск и проект в ОДНОЙ орге на
+  // уровне БД. Простой (projectId)→Project(id) пропустил бы cross-org привязку (таск орги A на проект
+  // орги B по подставленному id). Тот же backbone-инвариант, что везде. Cascade: нет сделки — нет чеклиста.
+  project  Project @relation(fields: [projectId, orgId], references: [id, orgId], onDelete: Cascade)
+  // SetNull: исполнитель уволился → таск жив, без исполнителя (работа переживает человека, P2-родственно).
+  assignee User?   @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
 
-  @@index([projectId])
+  @@index([projectId, done]) // список тасков сделки, разделение done/open
 }
 
 // ──────────────────────────── ACTIVITY EVENT ───────────────────────────────
