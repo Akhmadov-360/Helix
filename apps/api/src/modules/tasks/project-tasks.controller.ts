@@ -32,6 +32,6 @@ export class ProjectTasksController {
     @Param("projectId") projectId: string,
     @Body(new ZodValidationPipe(createTaskSchema)) dto: CreateTaskInput,
   ): Promise<TaskResponse> {
-    return this.tasks.create(auth.activeOrgId, projectId, dto);
+    return this.tasks.create(auth.activeOrgId, auth.userId, projectId, dto);
   }
 }

@@ -2,8 +2,11 @@ import {
   Body,
   Controller,
   Delete,
+  HttpCode,
+  HttpStatus,
   Param,
   Patch,
+  Post,
   UseGuards,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
@@ -39,5 +42,21 @@ export class TasksController {
   async remove(@CurrentAuth() auth: AuthContext, @Param("taskId") taskId: string): Promise<null> {
     await this.tasks.remove(auth.activeOrgId, taskId);
     return null;
+  }
+
+  // complete/reopen — отдельные action (§2): смена done с побочным эффектом (событие), не PATCH-поле.
+  // Не создание → 200. Оба идемпотентны (§5). Политика update Task (Member+).
+  @Post(":taskId/complete")
+  @HttpCode(HttpStatus.OK)
+  @CheckPolicy("update", "Task")
+  complete(@CurrentAuth() auth: AuthContext, @Param("taskId") taskId: string): Promise<TaskResponse> {
+    return this.tasks.complete(auth.activeOrgId, auth.userId, taskId);
+  }
+
+  @Post(":taskId/reopen")
+  @HttpCode(HttpStatus.OK)
+  @CheckPolicy("update", "Task")
+  reopen(@CurrentAuth() auth: AuthContext, @Param("taskId") taskId: string): Promise<TaskResponse> {
+    return this.tasks.reopen(auth.activeOrgId, taskId);
   }
 }
