@@ -22,5 +22,7 @@ import { AuditRecorder } from "./audit.recorder";
     ContactsRepository,
     AuditRecorder,
   ],
+  // ProjectLinksModule (срез связей) читает контакт по id + mergedIntoId при привязке к сделке.
+  exports: [ContactsRepository],
 })
 export class CrmModule {}

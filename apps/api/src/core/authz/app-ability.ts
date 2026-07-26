@@ -7,7 +7,14 @@ import type { Role } from "@helix/db";
 // leads»), тогда как edit лида = Member+. Поле-в-PATCH не выразило бы разные права (action-level
 // CASL не видит полей) → отдельная операция POST /:id/reassign, как move вынесен из PATCH.
 export type AppAction = "manage" | "create" | "read" | "update" | "delete" | "merge" | "reassign";
-export type AppSubject = "Workspace" | "Phase" | "Project" | "Company" | "Contact" | "all";
+export type AppSubject =
+  | "Workspace"
+  | "Phase"
+  | "Project"
+  | "Company"
+  | "Contact"
+  | "ProjectContact"
+  | "all";
 export type AppAbility = MongoAbility<[AppAction, AppSubject]>;
 
 /**
@@ -42,6 +49,7 @@ export function defineAbilityForRole(role: Role): AppAbility {
       can("create", "Project");
       can("update", "Project");
       can("reassign", "Project"); // «Reassign leads» = Manager+ (Member — нет)
+      can("manage", "ProjectContact"); // состав сделки — Manager+ тоже (⊃ Member+)
       // Contact/Company: полный CRUD-мутатор (update/delete=Manager+), но НЕ merge (=O/A).
       can("read", "Company");
       can("create", "Company");
@@ -66,6 +74,8 @@ export function defineAbilityForRole(role: Role): AppAbility {
       can("create", "Company");
       can("read", "Contact");
       can("create", "Contact");
+      // Состав сделки — часть «edit leads» (§2): Member привязывает/правит роли/отвязывает.
+      can("manage", "ProjectContact");
       break;
     case "VIEWER":
       // Глобальный read-only: видит всё, не меняет ничего.
@@ -74,6 +84,7 @@ export function defineAbilityForRole(role: Role): AppAbility {
       can("read", "Project");
       can("read", "Company");
       can("read", "Contact");
+      can("read", "ProjectContact");
       break;
   }
 

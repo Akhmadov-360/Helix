@@ -133,6 +133,28 @@ export class PhaseNotEmptyError extends ConflictError {
   }
 }
 
+/**
+ * Нельзя привязать смёрженный контакт к сделке (project-links.md §5.1). 409, не 410: 410 — про
+ * доступ к смёрженному по ЕГО id; здесь — про попытку сослаться на него из связи. В details —
+ * mergedIntoId (подсказка «привяжите target»).
+ */
+export class LinkMergedContactError extends ConflictError {
+  readonly code = "CONTACT_MERGED";
+
+  constructor(override readonly details: { mergedIntoId: string }) {
+    super("Contact was merged; link the target contact instead");
+  }
+}
+
+/** Контакт уже привязан к этой сделке (§5.2): PK (projectId, contactId). Роли меняют через PATCH. */
+export class ContactAlreadyLinkedError extends ConflictError {
+  readonly code = "CONTACT_ALREADY_LINKED";
+
+  constructor() {
+    super("Contact is already linked to this project; use PATCH to change roles");
+  }
+}
+
 /** Нельзя создать лид в доске без фаз (§10): Project.phaseId NOT NULL, класть некуда. */
 export class WorkspaceHasNoPhasesError extends ConflictError {
   readonly code = "WORKSPACE_HAS_NO_PHASES";

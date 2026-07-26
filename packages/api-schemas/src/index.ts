@@ -10,3 +10,5 @@ export * from "./activity";
 export * from "./contacts";
 export * from "./companies";
 export * from "./audit";
+export * from "./deal-roles";
+export * from "./project-links";
