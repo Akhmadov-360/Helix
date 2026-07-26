@@ -90,6 +90,7 @@ model Organization {
   contacts       Contact[]
   projects       Project[]
   activityEvents ActivityEvent[]
+  auditLogs      AuditLog[]
 }
 
 model User {
@@ -104,6 +105,7 @@ model User {
   ownedProjects    Project[]         @relation("ProjectOwner")
   assignments      ProjectAssignee[]
   activityEvents   ActivityEvent[] // виртуальная back-relation (нет колонки/FK); actorId живёт на ActivityEvent
+  auditLogs        AuditLog[] // back-relation; actorId живёт на AuditLog
   refreshSessions  RefreshSession[]
 }
 
@@ -248,7 +250,9 @@ model ProjectContact {
   //                                 легитимно несёт неск. ролей; merge = объединение множеств
 
   project Project @relation(fields: [projectId, orgId], references: [id, orgId], onDelete: Cascade)
-  contact Contact @relation(fields: [contactId, orgId], references: [id, orgId], onDelete: Cascade)
+  // D2 (contacts.md §6): Restrict, НЕ Cascade — нельзя тихо потерять участника сделки при
+  // удалении контакта. Оператор сначала отвязывает/мёржит; удаление занятого контакта → 409.
+  contact Contact @relation(fields: [contactId, orgId], references: [id, orgId], onDelete: Restrict)
 
   @@id([projectId, contactId])
 }
@@ -274,10 +278,18 @@ model Contact {
   phone           String? // PII
   emailNormalized String? // канон (lowercase/trim) под дедуп-хинт + индекс
   companyId       String?
+  mergedIntoId    String? // D1 (§7.3): NULL = активный; заполнен = смёржен в этот target
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   org      Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  company  Company?         @relation(fields: [companyId, orgId], references: [id, orgId]) // nullable composite FK: при null не проверяется (B2C ок)
+  // D3 (§6): SetNull — распустили компанию, люди остались. ⚠ composite-FK + orgId NOT NULL → §9.1.
+  company  Company?         @relation(fields: [companyId, orgId], references: [id, orgId], onDelete: SetNull)
   projects ProjectContact[]
+
+  // D1 (§7.3): self-relation "Merge" через composite-FK — source указывает на target той же орги.
+  mergedInto Contact?  @relation("Merge", fields: [mergedIntoId, orgId], references: [id, orgId])
+  mergedFrom Contact[] @relation("Merge")
 
   // Дедуп = advisory HINT (FR-CC-4), НЕ unique: email опционален, один email легитимно
   // на несколько человек, merge — решение пользователя. Дубль сущности терпим.
@@ -292,6 +304,8 @@ model Company {
   domain           String?
   domainNormalized String? // канон (strip protocol/www) под дедуп-хинт
   industry         String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   org      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   contacts Contact[]
@@ -299,6 +313,24 @@ model Company {
 
   @@unique([id, orgId]) // цель composite-FK из Project/Contact
   @@index([orgId, domainNormalized])
+}
+
+// D5 (§7.3): org-уровневый административный аудит — ОТДЕЛЬНО от ActivityEvent (тот projectId
+// NOT NULL, привязан к ленте лида). Merge контактов происходит вне проекта → пишется сюда.
+// ActivityEvent = факты о лиде для людей; AuditLog = org-уровень, административные действия.
+model AuditLog {
+  id        String   @id @default(cuid())
+  orgId     String
+  actorId   String? // кто; SetNull при удалении пользователя (актор мог уйти)
+  action    String // замкнутый словарь ("contact.merged", …) в api-schemas, не enum
+  payload   Json // СНАПШОТ (P2/P3): что произошло, без живых FK
+  createdAt DateTime @default(now())
+
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  actor User?        @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, createdAt]) // лента аудита org, свежие сверху
+  @@index([orgId, action, createdAt]) // фильтр по типу действия
 }
 
 // ──────────────────────────────── TASK ─────────────────────────────────────

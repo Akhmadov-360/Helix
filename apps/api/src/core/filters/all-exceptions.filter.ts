@@ -14,6 +14,7 @@ import {
   ConflictError,
   DomainError,
   ForbiddenError,
+  GoneError,
   ResourceNotFoundError,
   UnauthorizedError,
 } from "../errors/domain-error";
@@ -38,6 +39,7 @@ const DOMAIN_ERROR_STATUS: ReadonlyArray<[DomainErrorClass, HttpStatus]> = [
   [ResourceNotFoundError, HttpStatus.NOT_FOUND],
   [BadRequestError, HttpStatus.BAD_REQUEST],
   [ConflictError, HttpStatus.CONFLICT],
+  [GoneError, HttpStatus.GONE],
 ];
 
 interface ErrorBody {

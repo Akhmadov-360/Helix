@@ -96,11 +96,17 @@ manual-migration-инварианты (ниже) обязательны — па
 
 ## Manual-migration points (расхождения schema.prisma ↔ БД)
 
-Три инварианта живут в raw SQL, Prisma их не выражает. **Не давай `prisma migrate` их пересоздать/уронить:**
+Инварианты живут в raw SQL, Prisma их не выражает. **Не давай `prisma migrate` их пересоздать/уронить:**
 
 1. `Phase(workspaceId, order)` UNIQUE **DEFERRABLE INITIALLY DEFERRED**.
 2. `Project` generated columns под range-фильтры горячих custom fields.
 3. `ActivityEvent` иммутабельность (отзыв UPDATE/DELETE у роли приложения).
+4. `Project.rank` **COLLATE "C"** — байтовая коллация под fractional-indexing.
+5. `Contact.company` composite-FK **`ON DELETE SET NULL ("companyId")`** (partial, PG15+) — полный
+   SET NULL уронил бы `orgId` NOT NULL. Подробности — `decisions.md`.
+
+> Каждый `migrate dev` попутно генерит `DROP INDEX "phase_ws_order_unique"` (#1) — **вырезать вручную**
+> из миграции перед применением (см. decisions.md, gotcha #4).
 
 ## Дисциплина скоупа
 

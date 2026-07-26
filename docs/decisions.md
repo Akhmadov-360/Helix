@@ -53,7 +53,7 @@
 
 ## Manual migration points (расхождения schema.prisma ↔ БД)
 
-Три инварианта не выражаются в Prisma и живут в raw SQL. `prisma migrate` может их молча
+Инварианты, не выражаемые в Prisma и живущие в raw SQL. `prisma migrate` может их молча
 пересоздать/уронить → латентный баг. Огородить: комментарий-запрет в миграции + тест-на-инвариант.
 
 1. **`Phase(workspaceId, order)` UNIQUE DEFERRABLE INITIALLY DEFERRED.**
@@ -65,6 +65,16 @@
    чем у #1: drift сам не возникает (коллация в файле миграции), но правка типа колонки в схеме
    (`VarChar(64)→VarChar(128)`) заставит Prisma выпустить `ALTER COLUMN ... TYPE`, который **сбрасывает
    коллацию молча**. Тесты: структурный (collation_name='C') + поведенческий (`['B0','a0']` сортируются как есть).
+5. **`Contact.company` composite-FK → `ON DELETE SET NULL ("companyId")`** (partial, PG15+).
+   `(companyId, orgId) → Company(id, orgId)`, но `orgId` NOT NULL. Prisma выражает `SetNull` только как
+   полный `ON DELETE SET NULL` (обе колонки) → при удалении Company пытается занулить и `orgId` →
+   падение (эмпирически подтверждено, contacts.md §9.1). Partial-набор колонок Prisma не выражает —
+   держим в raw SQL, не давать пересоздать. Тест: delete company при живом контакте → `companyId`
+   занулён, `orgId` цел, контакт жив (`delete-integrity.spec`).
+
+> **Смежная правка того же среза (не manual-point, но требует ручного контроля миграции):** D2 —
+> `ProjectContact.contact` переведён с `Cascade` на `Restrict` (contacts.md §6). Prisma это выражает,
+> но каждый `migrate dev` попутно генерит `DROP INDEX "phase_ws_order_unique"` (#1) — вырезать вручную.
 
 ---
 

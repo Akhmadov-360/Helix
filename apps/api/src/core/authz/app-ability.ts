@@ -2,7 +2,7 @@ import { AbilityBuilder, createMongoAbility, type MongoAbility } from "@casl/abi
 import type { Role } from "@helix/db";
 
 export type AppAction = "manage" | "create" | "read" | "update" | "delete";
-export type AppSubject = "Workspace" | "Phase" | "Project" | "all";
+export type AppSubject = "Workspace" | "Phase" | "Project" | "Company" | "Contact" | "all";
 export type AppAbility = MongoAbility<[AppAction, AppSubject]>;
 
 /**
@@ -29,12 +29,31 @@ export function defineAbilityForRole(role: Role): AppAbility {
       can("read", "Project");
       can("create", "Project");
       can("update", "Project");
+      // Контакты/компании: create/read/update, но НЕ delete и НЕ merge (contacts.md §2: delete/merge = O/A).
+      can("read", "Company");
+      can("create", "Company");
+      can("update", "Company");
+      can("read", "Contact");
+      can("create", "Contact");
+      can("update", "Contact");
       break;
     case "MEMBER":
+      can("read", "Workspace");
+      can("read", "Phase");
+      can("read", "Project");
+      can("read", "Company");
+      // Контакты — общая адресная книга (contacts.md §10): Member заводит и правит контакты,
+      // но НЕ удаляет и НЕ мёржит (delete/merge = O/A). Компании create/update Member не может (§2).
+      can("read", "Contact");
+      can("create", "Contact");
+      can("update", "Contact");
+      break;
     case "VIEWER":
       can("read", "Workspace");
       can("read", "Phase");
       can("read", "Project");
+      can("read", "Company");
+      can("read", "Contact");
       break;
   }
 

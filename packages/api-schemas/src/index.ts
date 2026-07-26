@@ -7,3 +7,6 @@ export * from "./workspaces";
 export * from "./phases";
 export * from "./projects";
 export * from "./activity";
+export * from "./contacts";
+export * from "./companies";
+export * from "./audit";
