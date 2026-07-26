@@ -153,9 +153,9 @@ describe("merge контактов (§7, unit 7)", () => {
       const source = await seed({ name: "S" });
 
       // p1: только source; p2: и source, и target (дубль)
-      await prisma.projectContact.create({ data: { projectId: p1, contactId: source.id, orgId, roles: ["champion"] } });
-      await prisma.projectContact.create({ data: { projectId: p2, contactId: source.id, orgId, roles: ["user"] } });
-      await prisma.projectContact.create({ data: { projectId: p2, contactId: target.id, orgId, roles: ["decision-maker"] } });
+      await prisma.projectContact.create({ data: { projectId: p1, contactId: source.id, orgId, roles: ["CHAMPION"] } });
+      await prisma.projectContact.create({ data: { projectId: p2, contactId: source.id, orgId, roles: ["INFLUENCER"] } });
+      await prisma.projectContact.create({ data: { projectId: p2, contactId: target.id, orgId, roles: ["DECISION_MAKER"] } });
 
       await merge(target.id, source.id).expect(200);
 
@@ -165,13 +165,13 @@ describe("merge контактов (§7, unit 7)", () => {
       const l1 = await prisma.projectContact.findUnique({
         where: { projectId_contactId: { projectId: p1, contactId: target.id } },
       });
-      expect(l1?.roles).toEqual(["champion"]);
+      expect(l1?.roles).toEqual(["CHAMPION"]);
       expect(l1?.orgId).toBe(orgId);
       // p2: union ролей
       const l2 = await prisma.projectContact.findUnique({
         where: { projectId_contactId: { projectId: p2, contactId: target.id } },
       });
-      expect(new Set(l2?.roles)).toEqual(new Set(["decision-maker", "user"]));
+      expect(new Set(l2?.roles)).toEqual(new Set(["DECISION_MAKER", "INFLUENCER"]));
     });
   });
 

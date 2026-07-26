@@ -56,6 +56,17 @@ enum ProjectStatus {
   ARCHIVED // статус БЕЗ фазы — причина, по которой status хранится, а не выводится
 }
 
+// Роли контакта в сделке (B2B-комитет по закупке). Enum, не String[] и не config-таблица —
+// см. ADR «DealRole» в decisions.md (триггер переезда — второй несовместимый набор ролей).
+enum DealRole {
+  CHAMPION
+  DECISION_MAKER
+  ECONOMIC_BUYER
+  TECHNICAL_BUYER
+  INFLUENCER
+  BLOCKER
+}
+
 enum FieldType {
   text
   longtext
@@ -246,8 +257,8 @@ model ProjectContact {
   projectId String
   contactId String
   orgId     String // мост между двумя org-поддеревьями; composite-FK на оба конца
-  roles     String[] @default([]) // роли В СДЕЛКЕ (decision-maker, champion). Массив: человек
-  //                                 легитимно несёт неск. ролей; merge = объединение множеств
+  roles     DealRole[] @default([]) // роли В СДЕЛКЕ (enum, ADR DealRole). Массив: человек легитимно
+  //                                    несёт неск. ролей; merge = объединение множеств (union+dedupe)
 
   project Project @relation(fields: [projectId, orgId], references: [id, orgId], onDelete: Cascade)
   // D2 (contacts.md §6): Restrict, НЕ Cascade — нельзя тихо потерять участника сделки при
@@ -255,6 +266,7 @@ model ProjectContact {
   contact Contact @relation(fields: [contactId, orgId], references: [id, orgId], onDelete: Restrict)
 
   @@id([projectId, contactId])
+  @@index([contactId, orgId]) // merge-редирект: найти все сделки контакта (project-links.md §1)
 }
 
 model ProjectAssignee {
@@ -280,7 +292,9 @@ model Contact {
   companyId       String?
   mergedIntoId    String? // D1 (§7.3): NULL = активный; заполнен = смёржен в этот target
   createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  // @default(now()) выражает DB-дефолт, добавленный в timestamps-миграции (иначе Prisma дрейфит
+  // на DROP DEFAULT каждую миграцию). @updatedAt — авто-обновление на write поверх дефолта.
+  updatedAt       DateTime @default(now()) @updatedAt
 
   org      Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
   // D3 (§6): SetNull — распустили компанию, люди остались. ⚠ composite-FK + orgId NOT NULL → §9.1.
@@ -305,7 +319,7 @@ model Company {
   domainNormalized String? // канон (strip protocol/www) под дедуп-хинт
   industry         String?
   createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  updatedAt        DateTime @default(now()) @updatedAt // DB-дефолт из timestamps-миграции (см. Contact)
 
   org      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   contacts Contact[]
