@@ -140,9 +140,16 @@ describe("POST /v1/projects/:id/move (§5)", () => {
         .expect(404);
     });
 
-    it("MEMBER → 403", async () => {
+    // Матрица «Move phases» Member△ → capability allow (scope=ORG в M1). Viewer — deny.
+    it("MEMBER → 200 (move — capability allow)", async () => {
       const x = await seed(phaseIds[0]!, "a0");
       await prisma.membership.updateMany({ data: { role: "MEMBER" } });
+      await move(x.id, { toPhaseId: phaseIds[1] }).expect(200);
+    });
+
+    it("VIEWER → 403", async () => {
+      const x = await seed(phaseIds[0]!, "a0");
+      await prisma.membership.updateMany({ data: { role: "VIEWER" } });
       await move(x.id, { toPhaseId: phaseIds[1] }).expect(403);
     });
   });

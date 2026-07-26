@@ -116,9 +116,16 @@ describe("archive / restore (§7)", () => {
         .expect(404);
     });
 
-    it("MEMBER → 403", async () => {
+    // archive/restore — форма edit лида → Member△ capability allow. Viewer — deny.
+    it("MEMBER → 200 (archive — capability allow)", async () => {
       const p = await seed("a0");
       await prisma.membership.updateMany({ data: { role: "MEMBER" } });
+      await archive(p.id).expect(200);
+    });
+
+    it("VIEWER → 403", async () => {
+      const p = await seed("a0");
+      await prisma.membership.updateMany({ data: { role: "VIEWER" } });
       await archive(p.id).expect(403);
     });
   });

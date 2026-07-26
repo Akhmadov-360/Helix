@@ -58,6 +58,8 @@ describe("project CRUD (§1, units 10-11)", () => {
     request(app.getHttpServer()).patch(`/v1/projects/${id}`).set("Authorization", `Bearer ${token}`);
   const del = (id: string) =>
     request(app.getHttpServer()).delete(`/v1/projects/${id}`).set("Authorization", `Bearer ${token}`);
+  const reassign = (id: string) =>
+    request(app.getHttpServer()).post(`/v1/projects/${id}/reassign`).set("Authorization", `Bearer ${token}`);
   const eventCount = (projectId: string, type: string) =>
     prisma.activityEvent.count({ where: { projectId, type } });
 
@@ -100,11 +102,14 @@ describe("project CRUD (§1, units 10-11)", () => {
       expect((ev?.payload as { changed: string[] }).changed).toEqual(["value"]);
     });
 
-    it("изменение ownerId → событие project.updated {changed:[owner]}", async () => {
+    it("ownerId в PATCH отсекается схемой — владелец не меняется, reassign отдельно", async () => {
       const p = await seed("a0");
-      await patch(p.id).send({ ownerId: userId }).expect(200);
-      const ev = await prisma.activityEvent.findFirst({ where: { projectId: p.id, type: "project.updated" } });
-      expect((ev?.payload as { changed: string[] }).changed).toEqual(["owner"]);
+      // только ownerId в теле → после strip тело пустое → 400 (at-least-one)
+      await patch(p.id).send({ ownerId: userId }).expect(400);
+      // ownerId рядом с title → title применяется, ownerId игнорируется
+      await patch(p.id).send({ title: "New", ownerId: userId }).expect(200);
+      const row = await prisma.project.findUnique({ where: { id: p.id } });
+      expect(row?.ownerId).toBeNull(); // reassign через PATCH невозможен
     });
 
     it("изменение только title → события НЕТ (§6.3: не значимое поле)", async () => {
@@ -144,9 +149,16 @@ describe("project CRUD (§1, units 10-11)", () => {
         .expect(404);
     });
 
-    it("MEMBER → 403 (нет update Project)", async () => {
+    // Матрица «Create/edit leads» Member△ → Member правит лид (capability, scope=ORG в M1).
+    it("MEMBER → 200 (edit lead — capability allow)", async () => {
       const p = await seed("a0");
       await prisma.membership.updateMany({ data: { role: "MEMBER" } });
+      await patch(p.id).send({ title: "X" }).expect(200);
+    });
+
+    it("VIEWER → 403 (edit lead)", async () => {
+      const p = await seed("a0");
+      await prisma.membership.updateMany({ data: { role: "VIEWER" } });
       await patch(p.id).send({ title: "X" }).expect(403);
     });
   });
@@ -186,6 +198,47 @@ describe("project CRUD (§1, units 10-11)", () => {
       const p = await seed("a0");
       await prisma.membership.updateMany({ data: { role: "MANAGER" } });
       await patch(p.id).send({ title: "M" }).expect(200);
+    });
+  });
+
+  // reassign — отдельная операция (Manager+), не поле PATCH. Закрывает field-level дыру:
+  // Member (update Project) не может переназначить владельца → обхода visibility-scope (M6) нет.
+  describe("POST /:id/reassign", () => {
+    it("назначает владельца → 200 + событие project.updated {changed:[owner]}", async () => {
+      const p = await seed("a0");
+      const res = await reassign(p.id).send({ ownerId: userId }).expect(200);
+      expect(res.body.data.ownerId).toBe(userId);
+      const ev = await prisma.activityEvent.findFirst({ where: { projectId: p.id, type: "project.updated" } });
+      expect((ev?.payload as { changed: string[] }).changed).toEqual(["owner"]);
+    });
+
+    it("null снимает владельца", async () => {
+      const p = await seed("a0", { ownerId: userId });
+      const res = await reassign(p.id).send({ ownerId: null }).expect(200);
+      expect(res.body.data.ownerId).toBeNull();
+    });
+
+    it("без фактической смены владельца → события нет", async () => {
+      const p = await seed("a0");
+      await reassign(p.id).send({ ownerId: null }).expect(200); // был null, остаётся null
+      expect(await eventCount(p.id, "project.updated")).toBe(0);
+    });
+
+    it("несуществующий → 404", async () => {
+      await reassign("00000000-0000-0000-0000-000000000000").send({ ownerId: userId }).expect(404);
+    });
+
+    // Матрица «Reassign leads»: Manager+ можно, Member — нельзя (в отличие от edit).
+    it("MANAGER → 200", async () => {
+      const p = await seed("a0");
+      await prisma.membership.updateMany({ data: { role: "MANAGER" } });
+      await reassign(p.id).send({ ownerId: userId }).expect(200);
+    });
+
+    it("MEMBER → 403 (reassign ≠ edit)", async () => {
+      const p = await seed("a0");
+      await prisma.membership.updateMany({ data: { role: "MEMBER" } });
+      await reassign(p.id).send({ ownerId: userId }).expect(403);
     });
   });
 });

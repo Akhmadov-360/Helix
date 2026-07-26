@@ -20,12 +20,22 @@ export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 
 // phaseId/rank/status НЕ принимаются: фазу/позицию меняет только move, статус — производная
 // от фазы (§6.1); второй путь развалил бы синхрон.
+// ownerId НЕ принимается: reassign — отдельная операция с иными правами (Manager+, матрица
+// «Reassign leads»), не поле общего edit (Member+). Смена владельца меняет будущий scope
+// (visibility=ASSIGNED, M6) → capability строже. Отдельный эндпоинт POST /:id/reassign.
 export const updateProjectSchema = createProjectSchema
+  .omit({ ownerId: true })
   .partial()
   .refine((v) => Object.values(v).some((x) => x !== undefined), {
     message: "At least one field must be provided",
   });
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
+
+// Переназначение владельца лида — первоклассная операция (Manager+). null = снять владельца.
+export const reassignProjectSchema = z.object({
+  ownerId: z.string().min(1).nullable(),
+});
+export type ReassignProjectInput = z.infer<typeof reassignProjectSchema>;
 
 // Соседи по id, не по индексу/рангу (§4.1): позиция нестабильна, ранг утёк бы во фронт.
 // null = «явно с краю», undefined = «не указано» → дефолт наверх.

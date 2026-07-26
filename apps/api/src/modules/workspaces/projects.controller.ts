@@ -17,6 +17,7 @@ import {
   columnQuerySchema,
   createProjectSchema,
   moveProjectSchema,
+  reassignProjectSchema,
   updateProjectSchema,
   type ActivityEventResponse,
   type BoardQuery,
@@ -26,6 +27,7 @@ import {
   type CreateProjectInput,
   type MoveProjectInput,
   type ProjectResponse,
+  type ReassignProjectInput,
   type UpdateProjectInput,
 } from "@helix/api-schemas";
 import { CurrentAuth, type AuthContext } from "../../core/auth-context";
@@ -75,6 +77,20 @@ export class ProjectsController {
     @Body(new ZodValidationPipe(moveProjectSchema)) dto: MoveProjectInput,
   ): Promise<ProjectResponse> {
     return this.projects.move(auth.activeOrgId, auth.userId, id, dto);
+  }
+
+  // Переназначение владельца — отдельная операция с иными правами: reassign (Manager+), НЕ update
+  // (Member+). ownerId убран из PATCH-контракта. Не создание → 200.
+  @Post("projects/:id/reassign")
+  @HttpCode(HttpStatus.OK)
+  @CheckPolicy("reassign", "Project")
+  @ApiOkResponse({ description: "Владелец лида переназначен" })
+  reassign(
+    @CurrentAuth() auth: AuthContext,
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(reassignProjectSchema)) dto: ReassignProjectInput,
+  ): Promise<ProjectResponse> {
+    return this.projects.reassign(auth.activeOrgId, auth.userId, id, dto.ownerId);
   }
 
   @Post("projects/:id/archive")

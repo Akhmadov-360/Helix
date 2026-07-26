@@ -229,10 +229,18 @@ describe("merge контактов (§7, unit 7)", () => {
       await merge(target.id, foreign.id).expect(404);
     });
 
-    it("Member merge → 403 (merge = O/A)", async () => {
+    // merge = Owner/Admin (отдельный action, строже delete=Manager+): Member И Manager → 403.
+    it("Member merge → 403", async () => {
       const target = await seed({ name: "T" });
       const source = await seed({ name: "S" });
       await prisma.membership.updateMany({ data: { role: "MEMBER" } });
+      await merge(target.id, source.id).expect(403);
+    });
+
+    it("Manager merge → 403 (merge = Owner/Admin, не Manager)", async () => {
+      const target = await seed({ name: "T" });
+      const source = await seed({ name: "S" });
+      await prisma.membership.updateMany({ data: { role: "MANAGER" } });
       await merge(target.id, source.id).expect(403);
     });
   });

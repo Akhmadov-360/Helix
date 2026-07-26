@@ -55,8 +55,8 @@ export class ProjectsService {
     return toProjectResponse(project);
   }
 
-  // PATCH: редактируемые поля. status/phaseId/rank не принимаются (отсечены схемой).
-  // Событие project.updated — только на ЗНАЧИМЫЕ поля (value, owner) — §6.3.
+  // PATCH: редактируемые поля. status/phaseId/rank/ownerId не принимаются (отсечены схемой;
+  // ownerId — через reassign). Событие project.updated — только на ЗНАЧИМОЕ поле value (§6.3).
   async update(
     orgId: string,
     userId: string,
@@ -69,10 +69,7 @@ export class ProjectsService {
 
       const updated = await this.projects.updateFields(projectId, input, tx);
 
-      const changed: string[] = [];
-      if (input.value !== undefined && Number(before.value ?? NaN) !== input.value) changed.push("value");
-      if (input.ownerId !== undefined && before.ownerId !== input.ownerId) changed.push("owner");
-      if (changed.length > 0) {
+      if (input.value !== undefined && Number(before.value ?? NaN) !== input.value) {
         const actor = await this.users.findProfileById(userId);
         await this.activity.record(tx, {
           orgId,
@@ -81,7 +78,40 @@ export class ProjectsService {
           event: {
             type: "project.updated",
             schemaVersion: 1,
-            payload: { changed, actorName: actor?.name ?? null },
+            payload: { changed: ["value"], actorName: actor?.name ?? null },
+          },
+        });
+      }
+      return updated;
+    });
+    return toProjectResponse(row);
+  }
+
+  // Reassign владельца (Manager+, матрица «Reassign leads») — первоклассная операция, не PATCH-поле:
+  // меняет ответственность и будущий scope (visibility=ASSIGNED, M6). Событие project.updated
+  // {changed:[owner]} — только при фактической смене (§6.3).
+  async reassign(
+    orgId: string,
+    userId: string,
+    projectId: string,
+    ownerId: string | null,
+  ): Promise<ProjectResponse> {
+    const row = await this.prisma.client.$transaction(async (tx) => {
+      const before = await this.projects.findByIdInOrg(projectId, orgId, tx);
+      if (!before) throw new ResourceNotFoundError("Project not found");
+
+      const updated = await this.projects.reassignOwner(projectId, ownerId, tx);
+
+      if (before.ownerId !== ownerId) {
+        const actor = await this.users.findProfileById(userId);
+        await this.activity.record(tx, {
+          orgId,
+          projectId,
+          actorId: userId,
+          event: {
+            type: "project.updated",
+            schemaVersion: 1,
+            payload: { changed: ["owner"], actorName: actor?.name ?? null },
           },
         });
       }

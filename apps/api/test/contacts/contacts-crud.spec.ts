@@ -171,14 +171,21 @@ describe("Contact CRUD + emailNormalized (§2/§4.3, unit 5)", () => {
     });
   });
 
-  describe("authz (§2) + tenant", () => {
-    // §10: контакт — общая адресная книга, Member заводит/правит, но delete/merge = O/A.
-    it("Member: create → 201, update → 200, delete → 403", async () => {
+  // Матрица (ADR blast-radius): create=Member+, read=Member+/Viewer, update/delete=Manager+.
+  describe("authz + tenant", () => {
+    it("Member: create → 201, но update/delete → 403 (shared-объект)", async () => {
       const id = (await create({ name: "J" }).expect(201)).body.data.contact.id;
       await prisma.membership.updateMany({ data: { role: "MEMBER" } });
-      const created = await create({ name: "K" }).expect(201); // Member создаёт
-      await patch(created.body.data.contact.id).send({ name: "K2" }).expect(200); // и правит
-      await del(id).expect(403); // но не удаляет
+      await create({ name: "K" }).expect(201); // create — Member+
+      await patch(id).send({ name: "K2" }).expect(403); // update — Manager+
+      await del(id).expect(403); // delete — Manager+
+    });
+
+    it("Manager: update → 200, delete → 200 (было O/A)", async () => {
+      const id = (await create({ name: "J" }).expect(201)).body.data.contact.id;
+      await prisma.membership.updateMany({ data: { role: "MANAGER" } });
+      await patch(id).send({ name: "M" }).expect(200);
+      await del(id).expect(200);
     });
 
     it("Viewer: create → 403, read → 200", async () => {

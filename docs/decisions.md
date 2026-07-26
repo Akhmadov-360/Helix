@@ -305,3 +305,62 @@ Float отвергнут: `(a+b)/2` исчерпывает мантису за ~
 одинаковый ключ; UNIQUE превратил бы безобидную гонку в отказ пользователю (для публичного интейка M5 это
 систематика, не редкость). Дубль терпим и лечится — как дедуп контактов. `id` в индексе `(phaseId, rank, id)`
 делает скан полностью упорядоченным И служит keyset-курсору.
+
+ADR: RBAC — две оси, в M1 реализована одна
+
+PRD-матрица кодирует ДВЕ независимые оси:
+Capability — разрешено ли действие в принципе (роль)
+Scope — над какими объектами (visibility: ALL/ASSIGNED)
+
+△ в PRD = capability allowed, scope=ASSIGNED.
+M1 реализует ТОЛЬКО capability. Scope временно = ORG.
+M6 добавляет visibility-scope как условие на объект в CASL
+(can('update','Project',{assigneeId})), НЕ переписывая capability.
+
+Следствие для тестов: тесты M1 проверяют capability
+("Member может X"), НЕ org-wide видимость. Последнее временно
+и не является контрактом — иначе M6 ломает их массово.
+
+△-строки в M1: capability=allow, scope=ORG (Member работает
+во всей орге, сужение до assigned — M6).
+
+ADR: Contact/Company — операции расщеплены по blast radius
+
+Contact/Company — org-scoped SHARED resource: правка видна ВСЕМ,
+в отличие от pipeline-сущностей (правка локальна сделке).
+Поэтому доступ асимметричен create vs mutate:
+
+Create Member+ (добавление не ломает чужое)
+Read Member+
+Update Manager+ (правка shared-объекта — ответственность)
+Delete Manager+ (+ Restrict от ProjectContact, D2)
+Merge Owner/Admin (необратимо по связям, §7.7)
+
+Отвергнуто: полный Member CRUD (blast radius) и ownership-фильтр
+"Member правит своё" (это scope-механизм → M6, не плодить вторую
+историю про scope).
+
+Правка contacts.md §2: create=Member+, update/delete=Manager+
+(прежнее "O/A/M на всё" было неверно для create).
+
+ADR: reassign лида — первоклассная операция, не поле PATCH
+
+Матрица: edit lead=Member+, reassign lead=Manager+. Но ownerId —
+поле Project, а action-level CASL (can('update','Project')) не видит
+полей: дав Member update, PATCH {ownerId} даёт Member право Manager'а.
+Это НЕ недосмотр — граница action-level механизма (field-level = другой
+уровень гранулярности).
+
+Почему нельзя отложить: ownerId определяет scope в M6 (visibility=
+ASSIGNED). Member, переназначив ownerId на себя, в M6 присвоит лид вне
+своего scope → field-level дыра M1 = обход visibility в M6. Две оси
+смыкаются в уязвимость.
+
+Решение (вариант A): ownerId вычищен из UpdateProjectSchema; reassign —
+отдельный эндпоинт POST /projects/:id/reassign под can('reassign',
+'Project') (Manager+). Тот же ход, что move вынесен из PATCH: операция с
+иной семантикой и правами — отдельный эндпоинт, не поле общего update.
+Отвергнуто: field-level CASL (правило под каждое поле, плохо масштаб.)
+и проверка в сервисе (прячет authz вне CASL). create по-прежнему
+принимает ownerId — начальное назначение при создании ≠ переназначение
+существующего лида (последнее и есть охраняемая операция).

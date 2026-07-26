@@ -86,7 +86,7 @@ export class ProjectsRepository {
     return (tx ?? this.prisma.client).project.update({ where: { id }, data: { status }, select: PROJECT_SELECT });
   }
 
-  // PATCH: только редактируемые поля (не phaseId/rank/status — их меняет move/archive).
+  // PATCH: только редактируемые поля (не phaseId/rank/status — move/archive; не ownerId — reassign).
   updateFields(
     id: string,
     data: {
@@ -95,11 +95,24 @@ export class ProjectsRepository {
       currency?: string;
       source?: string;
       companyId?: string;
-      ownerId?: string;
     },
     tx?: Prisma.TransactionClient,
   ): Promise<ProjectRow> {
     return (tx ?? this.prisma.client).project.update({ where: { id }, data, select: PROJECT_SELECT });
+  }
+
+  // Reassign (§ матрица «Reassign leads»): смена владельца — отдельная операция, не поле PATCH.
+  // null = снять владельца.
+  reassignOwner(
+    id: string,
+    ownerId: string | null,
+    tx?: Prisma.TransactionClient,
+  ): Promise<ProjectRow> {
+    return (tx ?? this.prisma.client).project.update({
+      where: { id },
+      data: { ownerId },
+      select: PROJECT_SELECT,
+    });
   }
 
   async delete(id: string, tx?: Prisma.TransactionClient): Promise<void> {

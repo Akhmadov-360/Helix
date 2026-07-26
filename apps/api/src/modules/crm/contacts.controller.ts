@@ -96,10 +96,11 @@ export class ContactsController {
     return null;
   }
 
-  // Слить sourceId в :id (target). Деструктив → политика delete Contact (O/A, §2). Не создание → 200.
+  // Слить sourceId в :id (target). Необратим по связям (§7.7) → отдельный action merge (=Owner/Admin,
+  // строже delete=Manager+). Не создание → 200.
   @Post(":id/merge")
   @HttpCode(HttpStatus.OK)
-  @CheckPolicy("delete", "Contact")
+  @CheckPolicy("merge", "Contact")
   @ApiOkResponse({ description: "source влит в target, source погашен (§7)" })
   merge(
     @CurrentAuth() auth: AuthContext,
