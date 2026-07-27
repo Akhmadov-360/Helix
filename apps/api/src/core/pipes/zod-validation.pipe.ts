@@ -2,17 +2,9 @@ import { Injectable, type PipeTransform } from "@nestjs/common";
 import type { ZodType } from "zod";
 
 /**
- * Валидация тела/параметров через Zod-схему из @helix/api-schemas.
- * НЕ class-validator, НЕ DTO-классы (CLAUDE.md).
- *
- * Применяется per-route со схемой в конструкторе — идиоматичный no-DTO паттерн
- * (pipes не видят handler/Reflector, только ArgumentMetadata, поэтому единой
- * APP_PIPE-регистрации без DTO-метатипов нет):
- *
- *   @Post()
- *   create(@Body(new ZodValidationPipe(createProjectSchema)) dto: CreateProjectInput) { ... }
- *
- * `schema.parse` бросает ZodError → AllExceptionsFilter превращает в 400.
+ * Валидация тела/query через Zod-схему из @helix/api-schemas (НЕ class-validator, НЕ DTO — CLAUDE.md).
+ * Per-route (схема в конструкторе): pipe видит только значение + ArgumentMetadata, не handler/Reflector,
+ * поэтому глобальной APP_PIPE-регистрации без DTO-метатипов нет. schema.parse → ZodError → фильтр → 400.
  */
 @Injectable()
 export class ZodValidationPipe<T> implements PipeTransform<unknown, T> {

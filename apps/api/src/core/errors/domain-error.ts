@@ -139,7 +139,9 @@ export class PhaseNotEmptyError extends ConflictError {
  * mergedIntoId (подсказка «привяжите target»).
  */
 export class LinkMergedContactError extends ConflictError {
-  readonly code = "CONTACT_MERGED";
+  // Отдельный код от 410 CONTACT_MERGED: там «доступ к смёрженному по его id», здесь «попытка
+  // привязать смёрженного из связи». Один code на оба сбил бы фронт (разный статус, разный смысл).
+  readonly code = "CONTACT_MERGED_LINK";
 
   constructor(override readonly details: { mergedIntoId: string }) {
     super("Contact was merged; link the target contact instead");

@@ -98,7 +98,7 @@ describe("ProjectContact CRUD (§2/§5, unit 3)", () => {
       const target = await seedContact({ name: "T" });
       const merged = await seedContact({ name: "M", mergedIntoId: target.id });
       const res = await link(projectId, { contactId: merged.id, roles: [] }).expect(409);
-      expect(res.body.error.code).toBe("CONTACT_MERGED");
+      expect(res.body.error.code).toBe("CONTACT_MERGED_LINK");
       expect(res.body.error.details.mergedIntoId).toBe(target.id);
     });
 
