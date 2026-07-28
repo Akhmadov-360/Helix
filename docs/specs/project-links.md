@@ -76,7 +76,7 @@ enum DealRole { CHAMPION DECISION_MAKER ECONOMIC_BUYER TECHNICAL_BUYER INFLUENCE
   ответственных — управленческое действие, не рядовое. Consistency: и owner (reassign), и co-workers
   (assignee) — одна модель прав, оба Manager+, оба отдельные action (не поля в PATCH).
 
-`orgId` — только из ALS. Чужой проект/контакт по прямому id → **404**.
+`orgId` — только из токена (`request.auth`). Чужой проект/контакт по прямому id → **404**.
 
 ---
 

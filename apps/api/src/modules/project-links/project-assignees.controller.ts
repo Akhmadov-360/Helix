@@ -19,7 +19,7 @@ import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { ProjectAssigneesService } from "./project-assignees.service";
 
 // Co-workers сделки. read — все; назначение/снятие — Manager+ (§2: управленческое действие,
-// одна модель прав с reassign owner). orgId только из ALS; чужой проект → 404.
+// одна модель прав с reassign owner). orgId только из токена (request.auth); чужой проект → 404.
 @ApiTags("project-assignees")
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, PoliciesGuard)

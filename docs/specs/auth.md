@@ -10,7 +10,7 @@
 
 ## 0. Скоуп M0
 
-**В скоупе:** регистрация · логин · выдача токенов · защищённые эндпоинты (guard → ALS-контекст) ·
+**В скоупе:** регистрация · логин · выдача токенов · защищённые эндпоинты (guard → `request.auth`) ·
 refresh с ротацией и reuse-detection · logout · logout-all · switch-org.
 
 Auth M0 отвечает на **«кто ты»** (identity), а НЕ на **«что тебе можно»** (authorization). Guard кладёт
@@ -172,7 +172,7 @@ TTL (N от последнего использования) — возможн�
 ## 6. Мультитенантность — activeOrgId в токене, role НЕ в токене
 
 Пользователь может быть в нескольких оргах (`Membership` m-n). Access несёт **`activeOrgId`** (guard кладёт
-его в ALS-контекст → tenant-скоуп всех запросов; composite-FK backbone физически запирает данные к этой орге).
+его в `request.auth`; сервисы скоупят запросы **явным `orgId`**; composite-FK backbone физически запирает данные к этой орге).
 
 **Роль в токене НЕ кладём.** Читается из `Membership(activeOrgId, userId)` (у нас `@@unique([orgId,userId])`)
 **один раз за запрос** в guard.
@@ -270,11 +270,12 @@ RegistrationService (application/use-case слой — оркестратор с
 
 1. Достать access из `Authorization: Bearer` → проверить подпись → извлечь `{userId, activeOrgId, jti}`.
 2. Прочитать `Membership(activeOrgId, userId)` → `role`. Нет membership → 403/401 (исключён из орги).
-3. Положить `{userId, activeOrgId, role}` в **ALS-контекст** (тот самый `TenantContextInterceptor`, что уже
-   в каркасе — теперь наполняется реальными данными вместо заглушки).
+3. Положить `{userId, activeOrgId, role}` в **`request.auth`**. Контроллеры читают его через `@CurrentAuth`
+   и передают `activeOrgId` явным аргументом в сервисы (ALS-задел удалён — см. decisions.md «тенант через
+   явный orgId, не ALS»).
 
-Данные, которые эндпоинт потом трогает, скоупятся по `activeOrgId` из контекста; composite-FK гарантирует,
-что чужая орга не подмешается.
+Данные, которые эндпоинт потом трогает, скоупятся **явным `orgId`** из `request.auth`; composite-FK
+гарантирует, что чужая орга не подмешается.
 
 ---
 
@@ -285,14 +286,14 @@ RegistrationService (application/use-case слой — оркестратор с
    - Membership(OWNER). AuthService получает готового User. (Org/Membership уже в схеме — M0-ядро.)
 3. Логин (verify + progressive rehash).
 4. Выдача access JWT. **+ скелет JwtAuthGuard** — чтобы защитить тестовый эндпоинт и доказать, что токен
-   валиден (полный ALS+membership guard — шаг 11, но минимальный нужен здесь для тестируемости шагов 5–10).
+   валиден (полный membership guard — шаг 11, но минимальный нужен здесь для тестируемости шагов 5–10).
 5. RefreshSession в БД (создание на логине, sha256 hash, familyId, cookie).
 6. Refresh endpoint (лукап, выдача нового access).
 7. Ротация + reuse detection (инвариант «ровно один раз», kill family).
 8. Logout (revoke сессии).
 9. Logout-all (revoke всех сессий).
 10. Switch-org (переиздание access с новым activeOrgId).
-11. Полный ALS Guard (userId + activeOrgId + role из Membership в контекст).
+11. Полный Guard (userId + activeOrgId + role из Membership в `request.auth`).
 
 Каждый шаг строится на предыдущем и тестируется отдельно.
 
@@ -319,7 +320,7 @@ Auth — фича, где ошибка = дыра в безопасности, �
   - logout закрывает доступ: refresh после logout → 401.
   - switch-org: без membership → 403; с membership → новый access с новым `activeOrgId`.
   - guard: валидный access → роль читается свежей; юзер исключён из орги → отказ СРАЗУ (не через 15 мин).
-  - **tenant-изоляция:** access с `activeOrgId=A` не достаёт данные орги B (composite-FK + ALS запирают).
+  - **tenant-изоляция:** access с `activeOrgId=A` не достаёт данные орги B (composite-FK + явный `orgId`-фильтр запирают).
   - **конкурентность:** два одновременных refresh с одним токеном → один выигрывает, второй ловит reuse.
 
 - **E2E** — на M0 избыточно (Supertest in-process покрывает), приберечь.
@@ -342,8 +343,8 @@ in-place (§5, запрещено). Это не «проверить сейча�
 - **Refresh украли — как узнаешь?** Инвариант «ровно один раз» + reuse detection: повторный приход
   использованного токена = аномалия → kill family.
 - **Почему kill family, а не просто отказ?** Нельзя отличить вора от юзера → безопасно только убить цепочку.
-- **Юзер в двух оргах — как не дать чужие данные?** `activeOrgId` в токене → ALS → composite-FK backbone
-  физически запирает.
+- **Юзер в двух оргах — как не дать чужие данные?** `activeOrgId` в токене → `request.auth` → явный
+  `orgId`-фильтр + composite-FK backbone физически запирает.
 - **Почему role не в JWT?** Устаревает (stale authz) + membership читается 1 раз/запрос бесплатно + ловит
   исключение из орги мгновенно.
 - **Почему argon2 для пароля, но sha256 для refresh?** Пароль низкоэнтропийный (нужен медленный memory-hard);

@@ -28,7 +28,7 @@ import { ZodValidationPipe } from "../../core/pipes/zod-validation.pipe";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { CompaniesService } from "./companies.service";
 
-// orgId — только из ALS (токена), никогда из тела/query (§2). Чужой ресурс → 404.
+// orgId — только из токена (request.auth), никогда из тела/query (§2). Чужой ресурс → 404.
 @ApiTags("companies")
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, PoliciesGuard)
