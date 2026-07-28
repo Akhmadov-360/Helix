@@ -54,8 +54,20 @@ export class TaskRepository {
     return (tx ?? this.prisma.client).task.update({ where: { id }, data, select: TASK_SELECT });
   }
 
-  setDone(id: string, done: boolean, tx?: Prisma.TransactionClient): Promise<TaskRow> {
-    return (tx ?? this.prisma.client).task.update({ where: { id }, data: { done }, select: TASK_SELECT });
+  // Атомарный compare-and-set done (§5): переводит from→to ТОЛЬКО если текущее = from. count=1 —
+  // этот вызов выиграл переход; count=0 — уже переведён параллельным. Консистентно с markUsed/
+  // bumpVersionIf: гонку решает БД, не «прочитать-потом-записать» (иначе два complete = два события).
+  async setDoneIf(
+    id: string,
+    from: boolean,
+    to: boolean,
+    tx?: Prisma.TransactionClient,
+  ): Promise<number> {
+    const { count } = await (tx ?? this.prisma.client).task.updateMany({
+      where: { id, done: from },
+      data: { done: to },
+    });
+    return count;
   }
 
   async delete(id: string, tx?: Prisma.TransactionClient): Promise<void> {
