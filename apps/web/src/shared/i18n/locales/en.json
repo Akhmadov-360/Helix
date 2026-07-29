@@ -1,0 +1,22 @@
+{
+  "login.title": "Sign in to Helix",
+  "login.subtitle": "Sign in to your workspace account",
+  "login.email": "Email",
+  "login.password": "Password",
+  "login.submit": "Sign in",
+  "login.submitting": "Signing in…",
+  "login.error.invalidCredentials": "Invalid email or password",
+  "login.error.network": "No connection to the server. Check your network",
+  "login.error.generic": "Could not sign in. Please try again",
+  "shell.logout": "Sign out",
+  "home.welcome": "Welcome to Helix.",
+  "role.OWNER": "Owner",
+  "role.ADMIN": "Admin",
+  "role.MANAGER": "Manager",
+  "role.MEMBER": "Member",
+  "role.VIEWER": "Viewer",
+  "validation.email": "Invalid email address",
+  "validation.required": "This field is required",
+  "validation.tooShort": "At least {min} characters",
+  "validation.tooLong": "At most {max} characters"
+}

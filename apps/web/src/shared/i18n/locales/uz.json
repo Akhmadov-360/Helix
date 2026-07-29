@@ -1,0 +1,22 @@
+{
+  "login.title": "Helix'ga kirish",
+  "login.subtitle": "Ish hisobingizga kiring",
+  "login.email": "Email",
+  "login.password": "Parol",
+  "login.submit": "Kirish",
+  "login.submitting": "Kirilmoqda…",
+  "login.error.invalidCredentials": "Email yoki parol noto‘g‘ri",
+  "login.error.network": "Server bilan aloqa yo‘q. Ulanishni tekshiring",
+  "login.error.generic": "Kirib bo‘lmadi. Qaytadan urinib ko‘ring",
+  "shell.logout": "Chiqish",
+  "home.welcome": "Helix'ga xush kelibsiz.",
+  "role.OWNER": "Egasi",
+  "role.ADMIN": "Administrator",
+  "role.MANAGER": "Menejer",
+  "role.MEMBER": "A'zo",
+  "role.VIEWER": "Kuzatuvchi",
+  "validation.email": "Email formati noto‘g‘ri",
+  "validation.required": "Majburiy maydon",
+  "validation.tooShort": "Kamida {min} ta belgi",
+  "validation.tooLong": "Ko‘pi bilan {max} ta belgi"
+}

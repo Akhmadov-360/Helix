@@ -1,0 +1,22 @@
+{
+  "login.title": "Вход в Helix",
+  "login.subtitle": "Войдите в свой рабочий аккаунт",
+  "login.email": "Email",
+  "login.password": "Пароль",
+  "login.submit": "Войти",
+  "login.submitting": "Вход…",
+  "login.error.invalidCredentials": "Неверный email или пароль",
+  "login.error.network": "Нет связи с сервером. Проверьте подключение",
+  "login.error.generic": "Не удалось войти. Попробуйте ещё раз",
+  "shell.logout": "Выйти",
+  "home.welcome": "Добро пожаловать в Helix.",
+  "role.OWNER": "Владелец",
+  "role.ADMIN": "Администратор",
+  "role.MANAGER": "Менеджер",
+  "role.MEMBER": "Участник",
+  "role.VIEWER": "Наблюдатель",
+  "validation.email": "Неверный формат email",
+  "validation.required": "Обязательное поле",
+  "validation.tooShort": "Минимум {min} символов",
+  "validation.tooLong": "Максимум {max} символов"
+}
