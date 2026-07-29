@@ -1,0 +1,3 @@
+/* Tailwind v4 — CSS-first. Дизайн-токены (--color-* --space-* --radius-*, .dark) въезжают
+   через @theme в вехе A1b (frontend-architecture.md §9.4). Пока — только подключение движка. */
+@import "tailwindcss";
