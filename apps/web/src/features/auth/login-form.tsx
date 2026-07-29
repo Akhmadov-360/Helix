@@ -5,8 +5,10 @@ import { useNavigate } from "@tanstack/react-router";
 import { authResultSchema, loginSchema, type LoginInput } from "@helix/api-schemas";
 import { Button, Input, Label } from "@helix/ui";
 import { request, setAccessToken, TransportError } from "../../shared/api";
+import { useT, type MessageKey } from "../../shared/i18n";
 
 export function LoginForm() {
+  const t = useT();
   const navigate = useNavigate();
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
@@ -23,7 +25,7 @@ export function LoginForm() {
   });
 
   const { errors } = form.formState;
-  const rootError = login.isError ? messageForLoginError(login.error) : null;
+  const rootError = login.isError ? t(loginErrorKey(login.error)) : null;
 
   return (
     <form
@@ -32,7 +34,7 @@ export function LoginForm() {
       className="flex flex-col gap-4"
     >
       <div className="flex flex-col gap-2">
-        <Label htmlFor="email">Email</Label>
+        <Label htmlFor="email">{t("login.email")}</Label>
         <Input
           id="email"
           type="email"
@@ -44,7 +46,7 @@ export function LoginForm() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="password">Пароль</Label>
+        <Label htmlFor="password">{t("login.password")}</Label>
         <Input
           id="password"
           type="password"
@@ -62,17 +64,17 @@ export function LoginForm() {
       )}
 
       <Button type="submit" disabled={login.isPending}>
-        {login.isPending ? "Вход…" : "Войти"}
+        {login.isPending ? t("login.submitting") : t("login.submit")}
       </Button>
     </form>
   );
 }
 
-// Feature интерпретирует транспортный исход в доменный текст (§6.4): на логине 401 = неверные креды.
-function messageForLoginError(error: unknown): string {
+// Feature интерпретирует транспортный исход в доменный ключ (§6.4): на логине 401 = неверные креды.
+function loginErrorKey(error: unknown): MessageKey {
   if (error instanceof TransportError) {
-    if (error.kind === "unauthorized") return "Неверный email или пароль";
-    if (error.kind === "network") return "Нет связи с сервером. Проверьте подключение";
+    if (error.kind === "unauthorized") return "login.error.invalidCredentials";
+    if (error.kind === "network") return "login.error.network";
   }
-  return "Не удалось войти. Попробуйте ещё раз";
+  return "login.error.generic";
 }
