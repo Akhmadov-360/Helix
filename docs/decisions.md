@@ -410,3 +410,20 @@ ALS-задел (TenantContextInterceptor, tenantStorage, currentTenant, TenantCo
 удалён как незавершённая параллельная реализация, не мусор — осознанный выбор
 единого механизма. При переезде на Postgres RLS (M6+) тенант уйдёт на уровень
 БД — тогда пересмотреть.
+
+ADR-FE-1: TanStack Router вместо зафиксированного React Router
+
+PRD §12.3 / CLAUDE.md пинили React Router. Фронт (frontend-architecture.md §4)
+отклоняется на TanStack Router. Причины:
+- client-heavy SPA-дашборд; типизированные search-params под фильтры доски,
+  которые держим в URL;
+- общий кэш и паттерн мутаций с уже выбранным TanStack Query;
+- end-to-end типобезопасность путей/params без codegen.
+
+React Router v7 раскрывает типобезопасность только в framework-mode/SSR. Helix —
+SPA, деплой статикой на CDN, SSR нет → в library-mode остались бы с ручным
+приведением search-params. Цена: экосистема меньше, расхождение с PRD-стеком.
+Принято.
+
+Полное обоснование и производные решения (loader = только прогрев кэша,
+file-based роуты, pathless-группировка) — frontend-architecture.md §4.
