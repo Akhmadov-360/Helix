@@ -38,6 +38,11 @@ export const envSchema = z.object({
    * Диапазон из §1 — 7–30 дней; берём верхнюю границу как компромисс с удобством.
    */
   REFRESH_TTL_DAYS: z.coerce.number().int().positive().max(90).default(30),
+
+  // ── CORS (M1 — apps/web как отдельный origin) ────────────────────────────────
+  // Refresh-cookie идёт с credentials: "include" (auth.md §4) → нужен ТОЧНЫЙ origin
+  // в Access-Control-Allow-Origin, wildcard "*" с credentials браузер отклоняет.
+  WEB_ORIGIN: z.url().default("http://localhost:5173"),
 });
 
 export type Env = z.infer<typeof envSchema>;
