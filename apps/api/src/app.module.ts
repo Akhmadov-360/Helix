@@ -11,7 +11,6 @@ import { TasksModule } from "./modules/tasks/tasks.module";
 import { HealthModule } from "./modules/health/health.module";
 import { AllExceptionsFilter } from "./core/filters/all-exceptions.filter";
 import { ResponseTransformInterceptor } from "./core/interceptors/response-transform.interceptor";
-import { TenantContextInterceptor } from "./core/interceptors/tenant-context.interceptor";
 
 @Module({
   imports: [
@@ -28,8 +27,6 @@ import { TenantContextInterceptor } from "./core/interceptors/tenant-context.int
   providers: [
     // Глобальные cross-cutting провайдеры через APP_* (DI-friendly).
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
-    // Порядок важен: tenant-context ставит ALS до handler'а, response оборачивает после.
-    { provide: APP_INTERCEPTOR, useClass: TenantContextInterceptor },
     { provide: APP_INTERCEPTOR, useClass: ResponseTransformInterceptor },
   ],
 })

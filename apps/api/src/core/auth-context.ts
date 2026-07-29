@@ -4,37 +4,25 @@ import type { Role as ContractRole } from "@helix/api-schemas";
 import type { Request } from "express";
 import { InvalidTokenError } from "./errors/domain-error";
 
-/**
- * Страж от расхождения источников. `Role` объявлен дважды: в schema.prisma (домен,
- * источник истины) и в api-schemas (контракт для фронта, который Prisma не подключает).
- * Взаимная проверка присваиваемости роняет СБОРКУ, если наборы разойдутся, — иначе
- * рассинхрон всплыл бы рантайм-ошибкой у клиента.
- */
-// `_A` фигурирует только в ограничении — проверка и есть смысл этого типа.
+// Parity-guard: Role объявлена и в schema.prisma (домен), и в api-schemas (контракт). Эти типы
+// роняют СБОРКУ, если наборы ролей разойдутся (проверка = сам факт их существования, не мёртвый код).
 type AssignableTo<_A extends B, B> = never;
 type _DomainRoleFitsContract = AssignableTo<Role, ContractRole>;
 type _ContractRoleFitsDomain = AssignableTo<ContractRole, Role>;
 
-/**
- * Что guard кладёт в запрос: личность из подписи + роль, прочитанная из Membership.
- * `role` приходит ИЗ БД, а не из токена (§6) — поэтому она всегда актуальна.
- */
+// Что guard кладёт в request.auth. role — из БД (Membership), не из токена → всегда актуальна.
 export interface AuthContext {
   userId: string;
   activeOrgId: string;
   role: Role;
-  jti: string;
 }
 
 export interface AuthenticatedRequest extends Request {
   auth?: AuthContext;
 }
 
-/**
- * Достаёт auth-контекст в контроллере, чтобы тот не лез в сырой request.
- * Отсутствие контекста означает, что эндпоинт забыли закрыть guard'ом, —
- * это дефект конфигурации, поэтому ошибка, а не «молча undefined».
- */
+// Достаёт auth из request в контроллере. Нет auth = эндпоинт забыли закрыть guard'ом → ошибка,
+// а не молчаливый undefined, который упадёт где-то дальше.
 export const CurrentAuth = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext): AuthContext => {
     const request = ctx.switchToHttp().getRequest<AuthenticatedRequest>();

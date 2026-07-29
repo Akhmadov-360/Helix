@@ -73,28 +73,36 @@ export class TasksService {
     await this.tasks.delete(taskId); // §5: delete события НЕ пишет (изменение чеклиста, не веха лида)
   }
 
-  // §5: complete ИДЕМПОТЕНТЕН — уже done → no-op, 200, БЕЗ нового события (защита от двойного клика/
-  // retry: иначе дубль вехи в ленте). Событие task.completed атомарно с done=true (P4).
+  // §5: complete ИДЕМПОТЕНТЕН. Fast-path (уже done → no-op без tx) ловит последовательный
+  // двойной клик; атомарный CAS false→true внутри tx ловит ИСТИННУЮ гонку — событие пишет только
+  // победитель (won), поэтому два параллельных complete дают одно task.completed, а не два (P4).
   async complete(orgId: string, userId: string, taskId: string): Promise<TaskResponse> {
-    const task = await this.tasks.findByIdInOrg(taskId, orgId);
-    if (!task) throw new ResourceNotFoundError("Task not found");
-    if (task.done) return toTaskResponse(task); // уже завершён → no-op
+    const existing = await this.tasks.findByIdInOrg(taskId, orgId);
+    if (!existing) throw new ResourceNotFoundError("Task not found");
+    if (existing.done) return toTaskResponse(existing);
 
     const row = await this.prisma.client.$transaction(async (tx) => {
-      const updated = await this.tasks.setDone(taskId, true, tx);
-      await this.recordTaskEvent(tx, "task.completed", orgId, userId, updated);
-      return updated;
+      const won = (await this.tasks.setDoneIf(taskId, false, true, tx)) === 1;
+      const fresh = await this.tasks.findByIdInOrg(taskId, orgId, tx);
+      if (!fresh) throw new Error("task vanished within its own transaction");
+      if (won) await this.recordTaskEvent(tx, "task.completed", orgId, userId, fresh);
+      return fresh;
     });
     return toTaskResponse(row);
   }
 
-  // §5: reopen идемпотентен (уже open → no-op) и НЕ пишет событие — отмена вехи не несёт новой
-  // бизнес-информации о лиде (полный трек — AuditLog-территория M6, не лента сделки).
+  // §5: reopen идемпотентен и НЕ пишет событие (отмена вехи не несёт новой бизнес-информации; полный
+  // трек — AuditLog M6). Тот же атомарный CAS ради консистентности с complete — здесь гонка безобидна
+  // (нет события), но примитив единый: не «прочитать-потом-записать».
   async reopen(orgId: string, taskId: string): Promise<TaskResponse> {
-    const task = await this.tasks.findByIdInOrg(taskId, orgId);
-    if (!task) throw new ResourceNotFoundError("Task not found");
-    if (!task.done) return toTaskResponse(task); // уже открыт → no-op
-    return toTaskResponse(await this.tasks.setDone(taskId, false));
+    const existing = await this.tasks.findByIdInOrg(taskId, orgId);
+    if (!existing) throw new ResourceNotFoundError("Task not found");
+    if (!existing.done) return toTaskResponse(existing);
+
+    await this.tasks.setDoneIf(taskId, true, false);
+    const fresh = await this.tasks.findByIdInOrg(taskId, orgId);
+    if (!fresh) throw new ResourceNotFoundError("Task not found");
+    return toTaskResponse(fresh);
   }
 
   private async assertProjectInOrg(orgId: string, projectId: string): Promise<void> {

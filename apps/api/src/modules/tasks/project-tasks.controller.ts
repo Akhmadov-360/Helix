@@ -8,7 +8,7 @@ import { ZodValidationPipe } from "../../core/pipes/zod-validation.pipe";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { TasksService } from "./tasks.service";
 
-// Таски сделки. read — все; создание — Member+ (§2, часть «edit leads»). orgId из ALS; чужой проект → 404.
+// Таски сделки. read — все; создание — Member+ (§2, часть «edit leads»). orgId из токена (request.auth); чужой проект → 404.
 @ApiTags("tasks")
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, PoliciesGuard)

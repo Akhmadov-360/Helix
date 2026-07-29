@@ -27,7 +27,7 @@ import { ZodValidationPipe } from "../../core/pipes/zod-validation.pipe";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { WorkspacesService } from "./workspaces.service";
 
-// orgId берётся ТОЛЬКО из ALS-контекста (токена), никогда из тела/query — иначе
+// orgId берётся ТОЛЬКО из токена (request.auth), никогда из тела/query — иначе
 // клиент создал бы ресурс в чужой орге (§1 спеки). Ролевые ограничения — через @CheckPolicy.
 @ApiTags("workspaces")
 @ApiBearerAuth()

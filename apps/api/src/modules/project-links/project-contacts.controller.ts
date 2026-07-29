@@ -26,7 +26,7 @@ import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { ProjectContactsService } from "./project-contacts.service";
 
 // Состав сделки. read — все; мутации — Member+ (§2: работа с составом = «edit leads» △).
-// orgId только из ALS; чужой проект/контакт → 404.
+// orgId только из токена (request.auth); чужой проект/контакт → 404.
 @ApiTags("project-contacts")
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, PoliciesGuard)

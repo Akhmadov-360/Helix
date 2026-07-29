@@ -35,7 +35,7 @@ import { ZodValidationPipe } from "../../core/pipes/zod-validation.pipe";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { ContactsService } from "./contacts.service";
 
-// orgId — только из ALS (§2). Чужой ресурс → 404. dedup-check и merge — отдельные единицы (6/7).
+// orgId — только из токена (request.auth) (§2). Чужой ресурс → 404. dedup-check и merge — отдельные единицы (6/7).
 @ApiTags("contacts")
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, PoliciesGuard)

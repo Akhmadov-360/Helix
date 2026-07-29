@@ -117,7 +117,7 @@ model AuditLog {
 | PATCH  | `/v1/companies/:id`        | O/A/M | правка                                |
 | DELETE | `/v1/companies/:id`        | O/A   | удалить (контакты → companyId NULL)   |
 
-**`orgId` НИКОГДА не из тела/query** — только ALS. **Чужой ресурс → 404, не 403.**
+**`orgId` НИКОГДА не из тела/query** — только из токена (`request.auth`). **Чужой ресурс → 404, не 403.**
 Merge и delete — только O/A (деструктивно), остальное — O/A/M. Member/Viewer — чтение.
 
 ---
@@ -522,5 +522,5 @@ CONSTRAINT`. Это тот же zero-downtime-вопрос, что панель 
 **Tenant / roles**
 
 - Member на POST contact → 201; Member на merge → 403 (только O/A);
-- `orgId` из тела игнорируется, берётся из ALS;
+- `orgId` из тела игнорируется, берётся из токена (`request.auth`);
 - чужой контакт по прямому id → 404.

@@ -24,7 +24,8 @@ Helix — AI-native project-based CRM: **каждый лид = проект-во
 - **DB/ORM:** Prisma + PostgreSQL 17 (pgvector — с M4)
 - **Валидация/контракты:** **Zod** (`packages/api-schemas`) — НЕ class-validator (см. Конвенции)
 - **Authz:** CASL (policy guards) · **Async:** Redis + BullMQ · **Files:** S3 SDK (S3/MinIO)
-- **Frontend (apps/web, с M1):** Vite + React, React Router, TanStack Query (server state),
+- **Frontend (apps/web, с M1):** Vite + React, **TanStack Router** (ADR-FE-1 — отклонение от
+  PRD-пина React Router, см. decisions.md), TanStack Query (server state),
   Zustand (UI state), Tailwind + shadcn/ui, dnd-kit (kanban), TipTap (pages)
 - **Docs:** @nestjs/swagger → OpenAPI
 

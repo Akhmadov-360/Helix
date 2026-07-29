@@ -7,9 +7,8 @@ import {
 import { prisma, type PrismaClient } from "@helix/db";
 
 /**
- * Обёртка над singleton-клиентом из @helix/db (не создаём новый — один пул на
- * процесс, одна точка для tenant-middleware в M1). Управляет жизненным циклом
- * соединения через lifecycle-хуки Nest.
+ * Обёртка над singleton-клиентом из @helix/db (не создаём новый — один пул соединений на
+ * процесс). Управляет жизненным циклом соединения через lifecycle-хуки Nest.
  */
 @Injectable()
 export class PrismaService implements OnModuleInit, OnModuleDestroy {

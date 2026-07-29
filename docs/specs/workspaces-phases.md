@@ -34,7 +34,7 @@ CASL-guard на org-роли · raw-SQL миграция DEFERRABLE unique + т�
 Роли: O=OWNER, A=ADMIN, M=MANAGER (Appendix B «Create/configure workspaces & phases»).
 Member/Viewer — только чтение → 403 на мутации.
 
-**`orgId` НИКОГДА не принимается из тела/query** — только из ALS-контекста (из токена). Иначе клиент
+**`orgId` НИКОГДА не принимается из тела/query** — только из токена (`request.auth`). Иначе клиент
 создаст ресурс в чужой орге. Тенант приходит из контекста, не из пользовательского ввода.
 
 ---

@@ -87,11 +87,18 @@ describe("Task complete/reopen + события (§5, unit 3)", () => {
   });
 
   describe("идемпотентность (§5)", () => {
-    it("двойной complete → одно событие, оба 200", async () => {
+    it("двойной complete (последовательно) → одно событие, оба 200", async () => {
       const t = (await create({ title: "T" }).expect(201)).body.data;
       await complete(t.id).expect(200);
       await complete(t.id).expect(200); // уже done → no-op
       expect(await eventCount("task.completed")).toBe(1);
+    });
+
+    it("два ПАРАЛЛЕЛЬНЫХ complete → одно событие (CAS, не дубль вехи)", async () => {
+      const t = (await create({ title: "T" }).expect(201)).body.data;
+      const [r1, r2] = await Promise.all([complete(t.id), complete(t.id)]);
+      expect([r1.status, r2.status]).toEqual([200, 200]); // оба успешны
+      expect(await eventCount("task.completed")).toBe(1); // но событие одно (победитель CAS)
     });
 
     it("reopen на open → no-op, 200, события нет", async () => {
