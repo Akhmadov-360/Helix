@@ -37,3 +37,6 @@ coverage/
 
 # docker volumes (if bind-mounted locally)
 .docker-data/
+
+# playwright mcp session artifacts
+.playwright-mcp/

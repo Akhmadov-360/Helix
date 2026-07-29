@@ -2,6 +2,7 @@ import type { BoardResponse, LocalizedName } from "@helix/api-schemas";
 
 export interface ProjectCardViewModel {
   id: string;
+  phaseId: string;
   title: string;
   amount: { value: number; currency: string } | null;
 }
@@ -34,6 +35,7 @@ export function toBoardViewModel(data: BoardResponse): BoardViewModel {
       hasMore: phase.hasMore,
       projects: phase.projects.map((project) => ({
         id: project.id,
+        phaseId: project.phaseId,
         title: project.title,
         amount:
           project.value === null || project.currency === null
