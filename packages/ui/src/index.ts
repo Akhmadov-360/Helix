@@ -10,3 +10,4 @@ export {
   CardContent,
   CardFooter,
 } from "./components/card";
+export { Toast, toastVariants, type ToastProps } from "./components/toast";

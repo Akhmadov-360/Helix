@@ -2,6 +2,7 @@ import { Outlet } from "@tanstack/react-router";
 import { Button } from "@helix/ui";
 import { useLogout, useMe } from "../shared/auth/session";
 import { useT } from "../shared/i18n";
+import { Toaster } from "../shared/toast/toaster";
 
 // Persistent layout (§8.3): оборачивает _authenticated, не ремоунтится на навигации между роутами.
 export function AppShell() {
@@ -25,6 +26,7 @@ export function AppShell() {
       <main className="flex-1 p-6">
         <Outlet />
       </main>
+      <Toaster />
     </div>
   );
 }
