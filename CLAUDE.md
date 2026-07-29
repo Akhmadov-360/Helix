@@ -150,6 +150,22 @@ pnpm build                                        # сборка
 redis `6379` · minio `9000/9001` · тестовая БД `5434` · prisma studio `5555`. Env: `apps/api/.env`
 (DATABASE_URL, REDIS_URL, JWT-секреты, S3) — валидируется через `packages/config` на старте.
 
+### Демо-логины (ручное тестирование)
+
+`pnpm db:seed` (`packages/db/prisma/seed.ts`, идемпотентный) заводит 5 юзеров в одной орге — по одному на
+каждую роль, все с паролем `helix-demo-2026`:
+
+| Email | Пароль | Роль |
+| --- | --- | --- |
+| `owner@helix.dev` | `helix-demo-2026` | OWNER |
+| `admin@helix.dev` | `helix-demo-2026` | ADMIN |
+| `manager@helix.dev` | `helix-demo-2026` | MANAGER |
+| `member@helix.dev` | `helix-demo-2026` | MEMBER |
+| `viewer@helix.dev` | `helix-demo-2026` | VIEWER |
+
+Плюс воркспейс "Demo Board" с дефолтными фазами (lead/in-progress/won/lost) и 7 демо-проектов по колонкам —
+для ручной проверки RBAC-матрицы и канбана без API-клиента.
+
 ## Команды проекта (что и когда)
 
 Единственный источник — `package.json` каждого пакета. Ниже — что реально есть сейчас и когда применять.

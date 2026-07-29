@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { apiErrorResponseSchema } from "@helix/api-schemas";
 import { getAccessToken } from "./access-token";
+import { awaitPendingRefresh, refreshAccessToken, skipsAuthFlow } from "./refresh";
 import { TransportError, transportKindForStatus } from "./transport-error";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
@@ -36,21 +37,16 @@ function buildUrl(path: string, searchParams?: SearchParams): string {
   return url.toString();
 }
 
-/**
- * Единственная точка выхода в сеть (§6.1): разворачивает конверт, парсит по контракту,
- * нормализует ошибки в TransportError. Silent-refresh (§8.1) подключится здесь же в вехе B3.
- */
-export async function request<S extends z.ZodTypeAny>(opts: RequestOptions<S>): Promise<z.infer<S>> {
-  const { path, method = "GET", body, searchParams, schema, validate = true, signal } = opts;
+async function send<S extends z.ZodTypeAny>(opts: RequestOptions<S>): Promise<Response> {
+  const { path, method = "GET", body, searchParams, signal } = opts;
 
   const headers: Record<string, string> = {};
   const token = getAccessToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   if (body !== undefined) headers["Content-Type"] = "application/json";
 
-  let res: Response;
   try {
-    res = await fetch(buildUrl(path, searchParams), {
+    return await fetch(buildUrl(path, searchParams), {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -61,7 +57,10 @@ export async function request<S extends z.ZodTypeAny>(opts: RequestOptions<S>): 
   } catch (cause) {
     throw new TransportError({ kind: "network", message: "Network request failed", cause });
   }
+}
 
+async function parse<S extends z.ZodTypeAny>(res: Response, opts: RequestOptions<S>): Promise<z.infer<S>> {
+  const { schema, validate = true } = opts;
   const json: unknown = await res.json().catch(() => undefined);
 
   if (!res.ok) {
@@ -101,4 +100,30 @@ export async function request<S extends z.ZodTypeAny>(opts: RequestOptions<S>): 
     });
   }
   return data.data as z.infer<S>;
+}
+
+/**
+ * Единственная точка выхода в сеть (§6.1): разворачивает конверт, парсит по контракту,
+ * нормализует ошибки в TransportError. Silent-refresh single-flight (§8.1, AUTH-1) подключён здесь:
+ * проактивный lock перед отправкой + один post-refresh replay на 401 — единственный автоматический
+ * retry во всём клиенте.
+ */
+export async function request<S extends z.ZodTypeAny>(opts: RequestOptions<S>): Promise<z.infer<S>> {
+  const bypassAuthFlow = skipsAuthFlow(opts.path);
+
+  if (!bypassAuthFlow) {
+    // Не улетать со старым access, пока где-то уже идёт refresh (вторая гонка из §8.1).
+    await awaitPendingRefresh();
+  }
+
+  const res = await send(opts);
+
+  if (res.status === 401 && !bypassAuthFlow) {
+    // refreshAccessToken — single-flight; бросит SessionExpiredError при неудаче, пробрасываем как есть.
+    await refreshAccessToken();
+    const retried = await send(opts);
+    return parse(retried, opts);
+  }
+
+  return parse(res, opts);
 }
