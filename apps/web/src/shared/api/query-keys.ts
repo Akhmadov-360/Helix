@@ -6,4 +6,7 @@
 // orgId (identity), поэтому в его ключе orgId нет.
 export const queryKeys = {
   me: () => ["me"] as const,
+  workspaces: (orgId: string) => ["org", orgId, "workspaces"] as const,
+  board: (orgId: string, workspaceId: string, limitPerPhase: number) =>
+    ["org", orgId, "workspace", workspaceId, "board", { limitPerPhase }] as const,
 };

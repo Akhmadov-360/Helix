@@ -1,12 +1,19 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useT } from "../../shared/i18n";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { workspacesQueryOptions } from "../../features/workspaces/queries";
+import { meQueryOptions } from "../../shared/auth/session";
+import { getLastWorkspaceId } from "../../shared/lib/last-workspace";
 
+// "/" не рендерится — только редирект (§5 карты URL): на последний открытый воркспейс
+// (localStorage-хинт), иначе на первый из списка, иначе на пустой /workspaces.
 export const Route = createFileRoute("/_authenticated/")({
-  component: IndexPage,
-});
+  loader: async ({ context }) => {
+    const hint = getLastWorkspaceId();
+    if (hint) throw redirect({ to: "/workspaces/$workspaceId", params: { workspaceId: hint } });
 
-function IndexPage() {
-  const t = useT();
-  // Заглушка до вехи D: здесь `/` будет редиректить на последний открытый воркспейс (§6).
-  return <p className="text-muted-foreground">{t("home.welcome")}</p>;
-}
+    const me = await context.queryClient.ensureQueryData(meQueryOptions);
+    const workspaces = await context.queryClient.ensureQueryData(workspacesQueryOptions(me.activeOrgId));
+    const first = workspaces[0];
+    if (first) throw redirect({ to: "/workspaces/$workspaceId", params: { workspaceId: first.id } });
+    throw redirect({ to: "/workspaces" });
+  },
+});
