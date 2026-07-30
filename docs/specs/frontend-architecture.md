@@ -507,7 +507,7 @@ refresh failed → invalidate session → cancelQueries() → queryClient.clear(
 
 ### 8.2 Permission-aware rendering — capabilities с сервера, UI косметичен
 
-> **✅ Статус контракта (H0+H1 реализованы).** Серверный RBAC-энфорсмент (CASL) —
+> **✅ Статус контракта (H0+H1+H2 реализованы).** Серверный RBAC-энфорсмент (CASL) —
 > `apps/api/src/core/authz`: `defineAbilityForRole()` (матрица PRD Appendix B) +
 > `PoliciesGuard`/`@CheckPolicy` на каждом мутирующем эндпоинте. `capabilities` — в
 > `currentUserSchema` (H0, `core/authz/capabilities.ts::listCapabilities(role)`). FE-сторона (H1) —
@@ -518,9 +518,20 @@ refresh failed → invalidate session → cancelQueries() → queryClient.clear(
 > `attributes`/`listeners`, не красят `cursor-grab`), когда capability нет; сервер остаётся
 > единственным энфорсером в обоих случаях. Заодно выровнен `useMoveProject` (board) с уже
 > существующим паттерном `useReorderPhases` (phases, veha F): тост на любую доменную ошибку +
-> инвалидация `me` на 403 (§8.2.1 #2 — capabilities могли устареть). Живьём проверено VIEWER/MEMBER
-> на обеих фичах (см. коммит); **H2** (прогон всех 5 ролей целиком, включая OWNER/ADMIN/MANAGER) —
-> следующий шаг, не эта строка.
+> инвалидация `me` на 403 (§8.2.1 #2 — capabilities могли устареть).
+>
+> **H2 — прогон всех 5 ролей, обе половины инварианта #8.2.1.** Кнопка-скрытие (#1): все 5 ролей
+> живьём — OWNER/ADMIN/MANAGER видят `cursor-grab` на доске И на `/settings/phases`; MEMBER — только
+> на доске (нет `Phase.update`); VIEWER — нигде, синтетический drag даёт **ноль** сетевых вызовов.
+> Реактивный путь (#2, «FE-capability устарела → сервер истина»): т.к. capabilities теперь строго
+> механическая проекция того же `ability.can()`, что использует `PoliciesGuard`, естественного
+> расхождения между «UI показывает» и «сервер разрешает» больше нет — воспроизвели гонку явно
+> (временный патч `queryClient` кэша `me`, добавили VIEWER несуществующий `Project.update`): UI
+> показал `cursor-grab`, реальный drag ушёл на сервер и получил настоящий `403`, optimistic-патч
+> откатился, тост `"Недостаточно прав для перемещения карточки"` отрендерился, `me` инвалидировался
+> — повторная попытка drag уже НЕ создала сетевого вызова вообще (capabilities сами вернулись к
+> правде после рефетча). Вся цепочка §8.2.1 подтверждена живым браузером на реальном сервере, не
+> моком.
 
 `CLAUDE.md`: UI-скрытие косметическое, enforcement на сервере. Фронт **не переопределяет правила
 у себя** (два набора синхронно = дрейф матрицы прав Appendix B). Но и **не получает `packRules`**
