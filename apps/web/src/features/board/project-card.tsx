@@ -2,6 +2,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Link } from "@tanstack/react-router";
 import { Card, cn } from "@helix/ui";
+import { useCan } from "../../shared/auth/ability";
 import { useLocaleStore } from "../../shared/i18n";
 import type { ProjectCardViewModel } from "./select";
 
@@ -14,7 +15,11 @@ interface Props {
 // на обёртке, Card остаётся чистым визуальным примитивом (композиция, не форк).
 export function ProjectCard({ project, overlay = false }: Props) {
   const locale = useLocaleStore((state) => state.locale);
-  const sortable = useSortable({ id: project.id, disabled: overlay });
+  // §8.2: FE-capability — косметика (сервер всё равно единственный энфорсер move), но без неё
+  // юзер без Project.update мог бы бесконечно поднимать/бросать карту, каждый раз получая 403.
+  const canMove = useCan("Project.update");
+  const disabled = overlay || !canMove;
+  const sortable = useSortable({ id: project.id, disabled });
 
   const style = overlay
     ? undefined
@@ -24,13 +29,13 @@ export function ProjectCard({ project, overlay = false }: Props) {
     <div
       ref={overlay ? undefined : sortable.setNodeRef}
       style={style}
-      {...(overlay ? {} : sortable.attributes)}
-      {...(overlay ? {} : sortable.listeners)}
+      {...(disabled ? {} : sortable.attributes)}
+      {...(disabled ? {} : sortable.listeners)}
       role="listitem"
       tabIndex={overlay ? undefined : 0}
       className={cn(
         "touch-none",
-        !overlay && "cursor-grab active:cursor-grabbing",
+        !disabled && "cursor-grab active:cursor-grabbing",
         sortable.isDragging && "opacity-40",
       )}
     >

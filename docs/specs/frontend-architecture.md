@@ -507,11 +507,20 @@ refresh failed → invalidate session → cancelQueries() → queryClient.clear(
 
 ### 8.2 Permission-aware rendering — capabilities с сервера, UI косметичен
 
-> **✅ Статус контракта (H0 реализован).** Серверный RBAC-энфорсмент (CASL) — `apps/api/src/core/authz`:
-> `defineAbilityForRole()` (матрица PRD Appendix B) + `PoliciesGuard`/`@CheckPolicy` на каждом
-> мутирующем эндпоинте. `capabilities` теперь в `currentUserSchema` (`{id,email,name,activeOrgId,
-> role,capabilities}`) — `core/authz/capabilities.ts::listCapabilities(role)`. FE ability-provider
-> (H1) и прогон 5 ролей (H2) — следующие шаги, не эта строка.
+> **✅ Статус контракта (H0+H1 реализованы).** Серверный RBAC-энфорсмент (CASL) —
+> `apps/api/src/core/authz`: `defineAbilityForRole()` (матрица PRD Appendix B) +
+> `PoliciesGuard`/`@CheckPolicy` на каждом мутирующем эндпоинте. `capabilities` — в
+> `currentUserSchema` (H0, `core/authz/capabilities.ts::listCapabilities(role)`). FE-сторона (H1) —
+> `shared/auth/ability.ts::useCan(capability)`, один `.includes()` над `useMe().capabilities`
+> (§9.7: без Set/memo, массив ~10-30 записей, не hot-path). Подключено к двум существующим
+> mutating-фичам: `ProjectCard` (`Project.update` → можно ли drag на доске) и `PhaseRow`
+> (`Phase.update` → можно ли drag на `/settings/phases`) — обе прячут drag-аффорданс (не рендерят
+> `attributes`/`listeners`, не красят `cursor-grab`), когда capability нет; сервер остаётся
+> единственным энфорсером в обоих случаях. Заодно выровнен `useMoveProject` (board) с уже
+> существующим паттерном `useReorderPhases` (phases, veha F): тост на любую доменную ошибку +
+> инвалидация `me` на 403 (§8.2.1 #2 — capabilities могли устареть). Живьём проверено VIEWER/MEMBER
+> на обеих фичах (см. коммит); **H2** (прогон всех 5 ролей целиком, включая OWNER/ADMIN/MANAGER) —
+> следующий шаг, не эта строка.
 
 `CLAUDE.md`: UI-скрытие косметическое, enforcement на сервере. Фронт **не переопределяет правила
 у себя** (два набора синхронно = дрейф матрицы прав Appendix B). Но и **не получает `packRules`**
@@ -555,7 +564,8 @@ CASL может исчезнуть — контракт не изменится.
 кэшируются дольше ability-контекста** (сбрасываются P0-AUTH-FE). Прямое следствие «role не в JWT,
 читается свежей» (`auth.md`): права — тоже свежие, не захардкожены во фронт.
 
-Три инварианта (#### 8.2.1; оба действуют — #1 с H0, #2 действовал и раньше через голый 403):
+Три инварианта (#### 8.2.1; оба действуют — #1 с H1 (данные были с H0, скрытие кнопок — H1), #2
+действовал и раньше через голый 403, с H1 усилен рефетчем `me`):
 
 1. **FE-capability = «показывать ли кнопку», сервер = «сработает ли действие».** Скрытая кнопка —
    не безопасность; каждое действие проходит серверный policy-guard.

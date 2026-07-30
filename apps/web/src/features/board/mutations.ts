@@ -1,7 +1,9 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { BoardResponse, ProjectResponse } from "@helix/api-schemas";
 import { projectResponseSchema } from "@helix/api-schemas";
-import { request } from "../../shared/api";
+import { request, queryKeys } from "../../shared/api";
+import { useT, type MessageKey } from "../../shared/i18n";
+import { useToast } from "../../shared/toast/use-toast";
 import { boardQueryOptions } from "./queries";
 import { toBoardError } from "./board-error";
 
@@ -56,9 +58,24 @@ function patchProject(board: BoardResponse, project: ProjectResponse): BoardResp
   };
 }
 
+function boardErrorKey(kind: ReturnType<typeof toBoardError>): MessageKey {
+  switch (kind) {
+    case "staleNeighbors":
+      return "board.error.staleNeighbors";
+    case "permissionDenied":
+      return "board.error.permissionDenied";
+    case "notFound":
+      return "board.error.notFound";
+    default:
+      return "board.error.unexpected";
+  }
+}
+
 export function useMoveProject(orgId: string, workspaceId: string) {
   const queryClient = useQueryClient();
   const { queryKey } = boardQueryOptions(orgId, workspaceId);
+  const t = useT();
+  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: MoveVariables) =>
@@ -76,9 +93,14 @@ export function useMoveProject(orgId: string, workspaceId: string) {
     },
     // Единый rollback (§9.3): откат к снимку onMutate, не рефетч — кроме STALE_NEIGHBORS (§7),
     // где соседи реально устарели и снимок тоже нерелевантен → дополнительно инвалидируем колонку.
+    // §8.2 инвариант #2: 403 — доменный исход (FE-capability оптимистичны, гонка/реассайн между
+    // рендером и кликом) → тост + рефетч me (свежие capabilities), сервер остаётся истиной.
     onError: (error, _vars, ctx) => {
       if (ctx?.snapshot) queryClient.setQueryData(queryKey, ctx.snapshot);
-      if (toBoardError(error) === "staleNeighbors") void queryClient.invalidateQueries({ queryKey });
+      const kind = toBoardError(error);
+      if (kind === "staleNeighbors") void queryClient.invalidateQueries({ queryKey });
+      if (kind === "permissionDenied") void queryClient.invalidateQueries({ queryKey: queryKeys.me() });
+      toast.error(t(boardErrorKey(kind)));
     },
     onSuccess: (project) => {
       queryClient.setQueryData<BoardResponse>(queryKey, (current) => current && patchProject(current, project));

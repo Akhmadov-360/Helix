@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { WorkspaceResponse } from "@helix/api-schemas";
 import { workspaceResponseSchema } from "@helix/api-schemas";
-import { request } from "../../shared/api";
+import { request, queryKeys } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
 import { useToast } from "../../shared/toast/use-toast";
 import { workspaceQueryOptions } from "./queries";
@@ -61,10 +61,13 @@ export function useReorderPhases(orgId: string, workspaceId: string) {
     },
     // Единый rollback: откат к снимку onMutate. Конфликт версии (§5.1) — снимок тоже устарел,
     // дополнительно инвалидируем, чтобы подтянуть актуальный `version` и порядок с сервера.
+    // §8.2 инвариант #2: 403 — доменный исход, FE-capability оптимистичны → рефетч me (свежие
+    // capabilities) вдобавок к тосту, сервер остаётся истиной.
     onError: (error, _vars, ctx) => {
       if (ctx?.snapshot) queryClient.setQueryData(queryKey, ctx.snapshot);
       const kind = toPhaseError(error);
       if (kind === "versionConflict") void queryClient.invalidateQueries({ queryKey });
+      if (kind === "permissionDenied") void queryClient.invalidateQueries({ queryKey: queryKeys.me() });
       toast.error(t(phaseErrorKey(kind)));
     },
     onSuccess: (workspace) => {
