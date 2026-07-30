@@ -13,3 +13,4 @@ export * from "./audit";
 export * from "./deal-roles";
 export * from "./project-links";
 export * from "./tasks";
+export * from "./organizations";
