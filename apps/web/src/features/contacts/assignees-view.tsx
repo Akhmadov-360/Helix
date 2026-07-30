@@ -3,8 +3,9 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { Button, Card } from "@helix/ui";
 import { useCan } from "../../shared/auth/ability";
 import { useT } from "../../shared/i18n";
+import { orgMembersQueryOptions } from "../../shared/org/queries";
 import { useAssignMember, useUnassignMember } from "./mutations";
-import { orgMembersQueryOptions, projectAssigneesQueryOptions } from "./queries";
+import { projectAssigneesQueryOptions } from "./queries";
 
 // Co-workers сделки. Manager+ управляет (project-links.md §2); нет отдельного `<Select>` в
 // packages/ui ещё — нативный select, первый реальный потребитель, промотать в примитив, когда

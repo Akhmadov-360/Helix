@@ -20,4 +20,6 @@ export const queryKeys = {
   orgMembers: (orgId: string) => ["org", orgId, "members"] as const,
   // Typeahead-поиск (§13.1) — НЕ в loader (§4.2), короткоживущий, свой ключ под debounce-запрос.
   contactSearch: (orgId: string, q: string) => ["org", orgId, "contacts", "search", { q }] as const,
+  projectTasks: (orgId: string, projectId: string) =>
+    ["org", orgId, "project", projectId, "tasks"] as const,
 };

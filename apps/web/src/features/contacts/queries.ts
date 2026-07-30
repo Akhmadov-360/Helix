@@ -1,11 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import { z } from "zod";
-import {
-  contactListResponseSchema,
-  orgMemberListResponseSchema,
-  projectAssigneeResponseSchema,
-  projectContactResponseSchema,
-} from "@helix/api-schemas";
+import { contactListResponseSchema, projectAssigneeResponseSchema, projectContactResponseSchema } from "@helix/api-schemas";
 import { queryKeys, request } from "../../shared/api";
 
 const projectContactListSchema = z.array(projectContactResponseSchema);
@@ -24,13 +19,6 @@ export function projectAssigneesQueryOptions(orgId: string, projectId: string) {
     queryKey: queryKeys.projectAssignees(orgId, projectId),
     queryFn: () =>
       request({ path: `/v1/projects/${projectId}/assignees`, schema: projectAssigneeListSchema }),
-  });
-}
-
-export function orgMembersQueryOptions(orgId: string) {
-  return queryOptions({
-    queryKey: queryKeys.orgMembers(orgId),
-    queryFn: () => request({ path: "/v1/organizations/members", schema: orgMemberListResponseSchema }),
   });
 }
 

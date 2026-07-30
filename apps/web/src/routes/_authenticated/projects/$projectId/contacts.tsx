@@ -1,15 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { ContactsView } from "../../../../features/contacts/contacts-view";
-import {
-  orgMembersQueryOptions,
-  projectAssigneesQueryOptions,
-  projectContactsQueryOptions,
-} from "../../../../features/contacts/queries";
+import { projectAssigneesQueryOptions, projectContactsQueryOptions } from "../../../../features/contacts/queries";
 import { workspaceQueryOptions } from "../../../../features/phases/queries";
 import { projectQueryOptions } from "../../../../features/project-detail/queries";
 import { ProjectDetailShell } from "../../../../features/project-detail/project-detail-shell";
 import { meQueryOptions, useMe } from "../../../../shared/auth/session";
+import { orgMembersQueryOptions } from "../../../../shared/org/queries";
 
 export const Route = createFileRoute("/_authenticated/projects/$projectId/contacts")({
   loader: async ({ context, params }) => {
