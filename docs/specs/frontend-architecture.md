@@ -2,8 +2,9 @@
 
 > **Статус:** финальный (слои 0–4). Покрывает: скелет · модель состояния · роутер · карту URL
 > (слой 0) · контракт с бэком (слой 1) · kanban (слой 2, узел 1) · auth-фронт (слой 3) · стиль/
-> a11y/microactions/перф (слой 4). Не спроектирован остаток слоя 2 (формы из `FieldDefinition`,
-> project shell, dedup) — см. §12.
+> a11y/microactions/перф (слой 4) · project detail (overview/activity — реализовано veha G;
+> contacts/tasks/dedup/column-pagination — спроектировано §13). Единственный реально отложенный
+> остаток слоя 2 — data-driven формы `FieldDefinition` (§12: блокировано отсутствующим M2-бэком).
 > **Тип:** спека для Claude Code. Читать вместе с `CLAUDE.md`, `docs/decisions.md`,
 > `packages/api-schemas`, `docs/specs/{auth,projects,workspaces-phases}.md`. Расхождение — флагни,
 > не меняй сам.
@@ -693,6 +694,8 @@ prefetch (нет водопадов), React Compiler (нет лишних ре-�
 **ADR:** FE-1 (TanStack Router, §4) · FE-2 (kanban порядок в модели, §7) · FE-3 (action≠visibility,
 §8.2) · FE-4 / P0-AUTH-FE (инвалидация контекста, §8).
 
+**§13 добавляет:** KEY-2 (paginated-append колонки живёт в кэше board, не в отдельном кэше — §13.4).
+
 ---
 
 ## 11. Граница ошибок (четвёртая ступень лестницы)
@@ -720,12 +723,154 @@ throw — boundary (§9.2). Ни один класс не смешивается
   в одной орге, список тривиален (длины 1); расширяем `currentUserSchema` вместе с инвайт-флоу.
   (`capabilities` и `activeOrg:{id,name}` — НЕ здесь: оба строятся в M1, см. §8.2 / §8.3.
   `currentUserSchema` сегодня = `{id,email,name,activeOrgId,role}`.)
+- **Data-driven формы из `FieldDefinition`** — отложено до **M2** (не M1-развилка, бэк-зависимость).
+  `FieldDefinition` — модель в `schema.prisma` (`packages/db/prisma/schema.prisma:196`), но CRUD/
+  сервис/контроллер **не существуют** (`workspaces-phases.md` §0 и `projects.md` §0 оба явно
+  выносят его «в свои вехи»; `apps/api` не содержит ни одного `*field*`-модуля). `Project.fields`
+  сегодня — молчащая `Json @default("{}")`, `createProjectSchema` намеренно её не принимает
+  (`projects.md` §11: «валидировать нечем»). Проектировать FE-форму под контракт, которого нет, —
+  ровно то спекулятивное проектирование, которое запрещает `CLAUDE.md` («не строй абстракцию
+  раньше времени»). **Триггер:** M2 (блюпринты) добавит `FieldDefinition` CRUD в бэк — тогда эта
+  строка возвращается в §13 с реальным Zod-контрактом как входом, не раньше.
+- **Org members-list эндпоинт отсутствует** — блокирует ЛЮБОЙ UI-пикер человека (назначить owner,
+  co-worker/assignee, task assignee). Сервер сегодня умеет только **проверить** членство
+  (`assertOrgMember`, `project-links.md` §3/`tasks.md` §3), но не **отдать список** — нет
+  `GET /v1/organizations/:id/members` (или аналога) нигде в `apps/api`. Пикер без списка кандидатов
+  не построить иначе как typeahead-по-email вслепую — плохой UX даже для маленькой команды.
+  Требуется backend-веха (эндпоинт + Zod `OrgMemberResponse[]`) до FE-пикеров в §13.1/§13.2.
+  ⚠ **Не путать с денормализацией имени** (см. §13.1 — отображение уже назначенного `ownerId` как
+  имени решается на бэке отдельно и дёшево, без этого эндпоинта).
 
 ---
 
-## 13. Ещё не спроектировано (слой 2, остаток)
+## 13. Project detail — остаток (contacts/tasks/dedup/пагинация)
 
-- data-driven формы из `FieldDefinition` → динамическая Zod-схема → RHF (три-tier custom fields).
-- project detail shell (табы overview/contacts/tasks/activity) — персистентный под-shell.
-- soft-dedup UX контактов (подсказки по email/phone/domain — FR-CC-4).
-- keyset-курсор колонки: отдельный query-ключ + infinite-scroll паттерн (всплыл в §6.3).
+Veha G построила `overview`/`activity` (реализовано, `features/project-detail`). Этот раздел
+проектирует оставшиеся три пункта из бывшего «слоя 2, остаток» — **только те, у которых бэк уже
+есть** (`contacts.md`, `project-links.md`, `tasks.md` — все M1, не форвард-зависимость). Четвёртый
+бывший пункт (`FieldDefinition`-формы) в §13 не входит — см. §12, он блокирован M2-бэком, а не
+дизайном.
+
+### 13.1 Contacts tab — состав сделки
+
+`/projects/:id/contacts` (URL уже в карте, §5). `GET /projects/:id/contacts` → уже денормализован
+(`ProjectContactResponse{contactId,name,email,companyName?,roles}`) — рендерится без второго запроса
+за именами. `queryKeys.projectContacts(orgId, projectId)`.
+
+```
+список: строки контактов + чипы ролей (DealRole, локализовано) + «отвязать»
+  ↓ поиск существующего:  typeahead → GET /contacts?q= (debounced, НЕ в loader — §4.2 не про
+    interaction-запросы) → queryKeys.contactSearch(orgId, q), короткий staleTime
+  ↓ выбрать найденного →  POST /projects/:id/contacts { contactId, roles: [] }  (optimistic append)
+  ↓ ничего не найдено  →  «Создать и привязать» — инлайн-мини-форма (name/email/phone) →
+    dedup-aware create (§13.3) → POST /projects/:id/contacts с id нового контакта
+роли:  PATCH /projects/:id/contacts/:contactId { roles }  — ПОЛНАЯ замена (project-links.md §3),
+       не дельта; чекбоксы ролей локально собираются в массив перед PATCH, не шлются по одной.
+```
+
+**Audience-подсказка, не фильтр.** `validRolesFor(workspace.audience)` (`deal-roles.ts`) — уже
+существующая **recommendation model**, не validation (`project-links.md` §4: «никогда не 400»).
+FE обязан отразить это буквально: показать все 6 ролей, визуально выделить/сгруппировать
+рекомендованные для audience сверху — **не прятать** остальные. Прятать = превращать hint в gate,
+которого бэк сознательно не делает. `workspace.audience` не приходит с `project` — тянуть отдельным
+`ensureQueryData(workspaceQueryOptions(orgId, project.workspaceId))` в loader `contacts`-роута
+(второй `ensureQueryData` в `Promise.all`, §4.2 это разрешает).
+
+**409 «контакт смёржен»** (`project-links.md` §5.1) при попытке привязать смёрженный `contactId` —
+маппится в `ContactsError` по паттерну `phase-error.ts`/`board-error.ts` (§6.4). ⚠ **Открытый вопрос,
+не выдуманный ответ:** не подтверждено, что error `details` на этом 409 несёт `mergedIntoId` цели
+(в отличие от `GET :id` → 410, где он подтверждён контрактом, `contacts.md` §7.5). Проверить по
+живому payload при реализации; если `details` его не несёт — сообщение ограничивается «контакт уже
+объединён с другим», без прямой ссылки «привязать <target>».
+
+**Assignees (co-workers)** — секция ниже контактов, `GET/POST/DELETE /projects/:id/assignees`,
+Manager+ (`project-links.md` §2). До veha H (capabilities, §8.2) кнопки не прячутся ролью — это
+тот же временный разрыв, что у любого M1-действия без capabilities, не новый для этого среза.
+**Блокировано** пикером человека — см. §12 «org members-list эндпоинт отсутствует». Секция
+проектируется, но не реализуется, пока эндпоинта нет.
+
+### 13.2 Tasks tab — чеклист
+
+`/projects/:id/tasks`. `GET /projects/:id/tasks` → `TaskResponse[]` (`queryKeys.projectTasks`).
+
+```
+рендер: open сверху (сортировка dueAt asc, null — в конец) · done — свёрнутая секция «Выполнено (N)»
+  ↑ сортировка — КЛИЕНТСКАЯ, в select: у Task, в отличие от Project.rank, нет server-owned
+    порядка (нет /reorder, нет инварианта KAN-1) → сортировать в select/render не нарушает VM-1
+быстрое добавление: title-only инпут, Enter → POST /projects/:id/tasks { title }
+чекбокс: done=false→true → POST /tasks/:id/complete; true→false → POST /tasks/:id/reopen
+  optimistic: локальный флип done + (при complete) overdue пересчитывается на клиенте из dueAt/now
+  (безопасно: overdue — чистая функция dueAt+done+now, тот же вывод, что делает сервер, §4 tasks.md)
+удаление: инлайн-крестик, без confirm-диалога (низкая цена ошибки — чеклист, не лид)
+```
+
+`assigneeId` при создании/правке — тот же пикер-блокер, что owner/co-worker (§12). Quick-add остаётся
+title-only, пока пикера нет; `dueAt`/`assignee` — «развернуть» шаг формы, доступный уже сейчас (dueAt
+не требует пикера, обычный date-input).
+
+**Activity tab уже готова принять `task.created`/`task.completed`.** `select.ts` (veha G,
+`features/project-detail/select.ts`) парсит их через `projectEventSchema` — оба типа в discriminated
+union уже сегодня, `activity-view.tsx` уже умеет их отрендерить (`projectDetail.activity.taskCreated`/
+`taskCompleted`, i18n-ключи уже добавлены). Когда появится tasks tab — лента не потребует правок.
+
+### 13.3 Soft-dedup UX (FR-CC-4) — сквозной паттерн, не отдельный экран
+
+Два тачпоинта — ровно по числу существующих бэк-эндпоинтов (`contacts.md` §4.2), не придуманы сверху:
+
+```
+1. ПОДСКАЗКА НА ВВОДЕ (до создания):
+   debounce(email-поле, blur/change) → GET /contacts/dedup-check?email=
+     → если candidates.length>0: inline-хинт под полем, ненавязчивый, dismissible
+       («Похоже, уже есть: Иван Петров (i.petrov@acme.com) — использовать его?»)
+     → пользователь может прервать создание и выбрать существующего вместо сабмита
+
+2. FALLBACK ПОСЛЕ СОЗДАНИЯ (страховка от гонки/пропущенного blur):
+   POST /contacts → 201 { contact, dedupHint: { candidates } }  — контакт УЖЕ создан (§4.1 not
+   blocking), dedupHint — advisory
+     → если candidates.length>0: non-blocking баннер со списком кандидатов, на каждом:
+        - «Слить» (только O/A — merge=O/A, contacts.controller.ts) →
+          POST /contacts/:candidateId/merge { sourceId: <новый> }  (новый вливается В кандидата)
+        - «Не дубль» → dismiss
+```
+
+Один переиспользуемый компонент (`features/contacts/dedup-hint.tsx`, оба тачпоинта через него) —
+используется из inline create-and-link (§13.1) и позже из отдельной `/contacts` (org-wide адресная
+книга — сама эта страница вне объёма этого прохода, в карте URL уже есть, §5, но не запрошена
+сейчас). `useToast()` (veha F) не подходит для этого UI — хинт требует персистентного inline-состояния
+с действиями (кнопки «слить»/«не дубль»), не 5-секундного авто-dismiss тоста; это inline-баннер в
+потоке формы, не toast-стор.
+
+### 13.4 Keyset-курсор колонки — infinite scroll
+
+Бэк уже есть (`GET /phases/:phaseId/projects?cursorRank&cursorId&limit`, §7/§6.3 это анонсировали,
+не реализовав). Триггер на колонку: `board.phase.hasMore === true` (уже приходит в `BoardColumn`,
+из первой страницы `?limitPerPhase`).
+
+```
+UI: кнопка «Показать ещё» в подвале колонки (НЕ IntersectionObserver/auto-infinite — М1 держит
+    простое решение, тот же принцип, что и «виртуализация — по измеренному триггеру», §7)
+клик → GET /phases/:phaseId/projects?cursorRank=<rank последней карты>&cursorId=<id последней>&limit
+     → cursor непрозрачен, берётся из ПОСЛЕДНЕЙ карты уже загруженного массива колонки (KAN-1: клиент
+       никогда не вычисляет rank, только переносит его как ключ пагинации)
+```
+
+**Куда пишется ответ — ключевое решение.** KAN-1 требует ОДИН источник истины на колонку для DnD
+(`board-view.tsx` строит `serverOrder` из `board.columns`). Если новая страница ляжет в отдельный
+`queryKeys.column(phaseId, cursor)` кэш (как дословно предлагал черновик §6.3), DnD после первого
+«показать ещё» должен был бы читать порядок колонки из ДВУХ кэшей разом — двух источников истины
+там, где KAN-1 требует одного. Решение: страница **дозаписывается в кэш `board`** через тот же
+`setQueryData`-идиом, что `onSuccess` у `useMoveProject`/`useReorderPhases` — запрос физически GET,
+но моделируется `useMutation` (не `useQuery`): это разовое действие с побочным эффектом на чужом
+кэше, не самостоятельно рендерящийся ресурс.
+
+> ⚠ **Уточнение §6.3 задним числом.** §6.3 писала «board и column — разные запросы → разные ключи»
+> до того, как этот паттерн был спроектирован до конца. Уточнение: запрос физически отдельный (свой
+> путь/параметры), но его **результат** сливается в кэш `board`, не живёт в параллельном
+> `queryKeys.column`-кэше — иначе KAN-1 (единый источник порядка) ломается на второй странице
+> колонки. `queryKeys.column` как отдельная запись в фабрике ключей не заводится вовсе.
+
+**Стык с рекомпакцией (§7 уже называл этот риск).** После рекомпакции фазы `rank`-строки чужих карт
+в кэше устаревают; докрутка курсора — ровно то место, где это может укусить (повторный докрут может
+вернуть уже загруженные id). М1 принимает это, как и §7 (не чинится сейчас), но append обязан
+дедуплицировать по `id` (`Set`/`Map`, одна строка) как дешёвый защитный минимум — это не чинит
+стейл-ность, только не даёт дублю карточки появиться в DOM дважды.
