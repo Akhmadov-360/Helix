@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { BoardResponse, ProjectResponse } from "@helix/api-schemas";
-import { projectResponseSchema } from "@helix/api-schemas";
+import type { BoardResponse, ColumnResponse, ProjectResponse } from "@helix/api-schemas";
+import { columnResponseSchema, projectResponseSchema } from "@helix/api-schemas";
 import { request, queryKeys } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
 import { useToast } from "../../shared/toast/use-toast";
@@ -58,6 +58,20 @@ function patchProject(board: BoardResponse, project: ProjectResponse): BoardResp
   };
 }
 
+// §13.4: страница дозаписывается в кэш board (KAN-1 — один источник порядка для DnD), не в
+// отдельный кэш. Дедуп по id — дешёвая защита от повторного докрута после рекомпакции фазы (§7).
+function appendColumnPage(board: BoardResponse, phaseId: string, page: ColumnResponse): BoardResponse {
+  return {
+    ...board,
+    phases: board.phases.map((phase) => {
+      if (phase.id !== phaseId) return phase;
+      const existingIds = new Set(phase.projects.map((p) => p.id));
+      const newProjects = page.projects.filter((p) => !existingIds.has(p.id));
+      return { ...phase, projects: [...phase.projects, ...newProjects], hasMore: page.hasMore };
+    }),
+  };
+}
+
 function boardErrorKey(kind: ReturnType<typeof toBoardError>): MessageKey {
   switch (kind) {
     case "staleNeighbors":
@@ -104,6 +118,39 @@ export function useMoveProject(orgId: string, workspaceId: string) {
     },
     onSuccess: (project) => {
       queryClient.setQueryData<BoardResponse>(queryKey, (current) => current && patchProject(current, project));
+    },
+  });
+}
+
+// §13.4: физически GET, но моделируется useMutation — разовое действие с побочным эффектом на
+// чужом кэше (board), не самостоятельно рендерящийся ресурс (useQuery было бы неверной моделью).
+export function useLoadMoreColumn(orgId: string, workspaceId: string) {
+  const queryClient = useQueryClient();
+  const { queryKey } = boardQueryOptions(orgId, workspaceId);
+  const t = useT();
+  const toast = useToast();
+
+  return useMutation({
+    mutationFn: (vars: { phaseId: string }) => {
+      const board = queryClient.getQueryData<BoardResponse>(queryKey);
+      const phase = board?.phases.find((p) => p.id === vars.phaseId);
+      const last = phase?.projects.at(-1);
+      return request({
+        path: `/v1/phases/${vars.phaseId}/projects`,
+        searchParams: { cursorRank: last?.rank, cursorId: last?.id },
+        schema: columnResponseSchema,
+      }).then((page) => ({ phaseId: vars.phaseId, page }));
+    },
+    onError: (error) => {
+      const kind = toBoardError(error);
+      if (kind === "permissionDenied") void queryClient.invalidateQueries({ queryKey: queryKeys.me() });
+      toast.error(t(boardErrorKey(kind)));
+    },
+    onSuccess: ({ phaseId, page }) => {
+      queryClient.setQueryData<BoardResponse>(
+        queryKey,
+        (current) => current && appendColumnPage(current, phaseId, page),
+      );
     },
   });
 }

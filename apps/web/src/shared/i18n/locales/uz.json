@@ -12,6 +12,8 @@
   "workspaces.title": "Workspace'lar",
   "workspaces.empty": "Hozircha workspace yo‘q.",
   "board.column.count": "{count} / {total}",
+  "board.column.loadMore": "Ko‘proq ko‘rsatish",
+  "board.column.loadingMore": "Yuklanmoqda…",
   "board.dnd.picked": "«{title}» kartasi ko‘tarildi",
   "board.dnd.movedOver": "«{title}» — {column}, {position} / {total}",
   "board.dnd.dropped": "«{title}» {column}ga ko‘chirildi",

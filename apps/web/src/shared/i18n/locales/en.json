@@ -12,6 +12,8 @@
   "workspaces.title": "Workspaces",
   "workspaces.empty": "No workspaces yet.",
   "board.column.count": "{count} of {total}",
+  "board.column.loadMore": "Show more",
+  "board.column.loadingMore": "Loading…",
   "board.dnd.picked": "Card \"{title}\" picked up",
   "board.dnd.movedOver": "\"{title}\" — {column}, {position} of {total}",
   "board.dnd.dropped": "\"{title}\" moved to {column}",

@@ -17,7 +17,7 @@ import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { useT } from "../../shared/i18n";
 import { useLocalize } from "../../shared/lib/localize";
 import { BoardColumn } from "./board-column";
-import { useMoveProject } from "./mutations";
+import { useLoadMoreColumn, useMoveProject } from "./mutations";
 import { ProjectCard } from "./project-card";
 import { boardQueryOptions } from "./queries";
 import { toBoardViewModel, type BoardColumnViewModel } from "./select";
@@ -37,6 +37,7 @@ function findColumnId(order: ColumnOrder, id: string): string | null {
 export function BoardView({ orgId, workspaceId }: { orgId: string; workspaceId: string }) {
   const board = useSuspenseQuery({ ...boardQueryOptions(orgId, workspaceId), select: toBoardViewModel }).data;
   const move = useMoveProject(orgId, workspaceId);
+  const loadMore = useLoadMoreColumn(orgId, workspaceId);
   const localize = useLocalize();
   const t = useT();
 
@@ -173,6 +174,8 @@ export function BoardView({ orgId, workspaceId }: { orgId: string; workspaceId: 
             name={localize(column.phaseName)}
             order={order[column.id] ?? []}
             projectsById={projectsById}
+            onLoadMore={() => loadMore.mutate({ phaseId: column.id })}
+            loadingMore={loadMore.isPending && loadMore.variables?.phaseId === column.id}
           />
         ))}
       </div>

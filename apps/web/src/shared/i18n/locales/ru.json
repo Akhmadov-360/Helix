@@ -12,6 +12,8 @@
   "workspaces.title": "Воркспейсы",
   "workspaces.empty": "Пока нет ни одного воркспейса.",
   "board.column.count": "{count} из {total}",
+  "board.column.loadMore": "Показать ещё",
+  "board.column.loadingMore": "Загрузка…",
   "board.dnd.picked": "Карта «{title}» взята",
   "board.dnd.movedOver": "«{title}» — {column}, {position} из {total}",
   "board.dnd.dropped": "«{title}» перемещена в {column}",
