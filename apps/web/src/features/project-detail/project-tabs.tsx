@@ -1,9 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import { useT } from "../../shared/i18n";
 
-// Первая tab-nav в приложении (§13 остаток закрыт этим слайсом для overview/activity) — Link
-// с activeProps, без отдельного примитива в packages/ui: два таба, третий появится вместе
-// с contacts/tasks (следующая veha) — тогда и решим, выносить ли в примитив.
+// Первая tab-nav в приложении — Link с activeProps, без отдельного примитива в packages/ui: ещё
+// не 3+ разнородных потребителя, чтобы выносить (tasks-таб решит).
 export function ProjectTabs({ projectId }: { projectId: string }) {
   const t = useT();
   const tabClass = "px-3 py-1.5 text-sm rounded-md text-muted-foreground hover:text-foreground";
@@ -18,6 +17,14 @@ export function ProjectTabs({ projectId }: { projectId: string }) {
         activeProps={{ className: activeClass }}
       >
         {t("projectDetail.tabs.overview")}
+      </Link>
+      <Link
+        to="/projects/$projectId/contacts"
+        params={{ projectId }}
+        className={tabClass}
+        activeProps={{ className: activeClass }}
+      >
+        {t("projectDetail.tabs.contacts")}
       </Link>
       <Link
         to="/projects/$projectId/activity"

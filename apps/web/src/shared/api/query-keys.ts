@@ -13,4 +13,11 @@ export const queryKeys = {
   project: (orgId: string, projectId: string) => ["org", orgId, "project", projectId] as const,
   projectActivity: (orgId: string, projectId: string) =>
     ["org", orgId, "project", projectId, "activity"] as const,
+  projectContacts: (orgId: string, projectId: string) =>
+    ["org", orgId, "project", projectId, "contacts"] as const,
+  projectAssignees: (orgId: string, projectId: string) =>
+    ["org", orgId, "project", projectId, "assignees"] as const,
+  orgMembers: (orgId: string) => ["org", orgId, "members"] as const,
+  // Typeahead-поиск (§13.1) — НЕ в loader (§4.2), короткоживущий, свой ключ под debounce-запрос.
+  contactSearch: (orgId: string, q: string) => ["org", orgId, "contacts", "search", { q }] as const,
 };

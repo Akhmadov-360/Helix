@@ -15,6 +15,7 @@ import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedWorkspacesIndexRouteImport } from './routes/_authenticated/workspaces/index'
 import { Route as AuthenticatedProjectsProjectIdIndexRouteImport } from './routes/_authenticated/projects/$projectId/index'
 import { Route as AuthenticatedProjectsProjectIdActivityRouteImport } from './routes/_authenticated/projects/$projectId/activity'
+import { Route as AuthenticatedProjectsProjectIdContactsRouteImport } from './routes/_authenticated/projects/$projectId/contacts'
 import { Route as AuthenticatedProjectsProjectIdOverviewRouteImport } from './routes/_authenticated/projects/$projectId/overview'
 import { Route as AuthenticatedWorkspacesWorkspaceIdIndexRouteImport } from './routes/_authenticated/workspaces/$workspaceId/index'
 import { Route as AuthenticatedWorkspacesWorkspaceIdBoardRouteImport } from './routes/_authenticated/workspaces/$workspaceId/board'
@@ -53,6 +54,12 @@ const AuthenticatedProjectsProjectIdActivityRoute =
     path: '/projects/$projectId/activity',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedProjectsProjectIdContactsRoute =
+  AuthenticatedProjectsProjectIdContactsRouteImport.update({
+    id: '/projects/$projectId/contacts',
+    path: '/projects/$projectId/contacts',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedProjectsProjectIdOverviewRoute =
   AuthenticatedProjectsProjectIdOverviewRouteImport.update({
     id: '/projects/$projectId/overview',
@@ -89,6 +96,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/workspaces/': typeof AuthenticatedWorkspacesIndexRoute
   '/projects/$projectId/activity': typeof AuthenticatedProjectsProjectIdActivityRoute
+  '/projects/$projectId/contacts': typeof AuthenticatedProjectsProjectIdContactsRoute
   '/projects/$projectId/overview': typeof AuthenticatedProjectsProjectIdOverviewRoute
   '/workspaces/$workspaceId/board': typeof AuthenticatedWorkspacesWorkspaceIdBoardRoute
   '/projects/$projectId/': typeof AuthenticatedProjectsProjectIdIndexRoute
@@ -101,6 +109,7 @@ export interface FileRoutesByTo {
   '/': typeof AuthenticatedIndexRoute
   '/workspaces': typeof AuthenticatedWorkspacesIndexRoute
   '/projects/$projectId/activity': typeof AuthenticatedProjectsProjectIdActivityRoute
+  '/projects/$projectId/contacts': typeof AuthenticatedProjectsProjectIdContactsRoute
   '/projects/$projectId/overview': typeof AuthenticatedProjectsProjectIdOverviewRoute
   '/workspaces/$workspaceId/board': typeof AuthenticatedWorkspacesWorkspaceIdBoardRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdIndexRoute
@@ -115,6 +124,7 @@ export interface FileRoutesById {
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/workspaces/': typeof AuthenticatedWorkspacesIndexRoute
   '/_authenticated/projects/$projectId/activity': typeof AuthenticatedProjectsProjectIdActivityRoute
+  '/_authenticated/projects/$projectId/contacts': typeof AuthenticatedProjectsProjectIdContactsRoute
   '/_authenticated/projects/$projectId/overview': typeof AuthenticatedProjectsProjectIdOverviewRoute
   '/_authenticated/workspaces/$workspaceId/board': typeof AuthenticatedWorkspacesWorkspaceIdBoardRoute
   '/_authenticated/projects/$projectId/': typeof AuthenticatedProjectsProjectIdIndexRoute
@@ -129,6 +139,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/workspaces/'
     | '/projects/$projectId/activity'
+    | '/projects/$projectId/contacts'
     | '/projects/$projectId/overview'
     | '/workspaces/$workspaceId/board'
     | '/projects/$projectId/'
@@ -141,6 +152,7 @@ export interface FileRouteTypes {
     | '/'
     | '/workspaces'
     | '/projects/$projectId/activity'
+    | '/projects/$projectId/contacts'
     | '/projects/$projectId/overview'
     | '/workspaces/$workspaceId/board'
     | '/projects/$projectId'
@@ -154,6 +166,7 @@ export interface FileRouteTypes {
     | '/_authenticated/'
     | '/_authenticated/workspaces/'
     | '/_authenticated/projects/$projectId/activity'
+    | '/_authenticated/projects/$projectId/contacts'
     | '/_authenticated/projects/$projectId/overview'
     | '/_authenticated/workspaces/$workspaceId/board'
     | '/_authenticated/projects/$projectId/'
@@ -211,6 +224,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProjectsProjectIdActivityRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/projects/$projectId/contacts': {
+      id: '/_authenticated/projects/$projectId/contacts'
+      path: '/projects/$projectId/contacts'
+      fullPath: '/projects/$projectId/contacts'
+      preLoaderRoute: typeof AuthenticatedProjectsProjectIdContactsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/projects/$projectId/overview': {
       id: '/_authenticated/projects/$projectId/overview'
       path: '/projects/$projectId/overview'
@@ -253,6 +273,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedWorkspacesIndexRoute: typeof AuthenticatedWorkspacesIndexRoute
   AuthenticatedProjectsProjectIdActivityRoute: typeof AuthenticatedProjectsProjectIdActivityRoute
+  AuthenticatedProjectsProjectIdContactsRoute: typeof AuthenticatedProjectsProjectIdContactsRoute
   AuthenticatedProjectsProjectIdOverviewRoute: typeof AuthenticatedProjectsProjectIdOverviewRoute
   AuthenticatedWorkspacesWorkspaceIdBoardRoute: typeof AuthenticatedWorkspacesWorkspaceIdBoardRoute
   AuthenticatedProjectsProjectIdIndexRoute: typeof AuthenticatedProjectsProjectIdIndexRoute
@@ -266,6 +287,8 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedWorkspacesIndexRoute: AuthenticatedWorkspacesIndexRoute,
   AuthenticatedProjectsProjectIdActivityRoute:
     AuthenticatedProjectsProjectIdActivityRoute,
+  AuthenticatedProjectsProjectIdContactsRoute:
+    AuthenticatedProjectsProjectIdContactsRoute,
   AuthenticatedProjectsProjectIdOverviewRoute:
     AuthenticatedProjectsProjectIdOverviewRoute,
   AuthenticatedWorkspacesWorkspaceIdBoardRoute:
