@@ -1,5 +1,6 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { Link } from "@tanstack/react-router";
 import { Card, cn } from "@helix/ui";
 import { useLocaleStore } from "../../shared/i18n";
 import type { ProjectCardViewModel } from "./select";
@@ -34,7 +35,17 @@ export function ProjectCard({ project, overlay = false }: Props) {
       )}
     >
       <Card className={cn("p-3", overlay && "shadow-lg")}>
-        <p className="text-sm font-medium">{project.title}</p>
+        {overlay ? (
+          <p className="text-sm font-medium">{project.title}</p>
+        ) : (
+          <Link
+            to="/projects/$projectId/overview"
+            params={{ projectId: project.id }}
+            className="text-sm font-medium hover:underline"
+          >
+            {project.title}
+          </Link>
+        )}
         {project.amount && (
           <p className="mt-1 text-xs text-muted-foreground">{formatAmount(project.amount, locale)}</p>
         )}

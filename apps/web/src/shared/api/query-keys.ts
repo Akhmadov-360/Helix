@@ -10,4 +10,7 @@ export const queryKeys = {
   board: (orgId: string, workspaceId: string, limitPerPhase: number) =>
     ["org", orgId, "workspace", workspaceId, "board", { limitPerPhase }] as const,
   workspace: (orgId: string, workspaceId: string) => ["org", orgId, "workspace", workspaceId] as const,
+  project: (orgId: string, projectId: string) => ["org", orgId, "project", projectId] as const,
+  projectActivity: (orgId: string, projectId: string) =>
+    ["org", orgId, "project", projectId, "activity"] as const,
 };
