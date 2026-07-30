@@ -507,31 +507,55 @@ refresh failed → invalidate session → cancelQueries() → queryClient.clear(
 
 ### 8.2 Permission-aware rendering — capabilities с сервера, UI косметичен
 
-> **⚠ Статус контракта (сверено с кодом).** Серверный RBAC-энфорсмент (CASL) в M1 **реализован**:
-> `apps/api/src/core/authz` — `defineAbilityForRole()` (матрица PRD Appendix B) + `PoliciesGuard` /
-> `@CheckPolicy` на каждом мутирующем эндпоинте. Отсутствует только **FE-проекция** `capabilities`:
-> сегодня `currentUserSchema` = `{id, email, name, activeOrgId, role}`, поля `capabilities` не
-> содержит. Оно **строится в M1** (веха H плана фронта) как тонкая сериализация уже существующего
-> ability — НЕ отдельная веха и НЕ `packRules`. До этого шага permission-aware rendering не работает,
-> но серверный guard — единственный энфорсер в любом случае (§8.2.1), поэтому косметика кнопок на
-> безопасность не влияет.
+> **✅ Статус контракта (H0 реализован).** Серверный RBAC-энфорсмент (CASL) — `apps/api/src/core/authz`:
+> `defineAbilityForRole()` (матрица PRD Appendix B) + `PoliciesGuard`/`@CheckPolicy` на каждом
+> мутирующем эндпоинте. `capabilities` теперь в `currentUserSchema` (`{id,email,name,activeOrgId,
+> role,capabilities}`) — `core/authz/capabilities.ts::listCapabilities(role)`. FE ability-provider
+> (H1) и прогон 5 ролей (H2) — следующие шаги, не эта строка.
 
 `CLAUDE.md`: UI-скрытие косметическое, enforcement на сервере. Фронт **не переопределяет правила
 у себя** (два набора синхронно = дрейф матрицы прав Appendix B). Но и **не получает `packRules`**
 (сериализованные правила CASL связали бы фронт с внутренним языком бэковой authz — то же, против
-чего §6.4/§6.5). Контракт: бэк отдаёт **capabilities**, плоский JSON возможностей, не правил:
+чего §6.4/§6.5). Контракт: бэк отдаёт **capabilities**, плоский СПИСОК "Subject.action" — не матрица
+(меньше шума, чем `{subject:{action:bool}}`: только реально разрешённые пары, без cartesian
+product) и не набор CASL-правил:
 
 ```json
-{ "workspace": { "manage": true }, "project": { "create": true, "edit": true, "move": true } }
+{ "capabilities": ["Workspace.create", "Project.create", "Project.update", "Project.reassign"] }
 ```
 
-Бэк решает _как_ их вычислить (CASL/RLS/что угодно), фронт — _как_ применить (спрятать кнопку).
-CASL может исчезнуть — контракт не изменится. Приходят с `me` (расширение `currentUserSchema` в
-M1), scoped по `activeOrgId`, **не кэшируются дольше ability-контекста** (сбрасываются
-P0-AUTH-FE). Прямое следствие «role не в JWT, читается свежей» (`auth.md`): права — тоже свежие,
-не захардкожены во фронт.
+**Генерация — цикл по `APP_SUBJECTS × SUBJECT_OPERATIONS[subject]`, НЕ по всем `AppAction`
+поголовно** (живой урок из H0, стоит зафиксировать). Первая версия крутила все 6 actions для
+каждого subject и проверяла `ability.can()` — казалось безопаснее «списка», раз генерация
+механическая. На живой проверке (MEMBER-логин) вылезли `"ProjectContact.merge"`,
+`"Task.reassign"`, `"Project.delete"`, `"ProjectAssignee.update"` — операции, которых **нет в API
+вообще** (нет ни одного `@CheckPolicy`/эндпоинта на них). Причина — CASL-семантика: роли, которым
+выдан `can("manage", X)` (MANAGER/MEMBER на `ProjectContact`/`Task`, `PoliciesGuard` использует тот
+же `defineAbilityForRole`), резолвят **любой** `ability.can(action, X)` в `true`, включая
+бессмысленные комбинации — `"manage"` в CASL специально широкий грант-шорткат, а не заявление
+«эти конкретные actions существуют». `ability.can()` отвечает на вопрос RBAC («разрешено ли»), но
+не на вопрос поверхности API («существует ли такая операция вообще») — эти два вопроса раньше
+молчаливо считались одним.
 
-Три инварианта (#### 8.2.1; #2/403 действует уже сейчас, #1 косметика — с проекцией capabilities):
+Фикс — `SUBJECT_OPERATIONS` (`core/authz/capabilities.ts`): статический словарь **какие операции
+существуют** для каждого subject, сверенный с реальными `@CheckPolicy` по всем контроллерам —
+`{ Project: ["create","read","update","reassign"], ... }`. Это **не RBAC и не whitelist прав
+роли** — словарь ничего не говорит про то, кому что можно (это по-прежнему целиком решает
+`ability.can()` внутри цикла); он описывает **поверхность API**, ортогональный факт. Добавили
+новый эндпоинт — добавьте его action в `SUBJECT_OPERATIONS[subject]` один раз (не на каждую роль):
+забыли — capability просто не появится ни у одной роли (fail-safe, не false positive; тот же
+принцип, что «403 — нормальный доменный исход» ниже). `"manage"` (CASL-action) и `"all"`
+(CASL-subject) в словаре не встречаются вовсе — их не проверяет ни один `@CheckPolicy` напрямую.
+Цена контракта — FE видит CASL-имена действий (`update`, не `move`/`edit`), не продуктовые; при
+необходимости именованные хелперы (`canMoveProject()`) строятся в H1 поверх этого списка, не меняя
+контракт.
+
+Бэк решает _как_ их вычислить (CASL/RLS/что угодно), фронт — _как_ применить (спрятать кнопку).
+CASL может исчезнуть — контракт не изменится. Приходят с `me`, scoped по `activeOrgId`, **не
+кэшируются дольше ability-контекста** (сбрасываются P0-AUTH-FE). Прямое следствие «role не в JWT,
+читается свежей» (`auth.md`): права — тоже свежие, не захардкожены во фронт.
+
+Три инварианта (#### 8.2.1; оба действуют — #1 с H0, #2 действовал и раньше через голый 403):
 
 1. **FE-capability = «показывать ли кнопку», сервер = «сработает ли действие».** Скрытая кнопка —
    не безопасность; каждое действие проходит серверный policy-guard.
@@ -686,7 +710,7 @@ prefetch (нет водопадов), React Compiler (нет лишних ре-�
 | KAN-1      | rank server-owned; клиент рендерит по порядку массива, move по соседям-id                   | kanban    |
 | P0-AUTH-FE | смена идентичности → полная инвалидация контекста безопасности                              | auth      |
 | AUTH-1     | одна refresh-cookie → один одновременный refresh (single-flight)                            | auth      |
-| AUTH-2     | capabilities с сервера (не packRules); UI косметичен, сервер энфорсит ⚠целевой, с RBAC-вехи | auth      |
+| AUTH-2     | capabilities с сервера (не packRules); UI косметичен, сервер энфорсит — бэк готов (H0), FE (H1) в работе | auth      |
 | FE-3       | action authorization ≠ data visibility                                                      | auth      |
 | ERR-1      | ошибка на своём уровне; boundary только для непредвиденного                                 | слой 4    |
 | PERF-1     | оптимизация только после измеренного bottleneck                                             | слой 4    |
