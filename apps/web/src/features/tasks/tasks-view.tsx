@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { ListChecks } from "lucide-react";
-import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@helix/ui";
+import { Button, Input } from "@helix/ui";
 import { useCan } from "../../shared/auth/ability";
 import { useT } from "../../shared/i18n";
 import { orgMembersQueryOptions } from "../../shared/org/queries";
-import { useCompleteTask, useCreateTask, useDeleteTask, useReopenTask } from "./mutations";
+import { AssigneeField } from "./assignee-field";
+import { DueDateField } from "./due-date-field";
+import { useCompleteTask, useCreateTask, useDeleteTask, useReopenTask, useUpdateTask } from "./mutations";
 import { projectTasksQueryOptions } from "./queries";
 import { sortTasks } from "./select";
 import { TaskRow } from "./task-row";
@@ -18,6 +20,7 @@ export function TasksView({ orgId, projectId }: { orgId: string; projectId: stri
   const tasks = useSuspenseQuery(projectTasksQueryOptions(orgId, projectId)).data;
   const members = useSuspenseQuery(orgMembersQueryOptions(orgId)).data;
   const create = useCreateTask(orgId, projectId);
+  const update = useUpdateTask(orgId, projectId);
   const complete = useCompleteTask(orgId, projectId);
   const reopen = useReopenTask(orgId, projectId);
   const del = useDeleteTask(orgId, projectId);
@@ -26,26 +29,21 @@ export function TasksView({ orgId, projectId }: { orgId: string; projectId: stri
   const canDelete = useCan("Task.delete");
 
   const [title, setTitle] = useState("");
-  const [dueAt, setDueAt] = useState("");
-  const [assigneeId, setAssigneeId] = useState("");
+  const [dueAt, setDueAt] = useState<Date | null>(null);
+  const [assigneeId, setAssigneeId] = useState<string | null>(null);
 
   const { open, done } = sortTasks(tasks);
-  const membersById = new Map(members.map((m) => [m.userId, m.name]));
 
   function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
     create.mutate(
-      {
-        title: title.trim(),
-        dueAt: dueAt ? new Date(dueAt) : undefined,
-        assigneeId: assigneeId || undefined,
-      },
+      { title: title.trim(), dueAt: dueAt ?? undefined, assigneeId: assigneeId ?? undefined },
       {
         onSuccess: () => {
           setTitle("");
-          setDueAt("");
-          setAssigneeId("");
+          setDueAt(null);
+          setAssigneeId(null);
         },
       },
     );
@@ -54,31 +52,20 @@ export function TasksView({ orgId, projectId }: { orgId: string; projectId: stri
   return (
     <div className="flex flex-col gap-4">
       {canCreate && (
-        <form onSubmit={handleCreate} className="flex max-w-2xl flex-col gap-2 sm:flex-row">
-          <Input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder={t("tasks.quickAdd.placeholder")}
-            className="flex-1"
-          />
-          <Input
-            type="date"
-            value={dueAt}
-            onChange={(e) => setDueAt(e.target.value)}
-            className="sm:w-40"
-          />
-          <Select value={assigneeId} onValueChange={setAssigneeId}>
-            <SelectTrigger className="sm:w-44">
-              <SelectValue placeholder={t("tasks.list.assignee.placeholder")} />
-            </SelectTrigger>
-            <SelectContent>
-              {members.map((member) => (
-                <SelectItem key={member.userId} value={member.userId}>
-                  {member.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <form onSubmit={handleCreate} className="flex max-w-3xl items-center gap-2">
+          <div className="relative flex-1">
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder={t("tasks.quickAdd.placeholder")}
+              className="pr-16"
+            />
+            <div className="absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center gap-1">
+              <DueDateField value={dueAt} onChange={setDueAt} compact />
+              <span className="h-4 w-px bg-border" />
+              <AssigneeField value={assigneeId} onChange={setAssigneeId} members={members} compact />
+            </div>
+          </div>
           <Button type="submit" disabled={!title.trim() || create.isPending} className="shrink-0">
             {t("tasks.quickAdd.submit")}
           </Button>
@@ -91,16 +78,19 @@ export function TasksView({ orgId, projectId }: { orgId: string; projectId: stri
           <p>{t("tasks.list.empty")}</p>
         </div>
       ) : (
-        <ul className="flex flex-col gap-1">
+        <ul className="flex flex-col">
           {[...open, ...done].map((task) => (
             <TaskRow
               key={task.id}
               task={task}
-              assigneeName={task.assigneeId ? membersById.get(task.assigneeId) : undefined}
+              members={members}
               canUpdate={canUpdate}
               canDelete={canDelete}
               onToggle={() => (task.done ? reopen.mutate({ taskId: task.id }) : complete.mutate({ taskId: task.id }))}
               onDelete={() => del.mutate({ taskId: task.id })}
+              onRename={(nextTitle) => update.mutate({ taskId: task.id, input: { title: nextTitle } })}
+              onDueAtChange={(date) => update.mutate({ taskId: task.id, input: { dueAt: date } })}
+              onAssigneeChange={(userId) => update.mutate({ taskId: task.id, input: { assigneeId: userId } })}
             />
           ))}
         </ul>
