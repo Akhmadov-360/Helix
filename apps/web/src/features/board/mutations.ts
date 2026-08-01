@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { BoardResponse, ColumnResponse, ProjectResponse } from "@helix/api-schemas";
+import type { BoardResponse, ColumnResponse, CreateProjectInput, ProjectResponse } from "@helix/api-schemas";
 import { columnResponseSchema, projectResponseSchema } from "@helix/api-schemas";
 import { request, queryKeys } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
@@ -53,6 +53,21 @@ function patchProject(board: BoardResponse, project: ProjectResponse): BoardResp
     phases: board.phases.map((phase) =>
       phase.id === project.phaseId
         ? { ...phase, projects: phase.projects.map((p) => (p.id === project.id ? project : p)) }
+        : phase,
+    ),
+  };
+}
+
+// Лид создаётся всегда в первой фазе, наверху колонки (§1, projects.controller.ts create()) —
+// прекатенируем локально теми же правилами, сервер уже так и создал.
+function prependProject(board: BoardResponse, project: ProjectResponse): BoardResponse {
+  const firstPhase = board.phases[0];
+  if (!firstPhase || firstPhase.id !== project.phaseId) return board;
+  return {
+    ...board,
+    phases: board.phases.map((phase) =>
+      phase.id === firstPhase.id
+        ? { ...phase, projects: [project, ...phase.projects], total: phase.total + 1 }
         : phase,
     ),
   };
@@ -118,6 +133,32 @@ export function useMoveProject(orgId: string, workspaceId: string) {
     },
     onSuccess: (project) => {
       queryClient.setQueryData<BoardResponse>(queryKey, (current) => current && patchProject(current, project));
+    },
+  });
+}
+
+export function useCreateProject(orgId: string, workspaceId: string) {
+  const queryClient = useQueryClient();
+  const { queryKey } = boardQueryOptions(orgId, workspaceId);
+  const t = useT();
+  const toast = useToast();
+
+  return useMutation({
+    mutationFn: (input: CreateProjectInput) =>
+      request({
+        method: "POST",
+        path: `/v1/workspaces/${workspaceId}/projects`,
+        body: input,
+        schema: projectResponseSchema,
+      }),
+    onError: (error) => {
+      const kind = toBoardError(error);
+      if (kind === "permissionDenied") void queryClient.invalidateQueries({ queryKey: queryKeys.me() });
+      toast.error(t(boardErrorKey(kind)));
+    },
+    onSuccess: (project) => {
+      queryClient.setQueryData<BoardResponse>(queryKey, (current) => current && prependProject(current, project));
+      toast.show(t("board.create.success", { title: project.title }));
     },
   });
 }

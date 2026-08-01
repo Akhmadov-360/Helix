@@ -14,9 +14,13 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
+import { Plus } from "lucide-react";
+import { Button } from "@helix/ui";
+import { useCan } from "../../shared/auth/ability";
 import { useT } from "../../shared/i18n";
 import { useLocalize } from "../../shared/lib/localize";
 import { BoardColumn } from "./board-column";
+import { CreateDealDialog } from "./create-deal-dialog";
 import { useLoadMoreColumn, useMoveProject } from "./mutations";
 import { ProjectCard } from "./project-card";
 import { boardQueryOptions } from "./queries";
@@ -40,6 +44,8 @@ export function BoardView({ orgId, workspaceId }: { orgId: string; workspaceId: 
   const loadMore = useLoadMoreColumn(orgId, workspaceId);
   const localize = useLocalize();
   const t = useT();
+  const canCreate = useCan("Project.create");
+  const [createOpen, setCreateOpen] = useState(false);
 
   const columnsById = useMemo(() => new Map(board.columns.map((c) => [c.id, c])), [board]);
   const projectsById = useMemo(
@@ -157,29 +163,38 @@ export function BoardView({ orgId, workspaceId }: { orgId: string; workspaceId: 
   const activeProject = drag ? projectsById.get(drag.activeId) : undefined;
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCorners}
-      accessibility={{ announcements }}
-      onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
-      onDragEnd={handleDragEnd}
-      onDragCancel={() => setDrag(null)}
-    >
-      <div className="flex gap-4 overflow-x-auto pb-4">
-        {board.columns.map((column) => (
-          <BoardColumn
-            key={column.id}
-            column={column}
-            name={localize(column.phaseName)}
-            order={order[column.id] ?? []}
-            projectsById={projectsById}
-            onLoadMore={() => loadMore.mutate({ phaseId: column.id })}
-            loadingMore={loadMore.isPending && loadMore.variables?.phaseId === column.id}
-          />
-        ))}
-      </div>
-      <DragOverlay>{activeProject ? <ProjectCard project={activeProject} overlay /> : null}</DragOverlay>
-    </DndContext>
+    <div className="flex flex-col gap-3">
+      {canCreate && (
+        <Button type="button" size="sm" className="w-fit" onClick={() => setCreateOpen(true)}>
+          <Plus className="h-3.5 w-3.5" />
+          {t("board.create.trigger")}
+        </Button>
+      )}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        accessibility={{ announcements }}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+        onDragCancel={() => setDrag(null)}
+      >
+        <div className="flex gap-4 overflow-x-auto pb-4">
+          {board.columns.map((column) => (
+            <BoardColumn
+              key={column.id}
+              column={column}
+              name={localize(column.phaseName)}
+              order={order[column.id] ?? []}
+              projectsById={projectsById}
+              onLoadMore={() => loadMore.mutate({ phaseId: column.id })}
+              loadingMore={loadMore.isPending && loadMore.variables?.phaseId === column.id}
+            />
+          ))}
+        </div>
+        <DragOverlay>{activeProject ? <ProjectCard project={activeProject} overlay /> : null}</DragOverlay>
+      </DndContext>
+      <CreateDealDialog orgId={orgId} workspaceId={workspaceId} open={createOpen} onOpenChange={setCreateOpen} />
+    </div>
   );
 }
