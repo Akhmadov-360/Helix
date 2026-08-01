@@ -116,7 +116,7 @@ function PhaseFormFields({
           <SelectContent>
             {phaseTypeSchema.options.map((option) => (
               <SelectItem key={option} value={option}>
-                {option}
+                {t(`projectDetail.status.${option}`)}
               </SelectItem>
             ))}
           </SelectContent>
