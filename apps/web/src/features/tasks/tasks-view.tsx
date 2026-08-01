@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { Button, Input } from "@helix/ui";
+import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@helix/ui";
 import { useCan } from "../../shared/auth/ability";
 import { useT } from "../../shared/i18n";
 import { orgMembersQueryOptions } from "../../shared/org/queries";
@@ -69,18 +69,18 @@ export function TasksView({ orgId, projectId }: { orgId: string; projectId: stri
           {expanded && (
             <div className="flex gap-2">
               <Input type="date" value={dueAt} onChange={(e) => setDueAt(e.target.value)} className="w-auto" />
-              <select
-                value={assigneeId}
-                onChange={(e) => setAssigneeId(e.target.value)}
-                className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-              >
-                <option value="">{t("tasks.list.assignee.placeholder")}</option>
-                {members.map((member) => (
-                  <option key={member.userId} value={member.userId}>
-                    {member.name}
-                  </option>
-                ))}
-              </select>
+              <Select value={assigneeId} onValueChange={setAssigneeId}>
+                <SelectTrigger className="w-auto">
+                  <SelectValue placeholder={t("tasks.list.assignee.placeholder")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {members.map((member) => (
+                    <SelectItem key={member.userId} value={member.userId}>
+                      {member.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
         </form>

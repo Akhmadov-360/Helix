@@ -1,15 +1,13 @@
 import { useState } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { Button, Card } from "@helix/ui";
+import { Button, Card, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@helix/ui";
 import { useCan } from "../../shared/auth/ability";
 import { useT } from "../../shared/i18n";
 import { orgMembersQueryOptions } from "../../shared/org/queries";
 import { useAssignMember, useUnassignMember } from "./mutations";
 import { projectAssigneesQueryOptions } from "./queries";
 
-// Co-workers сделки. Manager+ управляет (project-links.md §2); нет отдельного `<Select>` в
-// packages/ui ещё — нативный select, первый реальный потребитель, промотать в примитив, когда
-// появится второй (тот же принцип, что ProjectTabs про третий таб).
+// Co-workers сделки. Manager+ управляет (project-links.md §2).
 export function AssigneesSection({ orgId, projectId }: { orgId: string; projectId: string }) {
   const t = useT();
   const assignees = useSuspenseQuery(projectAssigneesQueryOptions(orgId, projectId)).data;
@@ -45,18 +43,18 @@ export function AssigneesSection({ orgId, projectId }: { orgId: string; projectI
       </ul>
       {canAssign && candidates.length > 0 && (
         <div className="flex gap-2">
-          <select
-            value={selected}
-            onChange={(e) => setSelected(e.target.value)}
-            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-          >
-            <option value="">{t("contacts.assignees.picker.placeholder")}</option>
-            {candidates.map((member) => (
-              <option key={member.userId} value={member.userId}>
-                {member.name}
-              </option>
-            ))}
-          </select>
+          <Select value={selected} onValueChange={setSelected}>
+            <SelectTrigger className="w-auto">
+              <SelectValue placeholder={t("contacts.assignees.picker.placeholder")} />
+            </SelectTrigger>
+            <SelectContent>
+              {candidates.map((member) => (
+                <SelectItem key={member.userId} value={member.userId}>
+                  {member.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button
             size="sm"
             disabled={!selected}

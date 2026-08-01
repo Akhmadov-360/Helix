@@ -1,5 +1,6 @@
+import { Trash2 } from "lucide-react";
 import type { TaskResponse } from "@helix/api-schemas";
-import { Badge, cn } from "@helix/ui";
+import { Badge, Button, cn } from "@helix/ui";
 import { useLocaleStore, useT } from "../../shared/i18n";
 
 export function TaskRow({
@@ -42,14 +43,16 @@ export function TaskRow({
         {assigneeName ?? t("tasks.list.assignee.placeholder")}
       </span>
       {canDelete && (
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon"
           onClick={onDelete}
           aria-label={t("tasks.list.delete")}
-          className="shrink-0 text-muted-foreground hover:text-destructive"
+          className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
         >
-          ×
-        </button>
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
       )}
     </li>
   );
