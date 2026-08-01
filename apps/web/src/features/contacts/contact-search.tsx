@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Search } from "lucide-react";
 import type { ContactResponse, DedupHint } from "@helix/api-schemas";
 import { Button, Card, Input } from "@helix/ui";
 import { useT } from "../../shared/i18n";
@@ -45,12 +46,16 @@ export function ContactSearch({
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <Input
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder={t("contacts.search.placeholder")}
-      />
+    <div className="flex max-w-lg flex-col gap-2">
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t("contacts.search.placeholder")}
+          className="pl-9"
+        />
+      </div>
       {debounced.trim().length > 0 && (
         <Card className="flex flex-col divide-y divide-border p-1">
           {results.map((contact) => (

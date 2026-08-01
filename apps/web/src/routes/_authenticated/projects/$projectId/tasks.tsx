@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { projectQueryOptions } from "../../../../features/project-detail/queries";
+import { projectAssigneesQueryOptions, projectQueryOptions } from "../../../../features/project-detail/queries";
 import { ProjectDetailShell } from "../../../../features/project-detail/project-detail-shell";
 import { projectTasksQueryOptions } from "../../../../features/tasks/queries";
 import { TasksView } from "../../../../features/tasks/tasks-view";
@@ -12,6 +12,9 @@ export const Route = createFileRoute("/_authenticated/projects/$projectId/tasks"
     await Promise.all([
       context.queryClient.ensureQueryData(projectQueryOptions(me.activeOrgId, params.projectId)),
       context.queryClient.ensureQueryData(projectTasksQueryOptions(me.activeOrgId, params.projectId)),
+      // Сайдбар project-detail-shell.tsx теперь рендерится на ЛЮБОЙ вкладке (redesign) — грузим
+      // его данные (co-workers) здесь тоже, не только на бывшей вкладке Контакты.
+      context.queryClient.ensureQueryData(projectAssigneesQueryOptions(me.activeOrgId, params.projectId)),
       context.queryClient.ensureQueryData(orgMembersQueryOptions(me.activeOrgId)),
     ]);
   },

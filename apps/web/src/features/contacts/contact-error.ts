@@ -21,16 +21,6 @@ export function toLinkContactError(error: unknown): LinkContactError {
   return { kind: "unexpected" };
 }
 
-export type AssigneeError = "alreadyAssigned" | "permissionDenied" | "notFound" | "unexpected";
-
-export function toAssigneeError(error: unknown): AssigneeError {
-  if (!(error instanceof TransportError)) return "unexpected";
-  if (error.kind === "conflict" && error.code === "ASSIGNEE_ALREADY_EXISTS") return "alreadyAssigned";
-  if (error.kind === "forbidden") return "permissionDenied";
-  if (error.kind === "notFound") return "notFound";
-  return "unexpected";
-}
-
 // Общая доменная ошибка на прочие мутации (unlink/update roles/create contact) — тот же паттерн,
 // что board-error.ts/phase-error.ts.
 export type ContactError = "permissionDenied" | "notFound" | "unexpected";

@@ -12,14 +12,6 @@ export function ProjectTabs({ projectId }: { projectId: string }) {
   return (
     <nav className="flex gap-5 border-b border-border">
       <Link
-        to="/projects/$projectId/overview"
-        params={{ projectId }}
-        className={tabClass}
-        activeProps={{ className: activeClass }}
-      >
-        {t("projectDetail.tabs.overview")}
-      </Link>
-      <Link
         to="/projects/$projectId/contacts"
         params={{ projectId }}
         className={tabClass}

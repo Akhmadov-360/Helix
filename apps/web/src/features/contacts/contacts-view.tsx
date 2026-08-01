@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import type { Audience, ContactResponse, DedupHint as DedupHintData } from "@helix/api-schemas";
-import { Card } from "@helix/ui";
+import { Button, Card } from "@helix/ui";
 import { useCan } from "../../shared/auth/ability";
 import { useT } from "../../shared/i18n";
-import { AssigneesSection } from "./assignees-view";
 import { ContactSearch } from "./contact-search";
 import { DealRoleChips } from "./deal-role-chips";
 import { DedupHint } from "./dedup-hint";
@@ -77,11 +76,11 @@ export function ContactsView({
       {contacts.length === 0 ? (
         <p className="text-muted-foreground">{t("contacts.list.empty")}</p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {contacts.map((contact) => (
             <li key={contact.contactId}>
               <Card className="flex flex-col gap-2 p-3">
-                <div className="flex items-center justify-between">
+                <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="text-sm font-medium">{contact.name}</p>
                     {(contact.email ?? contact.companyName) && (
@@ -91,13 +90,15 @@ export function ContactsView({
                     )}
                   </div>
                   {canUnlink && (
-                    <button
+                    <Button
                       type="button"
-                      className="text-xs text-muted-foreground hover:text-destructive"
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto shrink-0 px-1.5 py-0.5 text-xs text-muted-foreground hover:text-destructive"
                       onClick={() => unlink.mutate({ contactId: contact.contactId })}
                     >
                       {t("contacts.list.unlink")}
-                    </button>
+                    </Button>
                   )}
                 </div>
                 <DealRoleChips
@@ -116,8 +117,6 @@ export function ContactsView({
           ))}
         </ul>
       )}
-
-      <AssigneesSection orgId={orgId} projectId={projectId} />
     </div>
   );
 }

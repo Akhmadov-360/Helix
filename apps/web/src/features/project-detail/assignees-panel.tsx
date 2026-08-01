@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { Button, Card, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@helix/ui";
+import { X } from "lucide-react";
+import { Avatar, Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@helix/ui";
 import { useCan } from "../../shared/auth/ability";
 import { useT } from "../../shared/i18n";
 import { orgMembersQueryOptions } from "../../shared/org/queries";
-import { useAssignMember, useUnassignMember } from "./mutations";
+import { useAssignMember, useUnassignMember } from "./assignees-mutations";
 import { projectAssigneesQueryOptions } from "./queries";
 
-// Co-workers сделки. Manager+ управляет (project-links.md §2).
-export function AssigneesSection({ orgId, projectId }: { orgId: string; projectId: string }) {
+// Co-workers сделки (redesign: сайдбар project-detail, было на вкладке Контакты). Manager+
+// управляет (project-links.md §2).
+export function AssigneesPanel({ orgId, projectId }: { orgId: string; projectId: string }) {
   const t = useT();
   const assignees = useSuspenseQuery(projectAssigneesQueryOptions(orgId, projectId)).data;
   const members = useSuspenseQuery(orgMembersQueryOptions(orgId)).data;
@@ -29,22 +31,29 @@ export function AssigneesSection({ orgId, projectId }: { orgId: string; projectI
       )}
       <ul className="flex flex-col gap-1">
         {assignees.map((assignee) => (
-          <li key={assignee.userId}>
-            <Card className="flex items-center justify-between p-2">
-              <span className="text-sm">{assignee.name}</span>
-              {canUnassign && (
-                <Button variant="ghost" size="sm" onClick={() => unassign.mutate({ userId: assignee.userId })}>
-                  {t("contacts.assignees.remove")}
-                </Button>
-              )}
-            </Card>
+          <li key={assignee.userId} className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-2 text-sm">
+              <Avatar name={assignee.name} size="sm" />
+              {assignee.name}
+            </span>
+            {canUnassign && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                aria-label={t("contacts.assignees.remove")}
+                onClick={() => unassign.mutate({ userId: assignee.userId })}
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            )}
           </li>
         ))}
       </ul>
       {canAssign && candidates.length > 0 && (
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2">
           <Select value={selected} onValueChange={setSelected}>
-            <SelectTrigger className="w-auto">
+            <SelectTrigger>
               <SelectValue placeholder={t("contacts.assignees.picker.placeholder")} />
             </SelectTrigger>
             <SelectContent>

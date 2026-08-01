@@ -15,11 +15,8 @@ import {
   SelectValue,
 } from "@helix/ui";
 import { useT } from "../../shared/i18n";
+import { CURRENCIES } from "./currencies";
 import { useCreateProject } from "./mutations";
-
-// Закрытый список — удобство ввода для частых валют (currency жёстко типизирован ISO-4217,
-// decisions.md §currency), НЕ ограничение контракта: бэк по-прежнему принимает любой ISO-код.
-const CURRENCIES = ["USD", "EUR", "RUB", "UZS"] as const;
 
 export function CreateDealDialog({
   orgId,
