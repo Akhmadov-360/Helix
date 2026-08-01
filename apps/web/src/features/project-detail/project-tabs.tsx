@@ -5,11 +5,12 @@ import { useT } from "../../shared/i18n";
 // один потребитель (project detail), выносить в packages/ui незачем, пока не появится второй.
 export function ProjectTabs({ projectId }: { projectId: string }) {
   const t = useT();
-  const tabClass = "px-3 py-1.5 text-sm rounded-md text-muted-foreground hover:text-foreground";
-  const activeClass = "bg-secondary text-foreground font-medium";
+  const tabClass =
+    "border-b-2 border-transparent px-1 pb-2 text-sm text-muted-foreground transition-colors hover:text-foreground";
+  const activeClass = "border-accent font-medium text-foreground";
 
   return (
-    <nav className="flex gap-1 border-b border-border pb-2">
+    <nav className="flex gap-5 border-b border-border">
       <Link
         to="/projects/$projectId/overview"
         params={{ projectId }}

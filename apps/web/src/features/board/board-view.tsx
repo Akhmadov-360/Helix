@@ -163,9 +163,11 @@ export function BoardView({ orgId, workspaceId }: { orgId: string; workspaceId: 
   const activeProject = drag ? projectsById.get(drag.activeId) : undefined;
 
   return (
-    <div className="flex flex-col gap-3">
+    // h-full: заполняет main (app-shell.tsx: h-dvh + overflow-y-auto) без второго page-scroll —
+    // единственный скролл внутри доски теперь горизонтальный (колонки) и по одной колонке (карты).
+    <div className="flex h-full flex-col gap-3">
       {canCreate && (
-        <Button type="button" size="sm" className="w-fit" onClick={() => setCreateOpen(true)}>
+        <Button type="button" size="sm" className="w-fit shrink-0" onClick={() => setCreateOpen(true)}>
           <Plus className="h-3.5 w-3.5" />
           {t("board.create.trigger")}
         </Button>
@@ -179,7 +181,7 @@ export function BoardView({ orgId, workspaceId }: { orgId: string; workspaceId: 
         onDragEnd={handleDragEnd}
         onDragCancel={() => setDrag(null)}
       >
-        <div className="flex gap-4 overflow-x-auto pb-4">
+        <div className="scroll-slim flex min-h-0 flex-1 gap-4 overflow-x-auto pb-2">
           {board.columns.map((column) => (
             <BoardColumn
               key={column.id}
@@ -187,12 +189,18 @@ export function BoardView({ orgId, workspaceId }: { orgId: string; workspaceId: 
               name={localize(column.phaseName)}
               order={order[column.id] ?? []}
               projectsById={projectsById}
+              orgId={orgId}
+              workspaceId={workspaceId}
               onLoadMore={() => loadMore.mutate({ phaseId: column.id })}
               loadingMore={loadMore.isPending && loadMore.variables?.phaseId === column.id}
             />
           ))}
         </div>
-        <DragOverlay>{activeProject ? <ProjectCard project={activeProject} overlay /> : null}</DragOverlay>
+        <DragOverlay>
+          {activeProject ? (
+            <ProjectCard project={activeProject} orgId={orgId} workspaceId={workspaceId} overlay />
+          ) : null}
+        </DragOverlay>
       </DndContext>
       <CreateDealDialog orgId={orgId} workspaceId={workspaceId} open={createOpen} onOpenChange={setCreateOpen} />
     </div>

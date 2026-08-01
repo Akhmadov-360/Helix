@@ -4,7 +4,12 @@ export interface ProjectCardViewModel {
   id: string;
   phaseId: string;
   title: string;
+  source: string | null;
   amount: { value: number; currency: string } | null;
+  doneTasksCount: number;
+  totalTasksCount: number;
+  assignees: Array<{ userId: string; name: string }>;
+  createdAt: string;
 }
 
 export interface BoardColumnViewModel {
@@ -37,10 +42,15 @@ export function toBoardViewModel(data: BoardResponse): BoardViewModel {
         id: project.id,
         phaseId: project.phaseId,
         title: project.title,
+        source: project.source,
         amount:
           project.value === null || project.currency === null
             ? null
             : { value: project.value, currency: project.currency },
+        doneTasksCount: project.doneTasksCount,
+        totalTasksCount: project.totalTasksCount,
+        assignees: project.assignees,
+        createdAt: project.createdAt,
       })),
     })),
   };

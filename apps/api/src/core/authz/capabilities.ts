@@ -13,15 +13,20 @@ import { APP_SUBJECTS, defineAbilityForRole, type AppAction } from "./app-abilit
  * Явные пробелы (не забыты — API их действительно не имеет):
  * - Phase: нет "read" — отдельного GET /phases/:id нет, фазы читаются только вложенными в
  *   Workspace.read; отдельной capability на них незачем.
- * - Project: нет "delete" — эндпоинта нет вовсе (архивация — update, не delete).
  * - ProjectAssignee: нет "update" — только assign(POST)/unassign(DELETE), PATCH не существует.
  * - "merge"/"reassign" — не generic-глаголы: merge существует только у Contact (Owner/Admin,
  *   decisions.md §7.7), reassign — только у Project (Manager+, project-links.md §6).
+ *
+ * Project.delete: ЕСТЬ (DELETE /v1/projects/:id, @CheckPolicy("delete","Project"),
+ * projects.controller.ts) — O/A по app-ability.ts (MANAGER явно без delete, комментарий там же
+ * «DELETE — только O/A»). Раньше этой строки не было (см. историю) — эндпоинт был добавлен уже
+ * после того, как список поверхности API зафиксировали здесь, из-за чего OWNER/ADMIN физически
+ * не могли получить Project.delete через /v1/auth/me, хотя API его разрешал.
  */
 const SUBJECT_OPERATIONS = {
   Workspace: ["create", "read", "update", "delete"],
   Phase: ["create", "update", "delete"],
-  Project: ["create", "read", "update", "reassign"],
+  Project: ["create", "read", "update", "delete", "reassign"],
   Company: ["create", "read", "update", "delete"],
   Contact: ["create", "read", "update", "delete", "merge"],
   ProjectContact: ["create", "read", "update", "delete"],

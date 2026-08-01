@@ -3,6 +3,7 @@ import type { PhaseType } from "@helix/db";
 import type { Prisma } from "@helix/db";
 import type {
   ActivityEventResponse,
+  BoardProjectResponse,
   BoardResponse,
   ColumnQuery,
   ColumnResponse,
@@ -23,7 +24,7 @@ import { ActivityRecorder } from "../activity/activity-recorder";
 import { ActivityRepository } from "../activity/activity.repository";
 import { toPhaseResponse } from "../phases/phase.mapper";
 import { PhasesRepository } from "../phases/phases.repository";
-import { toProjectResponse } from "../projects/project.mapper";
+import { toBoardProjectResponse, toProjectResponse } from "../projects/project.mapper";
 import { ProjectsRepository } from "../projects/projects.repository";
 import { denseRanks, rankBetween } from "../projects/rank";
 import { OrganizationsRepository } from "../organizations/organizations.repository";
@@ -165,15 +166,18 @@ export class ProjectsService {
     const workspace = await this.workspaces.findByIdInOrg(workspaceId, orgId);
     if (!workspace) throw new ResourceNotFoundError("Workspace not found");
 
-    const [rows, totals] = await Promise.all([
-      this.projects.boardRows(workspaceId, limitPerPhase),
+    const rows = await this.projects.boardRows(workspaceId, limitPerPhase);
+    const projectIds = rows.map((row) => row.id);
+    const [totals, taskCounts, assignees] = await Promise.all([
       this.projects.columnTotals(workspaceId),
+      this.projects.taskCountsByProjectIds(projectIds),
+      this.projects.assigneesByProjectIds(projectIds),
     ]);
 
-    const byPhase = new Map<string, ProjectResponse[]>();
+    const byPhase = new Map<string, BoardProjectResponse[]>();
     for (const row of rows) {
       const list = byPhase.get(row.phaseId) ?? [];
-      list.push(toProjectResponse(row));
+      list.push(toBoardProjectResponse(row, taskCounts.get(row.id), assignees.get(row.id)));
       byPhase.set(row.phaseId, list);
     }
 
@@ -367,9 +371,18 @@ export class ProjectsService {
       query.cursorId ?? null,
       query.limit + 1,
     );
+    const page = rows.slice(0, query.limit);
     const hasMore = rows.length > query.limit;
+
+    // Та же форма, что у доски (§13.4): страница дозаписывается в board-кэш на фронте.
+    const projectIds = page.map((row) => row.id);
+    const [taskCounts, assignees] = await Promise.all([
+      this.projects.taskCountsByProjectIds(projectIds),
+      this.projects.assigneesByProjectIds(projectIds),
+    ]);
+
     return {
-      projects: rows.slice(0, query.limit).map(toProjectResponse),
+      projects: page.map((row) => toBoardProjectResponse(row, taskCounts.get(row.id), assignees.get(row.id))),
       hasMore,
     };
   }

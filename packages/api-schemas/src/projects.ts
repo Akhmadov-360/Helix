@@ -77,10 +77,19 @@ export const projectResponseSchema = z.object({
 });
 export type ProjectResponse = z.infer<typeof projectResponseSchema>;
 
+// Расширение ТОЛЬКО для доски/колонки (не всего ProjectResponse — move/reassign/archive/restore
+// его тоже возвращают, пересчитывать агрегаты на каждой такой мутации незачем, P3).
+export const boardProjectResponseSchema = projectResponseSchema.extend({
+  doneTasksCount: z.number().int().nonnegative(),
+  totalTasksCount: z.number().int().nonnegative(),
+  assignees: z.array(z.object({ userId: z.string(), name: z.string() })),
+});
+export type BoardProjectResponse = z.infer<typeof boardProjectResponseSchema>;
+
 // Колонка доски: фаза + ограниченная выборка карточек + total (отдельный COUNT) + hasMore (§8).
 export const boardColumnSchema = phaseResponseSchema.extend({
   total: z.number().int(),
-  projects: z.array(projectResponseSchema),
+  projects: z.array(boardProjectResponseSchema),
   hasMore: z.boolean(),
 });
 export type BoardColumn = z.infer<typeof boardColumnSchema>;
@@ -93,9 +102,10 @@ export const boardResponseSchema = z.object({
 export type BoardResponse = z.infer<typeof boardResponseSchema>;
 
 // Догрузка колонки: страница карточек + hasMore. Курсор для следующей — (rank, id)
-// последней карточки страницы (клиент берёт из неё).
+// последней карточки страницы (клиент берёт из неё). Тот же boardProjectResponseSchema, что и
+// доска (§13.4) — страница дозаписывается в тот же кэш board, форма должна совпадать.
 export const columnResponseSchema = z.object({
-  projects: z.array(projectResponseSchema),
+  projects: z.array(boardProjectResponseSchema),
   hasMore: z.boolean(),
 });
 export type ColumnResponse = z.infer<typeof columnResponseSchema>;

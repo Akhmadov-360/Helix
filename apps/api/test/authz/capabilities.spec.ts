@@ -18,15 +18,16 @@ describe("listCapabilities (§8.2)", () => {
   it("OWNER/ADMIN получают деструктивные capability, которых нет ни у кого другого", () => {
     const owner = new Set(listCapabilities("OWNER"));
     const admin = new Set(listCapabilities("ADMIN"));
-    for (const destructive of ["Workspace.delete", "Contact.merge", "Company.delete"] as const) {
+    for (const destructive of ["Workspace.delete", "Contact.merge", "Company.delete", "Project.delete"] as const) {
       expect(owner.has(destructive)).toBe(true);
       expect(admin.has(destructive)).toBe(true);
     }
   });
 
-  it("MANAGER: reassign/delete лида есть, merge контакта — нет (только O/A)", () => {
+  it("MANAGER: reassign лида есть, delete лида и merge контакта — нет (только O/A)", () => {
     const manager = new Set(listCapabilities("MANAGER"));
     expect(manager.has("Project.reassign")).toBe(true);
+    expect(manager.has("Project.delete")).toBe(false);
     expect(manager.has("Contact.delete")).toBe(true);
     expect(manager.has("Contact.merge")).toBe(false);
   });
@@ -58,12 +59,12 @@ describe("listCapabilities (§8.2)", () => {
   // Regression (найдено живой проверкой в браузере): CASL "manage" ⊇ любое действие — роль
   // с can("manage", X) резолвит ЛЮБОЙ ability.can(action, X) в true, даже для операций, которых
   // нет в API вообще. Наивный цикл по всем AppAction выдавал "ProjectContact.merge",
-  // "Task.reassign", "Project.delete", "ProjectAssignee.update" = true ни у одной роли эти
-  // операции не существуют как эндпоинты. SUBJECT_OPERATIONS (поверхность API) — фикс:
-  // ability.can() продолжает решать RBAC, а не «существует ли такая операция».
+  // "Task.reassign", "ProjectAssignee.update" = true ни у одной роли эти операции не существуют
+  // как эндпоинты. SUBJECT_OPERATIONS (поверхность API) — фикс: ability.can() продолжает решать
+  // RBAC, а не «существует ли такая операция». (Project.delete раньше был в этом списке как
+  // пример «несуществующего» — эндпоинт добавили позже, см. capabilities.ts.)
   it("ни для одной роли не протекают операции, которых нет в API", () => {
     const impossible = [
-      "Project.delete",
       "Phase.read",
       "ProjectAssignee.update",
       "ProjectContact.merge",

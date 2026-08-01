@@ -10,7 +10,10 @@ export function AppShell() {
   const me = useMe();
 
   return (
-    <div className="flex min-h-dvh">
+    <div className="flex h-dvh">
+      {/* h-dvh (не min-h-dvh): main.overflow-y-auto реально включается только когда родитель
+          жёстко ограничен по высоте, иначе flex-row просто растёт вместе с контентом, и
+          "overflow" никогда не срабатывает — отсюда была «плавающая» доска без containment. */}
       <Sidebar orgId={me.activeOrgId} />
       <main className="min-w-0 flex-1 overflow-y-auto p-6">
         <Outlet />

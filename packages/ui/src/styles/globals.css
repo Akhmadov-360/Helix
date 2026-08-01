@@ -128,4 +128,27 @@
       animation: none;
     }
   }
+
+  /* Тонкий скроллбар, невидимый в покое — для внутренне-скроллящихся зон (колонки доски и т.п.).
+     Firefox — scrollbar-color; Chromium/WebKit — псевдоэлементы (Tailwind v4 не тянет плагин). */
+  .scroll-slim {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+  .scroll-slim:hover {
+    scrollbar-color: var(--border) transparent;
+  }
+  .scroll-slim::-webkit-scrollbar {
+    width: 6px;
+  }
+  .scroll-slim::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scroll-slim::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 9999px;
+  }
+  .scroll-slim:hover::-webkit-scrollbar-thumb {
+    background: var(--border);
+  }
 }

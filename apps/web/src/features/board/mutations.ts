@@ -1,5 +1,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { BoardResponse, ColumnResponse, CreateProjectInput, ProjectResponse } from "@helix/api-schemas";
+import type {
+  BoardProjectResponse,
+  BoardResponse,
+  ColumnResponse,
+  CreateProjectInput,
+  ProjectResponse,
+} from "@helix/api-schemas";
 import { columnResponseSchema, projectResponseSchema } from "@helix/api-schemas";
 import { request, queryKeys } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
@@ -46,28 +52,34 @@ function spliceMove(board: BoardResponse, vars: MoveVariables): BoardResponse {
 }
 
 // onSuccess патчит карту из ОТВЕТА (§7) — реальный rank/status только у сервера, порядок массива
-// (уже верный из optimistic-сплайса) трогать не нужно.
+// (уже верный из optimistic-сплайса) трогать не нужно. move/reassign/archive/restore возвращают
+// плоский ProjectResponse (без doneTasksCount/assignees, §13.4 redesign — эти агрегаты не
+// пересчитываются на КАЖДОЙ мутации), поэтому мёржим поверх уже закэшированной карточки, а не
+// заменяем целиком — иначе слетели бы счётчик задач и аватарки co-workers.
 function patchProject(board: BoardResponse, project: ProjectResponse): BoardResponse {
   return {
     ...board,
     phases: board.phases.map((phase) =>
       phase.id === project.phaseId
-        ? { ...phase, projects: phase.projects.map((p) => (p.id === project.id ? project : p)) }
+        ? { ...phase, projects: phase.projects.map((p) => (p.id === project.id ? { ...p, ...project } : p)) }
         : phase,
     ),
   };
 }
 
 // Лид создаётся всегда в первой фазе, наверху колонки (§1, projects.controller.ts create()) —
-// прекатенируем локально теми же правилами, сервер уже так и создал.
+// прекатенируем локально теми же правилами, сервер уже так и создал. Свежесозданный лид точно
+// без задач/co-workers — 0/0/[] корректны, не выдумка (в отличие от отсутствующих в ProjectResponse
+// полей, которые пришлось бы гадать).
 function prependProject(board: BoardResponse, project: ProjectResponse): BoardResponse {
   const firstPhase = board.phases[0];
   if (!firstPhase || firstPhase.id !== project.phaseId) return board;
+  const boardProject: BoardProjectResponse = { ...project, doneTasksCount: 0, totalTasksCount: 0, assignees: [] };
   return {
     ...board,
     phases: board.phases.map((phase) =>
       phase.id === firstPhase.id
-        ? { ...phase, projects: [project, ...phase.projects], total: phase.total + 1 }
+        ? { ...phase, projects: [boardProject, ...phase.projects], total: phase.total + 1 }
         : phase,
     ),
   };
@@ -159,6 +171,63 @@ export function useCreateProject(orgId: string, workspaceId: string) {
     onSuccess: (project) => {
       queryClient.setQueryData<BoardResponse>(queryKey, (current) => current && prependProject(current, project));
       toast.show(t("board.create.success", { title: project.title }));
+    },
+  });
+}
+
+// Убрать карточку из кэша доски (архив/удаление): архив фильтруется бэком из board-запроса
+// (status <> 'ARCHIVED'), удаление — физическое. В обоих случаях карточка пропадает с доски.
+function removeProject(board: BoardResponse, projectId: string): BoardResponse {
+  return {
+    ...board,
+    phases: board.phases.map((phase) => {
+      const index = phase.projects.findIndex((p) => p.id === projectId);
+      if (index === -1) return phase;
+      const projects = phase.projects.filter((p) => p.id !== projectId);
+      return { ...phase, projects, total: phase.total - 1 };
+    }),
+  };
+}
+
+// Архивация обратима (restore есть) — без confirm-диалога, прямое действие + тост.
+export function useArchiveProject(orgId: string, workspaceId: string) {
+  const queryClient = useQueryClient();
+  const { queryKey } = boardQueryOptions(orgId, workspaceId);
+  const t = useT();
+  const toast = useToast();
+
+  return useMutation({
+    mutationFn: (vars: { id: string; title: string }) =>
+      request({ method: "POST", path: `/v1/projects/${vars.id}/archive`, schema: projectResponseSchema }),
+    onError: (error) => {
+      const kind = toBoardError(error);
+      if (kind === "permissionDenied") void queryClient.invalidateQueries({ queryKey: queryKeys.me() });
+      toast.error(t(boardErrorKey(kind)));
+    },
+    onSuccess: (_project, vars) => {
+      queryClient.setQueryData<BoardResponse>(queryKey, (current) => current && removeProject(current, vars.id));
+      toast.show(t("board.card.archived", { title: vars.title }));
+    },
+  });
+}
+
+export function useDeleteProject(orgId: string, workspaceId: string) {
+  const queryClient = useQueryClient();
+  const { queryKey } = boardQueryOptions(orgId, workspaceId);
+  const t = useT();
+  const toast = useToast();
+
+  return useMutation({
+    mutationFn: (vars: { id: string; title: string }) =>
+      request({ method: "DELETE", path: `/v1/projects/${vars.id}`, schema: projectResponseSchema.nullable() }),
+    onError: (error) => {
+      const kind = toBoardError(error);
+      if (kind === "permissionDenied") void queryClient.invalidateQueries({ queryKey: queryKeys.me() });
+      toast.error(t(boardErrorKey(kind)));
+    },
+    onSuccess: (_response, vars) => {
+      queryClient.setQueryData<BoardResponse>(queryKey, (current) => current && removeProject(current, vars.id));
+      toast.show(t("board.card.deleted", { title: vars.title }));
     },
   });
 }

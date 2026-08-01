@@ -8,9 +8,18 @@ import {
   DialogTitle,
   Input,
   Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@helix/ui";
 import { useT } from "../../shared/i18n";
 import { useCreateProject } from "./mutations";
+
+// Закрытый список — удобство ввода для частых валют (currency жёстко типизирован ISO-4217,
+// decisions.md §currency), НЕ ограничение контракта: бэк по-прежнему принимает любой ISO-код.
+const CURRENCIES = ["USD", "EUR", "RUB", "UZS"] as const;
 
 export function CreateDealDialog({
   orgId,
@@ -88,15 +97,20 @@ export function CreateDealDialog({
                 disabled={create.isPending}
               />
             </div>
-            <div className="flex w-24 flex-col gap-1.5">
+            <div className="flex w-28 flex-col gap-1.5">
               <Label htmlFor="deal-currency">{t("board.create.currency")}</Label>
-              <Input
-                id="deal-currency"
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-                disabled={create.isPending || !value.trim()}
-                maxLength={3}
-              />
+              <Select value={currency} onValueChange={setCurrency} disabled={create.isPending || !value.trim()}>
+                <SelectTrigger id="deal-currency">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CURRENCIES.map((code) => (
+                    <SelectItem key={code} value={code}>
+                      {code}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <div className="flex flex-col gap-1.5">
@@ -107,6 +121,7 @@ export function CreateDealDialog({
               onChange={(e) => setSource(e.target.value)}
               disabled={create.isPending}
             />
+            <p className="text-xs text-muted-foreground">{t("board.create.sourceHint")}</p>
           </div>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={create.isPending}>
