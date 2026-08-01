@@ -85,6 +85,7 @@
   "phases.delete.submit": "Delete",
   "phases.delete.submitting": "Deleting…",
   "phases.delete.success": "Phase deleted",
+  "projectDetail.backToBoard": "Back to board",
   "projectDetail.tabs.overview": "Overview",
   "projectDetail.tabs.activity": "Activity",
   "projectDetail.tabs.contacts": "Contacts",

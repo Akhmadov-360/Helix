@@ -1,5 +1,8 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
+import { Link } from "@tanstack/react-router";
+import { ArrowLeft } from "lucide-react";
+import { useT } from "../../shared/i18n";
 import { projectQueryOptions } from "./queries";
 import { ProjectTabs } from "./project-tabs";
 
@@ -15,9 +18,20 @@ export function ProjectDetailShell({
   children: ReactNode;
 }) {
   const project = useSuspenseQuery(projectQueryOptions(orgId, projectId)).data;
+  const t = useT();
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Раньше единственный путь назад к доске — browser back; project.workspaceId уже есть
+          в ответе, отдельного запроса не требует. */}
+      <Link
+        to="/workspaces/$workspaceId/board"
+        params={{ workspaceId: project.workspaceId }}
+        className="flex w-fit items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" />
+        {t("projectDetail.backToBoard")}
+      </Link>
       <h1 className="text-lg font-semibold">{project.title}</h1>
       <ProjectTabs projectId={projectId} />
       {children}

@@ -85,6 +85,7 @@
   "phases.delete.submit": "O‘chirish",
   "phases.delete.submitting": "O‘chirilmoqda…",
   "phases.delete.success": "Faza o‘chirildi",
+  "projectDetail.backToBoard": "Doskaga qaytish",
   "projectDetail.tabs.overview": "Umumiy",
   "projectDetail.tabs.activity": "Faoliyat",
   "projectDetail.tabs.contacts": "Kontaktlar",

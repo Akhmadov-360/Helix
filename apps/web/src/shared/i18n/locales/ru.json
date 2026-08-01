@@ -85,6 +85,7 @@
   "phases.delete.submit": "Удалить",
   "phases.delete.submitting": "Удаление…",
   "phases.delete.success": "Фаза удалена",
+  "projectDetail.backToBoard": "Назад к доске",
   "projectDetail.tabs.overview": "Обзор",
   "projectDetail.tabs.activity": "Активность",
   "projectDetail.tabs.contacts": "Контакты",
