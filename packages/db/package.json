@@ -18,6 +18,7 @@
     "generate": "prisma generate",
     "migrate": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
+    "seed": "tsx prisma/seed.ts",
     "studio": "prisma studio",
     "build": "prisma generate && tsc -p tsconfig.build.json",
     "dev": "tsc -p tsconfig.build.json --watch",
@@ -25,9 +26,11 @@
     "lint": "eslint ."
   },
   "prisma": {
-    "schema": "prisma/schema.prisma"
+    "schema": "prisma/schema.prisma",
+    "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@node-rs/argon2": "^2.0.2",
     "@prisma/client": "^6.16.2",
     "fractional-indexing": "^3.2.0"
   },
@@ -37,6 +40,7 @@
     "@types/node": "^22.18.9",
     "eslint": "^9.39.0",
     "prisma": "^6.16.2",
+    "tsx": "^4.19.2",
     "typescript": "^5.9.3"
   }
 }

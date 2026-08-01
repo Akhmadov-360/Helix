@@ -19,6 +19,7 @@ import {
   type SwitchOrgInput,
 } from "@helix/api-schemas";
 import type { Request, Response } from "express";
+import { listCapabilities } from "../../core/authz/capabilities";
 import { InvalidRefreshTokenError, InvalidTokenError } from "../../core/errors/domain-error";
 import { ZodValidationPipe } from "../../core/pipes/zod-validation.pipe";
 import { UsersRepository } from "../users/users.repository";
@@ -171,8 +172,14 @@ export class AuthController {
     }
 
     // Роль отдаём из контекста guard'а — она прочитана из Membership на этом же
-    // запросе, поэтому не может быть устаревшей.
-    return { ...profile, activeOrgId: auth.activeOrgId, role: auth.role };
+    // запросе, поэтому не может быть устаревшей. capabilities — проекция той же роли (§8.2),
+    // не отдельное чтение: не может разойтись с role в одном ответе.
+    return {
+      ...profile,
+      activeOrgId: auth.activeOrgId,
+      role: auth.role,
+      capabilities: listCapabilities(auth.role),
+    };
   }
 
   /**

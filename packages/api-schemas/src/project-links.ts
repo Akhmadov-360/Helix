@@ -26,6 +26,7 @@ export const projectContactResponseSchema = z.object({
   contactId: z.string(),
   name: z.string(),
   email: z.string().nullable(),
+  phone: z.string().nullable(),
   companyName: z.string().optional(),
   roles: z.array(dealRoleSchema),
 });

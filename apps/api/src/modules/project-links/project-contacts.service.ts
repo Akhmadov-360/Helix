@@ -93,6 +93,7 @@ function toProjectContactResponse(row: ProjectContactRow): ProjectContactRespons
     contactId: row.contactId,
     name: row.contact.name,
     email: row.contact.email,
+    phone: row.contact.phone,
     roles: row.roles,
     ...(row.contact.company ? { companyName: row.contact.company.name } : {}),
   };

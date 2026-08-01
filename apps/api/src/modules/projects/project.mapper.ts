@@ -1,5 +1,5 @@
 import type { Prisma } from "@helix/db";
-import type { ProjectResponse, ProjectStatus } from "@helix/api-schemas";
+import type { BoardProjectResponse, ProjectResponse, ProjectStatus } from "@helix/api-schemas";
 
 export interface ProjectRow {
   id: string;
@@ -33,5 +33,18 @@ export function toProjectResponse(p: ProjectRow): ProjectResponse {
     rank: p.rank,
     createdAt: p.createdAt.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
+  };
+}
+
+export function toBoardProjectResponse(
+  p: ProjectRow,
+  taskCounts: { done: number; total: number } | undefined,
+  assignees: Array<{ userId: string; name: string }> | undefined,
+): BoardProjectResponse {
+  return {
+    ...toProjectResponse(p),
+    doneTasksCount: taskCounts?.done ?? 0,
+    totalTasksCount: taskCounts?.total ?? 0,
+    assignees: assignees ?? [],
   };
 }

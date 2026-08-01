@@ -48,6 +48,19 @@ describe("GET /v1/auth/me (JwtAuthGuard)", () => {
     expect(res.body.data).not.toHaveProperty("passwordHash");
   });
 
+  it("отдаёт capabilities (§8.2) — регистрирующий владеет своей новой оргой (OWNER)", async () => {
+    const token = await registerAndGetToken();
+
+    const res = await request(app.getHttpServer())
+      .get("/v1/auth/me")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200);
+
+    expect(res.body.data.role).toBe("OWNER");
+    // Проекция листа § "Subject.action", не матрица — деструктивные capability тоже видны OWNER'у.
+    expect(res.body.data.capabilities).toEqual(expect.arrayContaining(["Workspace.delete", "Contact.merge"]));
+  });
+
   it("токен, выданный логином, тоже работает", async () => {
     await registerAndGetToken();
 

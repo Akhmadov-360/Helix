@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { capabilitiesSchema } from "./capabilities";
 
 /**
  * Нормализация ДО валидации: пользователи пастят email с пробелами и в разном
@@ -71,6 +72,9 @@ export type SwitchOrgInput = z.infer<typeof switchOrgSchema>;
 export const currentUserSchema = userProfileSchema.extend({
   activeOrgId: z.string(),
   role: roleSchema,
+  // Плоская проекция CASL-ability (§8.2 frontend-architecture.md) — UI решает, что показать;
+  // сервер по-прежнему единственный энфорсер (@CheckPolicy на каждом мутаторе).
+  capabilities: capabilitiesSchema,
 });
 export type CurrentUser = z.infer<typeof currentUserSchema>;
 

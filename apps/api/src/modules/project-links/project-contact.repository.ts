@@ -11,13 +11,13 @@ type _DealRoleParity = AssignableTo<DbDealRole, DealRole> | AssignableTo<DealRol
 export interface ProjectContactRow {
   contactId: string;
   roles: DealRole[];
-  contact: { name: string; email: string | null; company: { name: string } | null };
+  contact: { name: string; email: string | null; phone: string | null; company: { name: string } | null };
 }
 
 const LINK_SELECT = {
   contactId: true,
   roles: true,
-  contact: { select: { name: true, email: true, company: { select: { name: true } } } },
+  contact: { select: { name: true, email: true, phone: true, company: { select: { name: true } } } },
 } as const;
 
 @Injectable()

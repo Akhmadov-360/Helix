@@ -64,6 +64,18 @@ export class OrganizationsRepository {
    *
    * null означал бы User без Membership — состояние, которого по §9.1 не бывает.
    */
+  /** Ростер орги под UI-пикеры (assignee/co-worker/reassign) — денормализованный name/email/role. */
+  async listMembers(
+    orgId: string,
+  ): Promise<{ userId: string; name: string; email: string; role: Role }[]> {
+    const memberships = await this.prisma.client.membership.findMany({
+      where: { orgId },
+      select: { role: true, user: { select: { id: true, name: true, email: true } } },
+      orderBy: { user: { name: "asc" } },
+    });
+    return memberships.map((m) => ({ userId: m.user.id, name: m.user.name, email: m.user.email, role: m.role }));
+  }
+
   async findDefaultOrgIdForUser(
     userId: string,
     tx?: Prisma.TransactionClient,

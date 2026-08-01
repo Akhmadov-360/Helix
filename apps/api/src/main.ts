@@ -9,9 +9,12 @@ import { AppModule } from "./app.module";
 
 async function bootstrap(): Promise<void> {
   // Валидация env на старте: бросит с читаемым списком проблем при невалидном.
-  getEnv();
+  const env = getEnv();
 
   const app = await NestFactory.create(AppModule);
+
+  // apps/web — отдельный origin (5173 vs 3000); credentials: true нужен для refresh-cookie.
+  app.enableCors({ origin: env.WEB_ORIGIN, credentials: true });
 
   // Все контроллеры под /v1 (FR-API-1). Health остаётся на /health.
   app.setGlobalPrefix("v1", { exclude: ["health"] });

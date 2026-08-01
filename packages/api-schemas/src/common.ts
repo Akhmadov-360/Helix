@@ -23,6 +23,22 @@ export interface ApiResponse<T> {
   timestamp: string;
 }
 
+/**
+ * Error-конверт (AllExceptionsFilter) — симметричен success-конверту, единый контракт.
+ * `code` машиночитаем и стабилен (по нему фронт различает причины); `details` — опциональная
+ * доп. нагрузка (напр. фазы-кандидаты при PHASE_NOT_EMPTY, поля при VALIDATION_ERROR).
+ */
+export const apiErrorResponseSchema = z.object({
+  success: z.literal(false),
+  error: z.object({
+    code: z.string(),
+    message: z.string(),
+    details: z.unknown().optional(),
+  }),
+  timestamp: z.iso.datetime(),
+});
+export type ApiErrorResponse = z.infer<typeof apiErrorResponseSchema>;
+
 // ─────────────────────────────── LocalizedName ─────────────────────────────
 // jsonb {uz?, ru?, en?}. Никогда не рендерить напрямую — только через localize() (P1).
 

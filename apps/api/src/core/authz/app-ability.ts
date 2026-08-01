@@ -6,17 +6,22 @@ import type { Role } from "@helix/db";
 // reassign — отдельный action (не update): смена ownerId лида = Manager+ (матрица «Reassign
 // leads»), тогда как edit лида = Member+. Поле-в-PATCH не выразило бы разные права (action-level
 // CASL не видит полей) → отдельная операция POST /:id/reassign, как move вынесен из PATCH.
-export type AppAction = "manage" | "create" | "read" | "update" | "delete" | "merge" | "reassign";
-export type AppSubject =
-  | "Workspace"
-  | "Phase"
-  | "Project"
-  | "Company"
-  | "Contact"
-  | "ProjectContact"
-  | "ProjectAssignee"
-  | "Task"
-  | "all";
+// Массивы, не только типы: capabilities.ts итерирует их механически (§8.2) — единственный
+// источник, откуда типы ВЫВОДЯТСЯ, чтобы список действий/субъектов не дублировался вручную.
+export const APP_ACTIONS = ["manage", "create", "read", "update", "delete", "merge", "reassign"] as const;
+export type AppAction = (typeof APP_ACTIONS)[number];
+
+export const APP_SUBJECTS = [
+  "Workspace",
+  "Phase",
+  "Project",
+  "Company",
+  "Contact",
+  "ProjectContact",
+  "ProjectAssignee",
+  "Task",
+] as const;
+export type AppSubject = (typeof APP_SUBJECTS)[number] | "all";
 export type AppAbility = MongoAbility<[AppAction, AppSubject]>;
 
 /**

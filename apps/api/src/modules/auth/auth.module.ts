@@ -12,6 +12,8 @@ import { RefreshCookieService } from "./sessions/refresh-cookie.service";
 import { RefreshSessionService } from "./sessions/refresh-session.service";
 import { RefreshSessionsRepository } from "./sessions/refresh-sessions.repository";
 import { TokenService } from "./token.service";
+import { OrganizationsController } from "../organizations/organizations.controller";
+import { OrganizationsService } from "../organizations/organizations.service";
 
 @Module({
   imports: [
@@ -34,7 +36,10 @@ import { TokenService } from "./token.service";
       }),
     }),
   ],
-  controllers: [AuthController],
+  // OrganizationsController — здесь, не в OrganizationsModule (см. её комментарий):
+  // избегаем цикла OrganizationsModule↔AuthModule, а AuthModule уже импортирует
+  // OrganizationsModule (за OrganizationsRepository) и сам содержит JwtAuthGuard.
+  controllers: [AuthController, OrganizationsController],
   providers: [
     AuthService,
     TokenService,
@@ -42,6 +47,7 @@ import { TokenService } from "./token.service";
     RefreshSessionService,
     RefreshSessionsRepository,
     RefreshCookieService,
+    OrganizationsService,
   ],
   // AuthService нужен RegistrationService'у (§9.1: регистрация просит токены у auth),
   // RefreshCookieService — её контроллеру; JwtAuthGuard — другим модулям (@UseGuards).

@@ -2,8 +2,9 @@
 
 > **Статус:** финальный (слои 0–4). Покрывает: скелет · модель состояния · роутер · карту URL
 > (слой 0) · контракт с бэком (слой 1) · kanban (слой 2, узел 1) · auth-фронт (слой 3) · стиль/
-> a11y/microactions/перф (слой 4). Не спроектирован остаток слоя 2 (формы из `FieldDefinition`,
-> project shell, dedup) — см. §12.
+> a11y/microactions/перф (слой 4) · project detail (overview/activity — реализовано veha G;
+> contacts/tasks/dedup/column-pagination — спроектировано §13). Единственный реально отложенный
+> остаток слоя 2 — data-driven формы `FieldDefinition` (§12: блокировано отсутствующим M2-бэком).
 > **Тип:** спека для Claude Code. Читать вместе с `CLAUDE.md`, `docs/decisions.md`,
 > `packages/api-schemas`, `docs/specs/{auth,projects,workspaces-phases}.md`. Расхождение — флагни,
 > не меняй сам.
@@ -72,8 +73,17 @@ React Compiler 1.0 стабилен, production-ready, официальная и
 | Motion (ex-Framer)                    | осмысленные переходы (move, drawer) | не декор                                         |
 
 **Не берём:** Redux (server→Query, остальное→Zustand); axios (нативный fetch + тонкая обёртка);
-отдельный i18n-рантайм (localize() + jsonb `{uz,ru,en}` покрывает P1); `nuqs` (search-params
-нативны в TanStack Router).
+**i18n-библиотеку** (react-i18next и т.п.); `nuqs` (search-params нативны в TanStack Router).
+
+**i18n — два in-house механизма, без библиотеки (уточнение).** Ранее §1.2 говорила «localize() +
+jsonb покрывает P1» — но это только **доменные данные** (`LocalizedName`: имена фаз и т.п.).
+**UI-микрокопию** (кнопки, лейблы, ошибки формы) `localize()` не покрывает. Поэтому:
+- **Доменные строки** → `localize(value, locale)` (§6.5), источник — jsonb `{uz,ru,en}`.
+- **UI-микрокопия** → `shared/i18n`: типизированные каталоги по локали + `t()`/`useT()` +
+  locale-store (Zustand+persist) + zod error-map (локализация валидации). Ключи типобезопасны
+  (канон ru задаёт множество, en/uz обязаны его повторить), fallback на дефолтную локаль.
+- Обе системы читают **одну** локаль (locale-store) — симметрия, не дублирование. i18n-библиотеку
+  не берём осознанно: плюрализация/ленивые каталоги пока не нужны; введём, когда появится триггер.
 
 ---
 
@@ -497,31 +507,76 @@ refresh failed → invalidate session → cancelQueries() → queryClient.clear(
 
 ### 8.2 Permission-aware rendering — capabilities с сервера, UI косметичен
 
-> **⚠ Статус контракта (сверено с кодом).** Серверный RBAC-энфорсмент (CASL) в M1 **реализован**:
-> `apps/api/src/core/authz` — `defineAbilityForRole()` (матрица PRD Appendix B) + `PoliciesGuard` /
-> `@CheckPolicy` на каждом мутирующем эндпоинте. Отсутствует только **FE-проекция** `capabilities`:
-> сегодня `currentUserSchema` = `{id, email, name, activeOrgId, role}`, поля `capabilities` не
-> содержит. Оно **строится в M1** (веха H плана фронта) как тонкая сериализация уже существующего
-> ability — НЕ отдельная веха и НЕ `packRules`. До этого шага permission-aware rendering не работает,
-> но серверный guard — единственный энфорсер в любом случае (§8.2.1), поэтому косметика кнопок на
-> безопасность не влияет.
+> **✅ Статус контракта (H0+H1+H2 реализованы).** Серверный RBAC-энфорсмент (CASL) —
+> `apps/api/src/core/authz`: `defineAbilityForRole()` (матрица PRD Appendix B) +
+> `PoliciesGuard`/`@CheckPolicy` на каждом мутирующем эндпоинте. `capabilities` — в
+> `currentUserSchema` (H0, `core/authz/capabilities.ts::listCapabilities(role)`). FE-сторона (H1) —
+> `shared/auth/ability.ts::useCan(capability)`, один `.includes()` над `useMe().capabilities`
+> (§9.7: без Set/memo, массив ~10-30 записей, не hot-path). Подключено к двум существующим
+> mutating-фичам: `ProjectCard` (`Project.update` → можно ли drag на доске) и `PhaseRow`
+> (`Phase.update` → можно ли drag на `/settings/phases`) — обе прячут drag-аффорданс (не рендерят
+> `attributes`/`listeners`, не красят `cursor-grab`), когда capability нет; сервер остаётся
+> единственным энфорсером в обоих случаях. Заодно выровнен `useMoveProject` (board) с уже
+> существующим паттерном `useReorderPhases` (phases, veha F): тост на любую доменную ошибку +
+> инвалидация `me` на 403 (§8.2.1 #2 — capabilities могли устареть).
+>
+> **H2 — прогон всех 5 ролей, обе половины инварианта #8.2.1.** Кнопка-скрытие (#1): все 5 ролей
+> живьём — OWNER/ADMIN/MANAGER видят `cursor-grab` на доске И на `/settings/phases`; MEMBER — только
+> на доске (нет `Phase.update`); VIEWER — нигде, синтетический drag даёт **ноль** сетевых вызовов.
+> Реактивный путь (#2, «FE-capability устарела → сервер истина»): т.к. capabilities теперь строго
+> механическая проекция того же `ability.can()`, что использует `PoliciesGuard`, естественного
+> расхождения между «UI показывает» и «сервер разрешает» больше нет — воспроизвели гонку явно
+> (временный патч `queryClient` кэша `me`, добавили VIEWER несуществующий `Project.update`): UI
+> показал `cursor-grab`, реальный drag ушёл на сервер и получил настоящий `403`, optimistic-патч
+> откатился, тост `"Недостаточно прав для перемещения карточки"` отрендерился, `me` инвалидировался
+> — повторная попытка drag уже НЕ создала сетевого вызова вообще (capabilities сами вернулись к
+> правде после рефетча). Вся цепочка §8.2.1 подтверждена живым браузером на реальном сервере, не
+> моком.
 
 `CLAUDE.md`: UI-скрытие косметическое, enforcement на сервере. Фронт **не переопределяет правила
 у себя** (два набора синхронно = дрейф матрицы прав Appendix B). Но и **не получает `packRules`**
 (сериализованные правила CASL связали бы фронт с внутренним языком бэковой authz — то же, против
-чего §6.4/§6.5). Контракт: бэк отдаёт **capabilities**, плоский JSON возможностей, не правил:
+чего §6.4/§6.5). Контракт: бэк отдаёт **capabilities**, плоский СПИСОК "Subject.action" — не матрица
+(меньше шума, чем `{subject:{action:bool}}`: только реально разрешённые пары, без cartesian
+product) и не набор CASL-правил:
 
 ```json
-{ "workspace": { "manage": true }, "project": { "create": true, "edit": true, "move": true } }
+{ "capabilities": ["Workspace.create", "Project.create", "Project.update", "Project.reassign"] }
 ```
 
-Бэк решает _как_ их вычислить (CASL/RLS/что угодно), фронт — _как_ применить (спрятать кнопку).
-CASL может исчезнуть — контракт не изменится. Приходят с `me` (расширение `currentUserSchema` в
-M1), scoped по `activeOrgId`, **не кэшируются дольше ability-контекста** (сбрасываются
-P0-AUTH-FE). Прямое следствие «role не в JWT, читается свежей» (`auth.md`): права — тоже свежие,
-не захардкожены во фронт.
+**Генерация — цикл по `APP_SUBJECTS × SUBJECT_OPERATIONS[subject]`, НЕ по всем `AppAction`
+поголовно** (живой урок из H0, стоит зафиксировать). Первая версия крутила все 6 actions для
+каждого subject и проверяла `ability.can()` — казалось безопаснее «списка», раз генерация
+механическая. На живой проверке (MEMBER-логин) вылезли `"ProjectContact.merge"`,
+`"Task.reassign"`, `"Project.delete"`, `"ProjectAssignee.update"` — операции, которых **нет в API
+вообще** (нет ни одного `@CheckPolicy`/эндпоинта на них). Причина — CASL-семантика: роли, которым
+выдан `can("manage", X)` (MANAGER/MEMBER на `ProjectContact`/`Task`, `PoliciesGuard` использует тот
+же `defineAbilityForRole`), резолвят **любой** `ability.can(action, X)` в `true`, включая
+бессмысленные комбинации — `"manage"` в CASL специально широкий грант-шорткат, а не заявление
+«эти конкретные actions существуют». `ability.can()` отвечает на вопрос RBAC («разрешено ли»), но
+не на вопрос поверхности API («существует ли такая операция вообще») — эти два вопроса раньше
+молчаливо считались одним.
 
-Три инварианта (#### 8.2.1; #2/403 действует уже сейчас, #1 косметика — с проекцией capabilities):
+Фикс — `SUBJECT_OPERATIONS` (`core/authz/capabilities.ts`): статический словарь **какие операции
+существуют** для каждого subject, сверенный с реальными `@CheckPolicy` по всем контроллерам —
+`{ Project: ["create","read","update","reassign"], ... }`. Это **не RBAC и не whitelist прав
+роли** — словарь ничего не говорит про то, кому что можно (это по-прежнему целиком решает
+`ability.can()` внутри цикла); он описывает **поверхность API**, ортогональный факт. Добавили
+новый эндпоинт — добавьте его action в `SUBJECT_OPERATIONS[subject]` один раз (не на каждую роль):
+забыли — capability просто не появится ни у одной роли (fail-safe, не false positive; тот же
+принцип, что «403 — нормальный доменный исход» ниже). `"manage"` (CASL-action) и `"all"`
+(CASL-subject) в словаре не встречаются вовсе — их не проверяет ни один `@CheckPolicy` напрямую.
+Цена контракта — FE видит CASL-имена действий (`update`, не `move`/`edit`), не продуктовые; при
+необходимости именованные хелперы (`canMoveProject()`) строятся в H1 поверх этого списка, не меняя
+контракт.
+
+Бэк решает _как_ их вычислить (CASL/RLS/что угодно), фронт — _как_ применить (спрятать кнопку).
+CASL может исчезнуть — контракт не изменится. Приходят с `me`, scoped по `activeOrgId`, **не
+кэшируются дольше ability-контекста** (сбрасываются P0-AUTH-FE). Прямое следствие «role не в JWT,
+читается свежей» (`auth.md`): права — тоже свежие, не захардкожены во фронт.
+
+Три инварианта (#### 8.2.1; оба действуют — #1 с H1 (данные были с H0, скрытие кнопок — H1), #2
+действовал и раньше через голый 403, с H1 усилен рефетчем `me`):
 
 1. **FE-capability = «показывать ли кнопку», сервер = «сработает ли действие».** Скрытая кнопка —
    не безопасность; каждое действие проходит серверный policy-guard.
@@ -676,13 +731,15 @@ prefetch (нет водопадов), React Compiler (нет лишних ре-�
 | KAN-1      | rank server-owned; клиент рендерит по порядку массива, move по соседям-id                   | kanban    |
 | P0-AUTH-FE | смена идентичности → полная инвалидация контекста безопасности                              | auth      |
 | AUTH-1     | одна refresh-cookie → один одновременный refresh (single-flight)                            | auth      |
-| AUTH-2     | capabilities с сервера (не packRules); UI косметичен, сервер энфорсит ⚠целевой, с RBAC-вехи | auth      |
+| AUTH-2     | capabilities с сервера (не packRules); UI косметичен, сервер энфорсит — бэк готов (H0), FE (H1) в работе | auth      |
 | FE-3       | action authorization ≠ data visibility                                                      | auth      |
 | ERR-1      | ошибка на своём уровне; boundary только для непредвиденного                                 | слой 4    |
 | PERF-1     | оптимизация только после измеренного bottleneck                                             | слой 4    |
 
 **ADR:** FE-1 (TanStack Router, §4) · FE-2 (kanban порядок в модели, §7) · FE-3 (action≠visibility,
 §8.2) · FE-4 / P0-AUTH-FE (инвалидация контекста, §8).
+
+**§13 добавляет:** KEY-2 (paginated-append колонки живёт в кэше board, не в отдельном кэше — §13.4).
 
 ---
 
@@ -711,12 +768,154 @@ throw — boundary (§9.2). Ни один класс не смешивается
   в одной орге, список тривиален (длины 1); расширяем `currentUserSchema` вместе с инвайт-флоу.
   (`capabilities` и `activeOrg:{id,name}` — НЕ здесь: оба строятся в M1, см. §8.2 / §8.3.
   `currentUserSchema` сегодня = `{id,email,name,activeOrgId,role}`.)
+- **Data-driven формы из `FieldDefinition`** — отложено до **M2** (не M1-развилка, бэк-зависимость).
+  `FieldDefinition` — модель в `schema.prisma` (`packages/db/prisma/schema.prisma:196`), но CRUD/
+  сервис/контроллер **не существуют** (`workspaces-phases.md` §0 и `projects.md` §0 оба явно
+  выносят его «в свои вехи»; `apps/api` не содержит ни одного `*field*`-модуля). `Project.fields`
+  сегодня — молчащая `Json @default("{}")`, `createProjectSchema` намеренно её не принимает
+  (`projects.md` §11: «валидировать нечем»). Проектировать FE-форму под контракт, которого нет, —
+  ровно то спекулятивное проектирование, которое запрещает `CLAUDE.md` («не строй абстракцию
+  раньше времени»). **Триггер:** M2 (блюпринты) добавит `FieldDefinition` CRUD в бэк — тогда эта
+  строка возвращается в §13 с реальным Zod-контрактом как входом, не раньше.
+- **Org members-list эндпоинт отсутствует** — блокирует ЛЮБОЙ UI-пикер человека (назначить owner,
+  co-worker/assignee, task assignee). Сервер сегодня умеет только **проверить** членство
+  (`assertOrgMember`, `project-links.md` §3/`tasks.md` §3), но не **отдать список** — нет
+  `GET /v1/organizations/:id/members` (или аналога) нигде в `apps/api`. Пикер без списка кандидатов
+  не построить иначе как typeahead-по-email вслепую — плохой UX даже для маленькой команды.
+  Требуется backend-веха (эндпоинт + Zod `OrgMemberResponse[]`) до FE-пикеров в §13.1/§13.2.
+  ⚠ **Не путать с денормализацией имени** (см. §13.1 — отображение уже назначенного `ownerId` как
+  имени решается на бэке отдельно и дёшево, без этого эндпоинта).
 
 ---
 
-## 13. Ещё не спроектировано (слой 2, остаток)
+## 13. Project detail — остаток (contacts/tasks/dedup/пагинация)
 
-- data-driven формы из `FieldDefinition` → динамическая Zod-схема → RHF (три-tier custom fields).
-- project detail shell (табы overview/contacts/tasks/activity) — персистентный под-shell.
-- soft-dedup UX контактов (подсказки по email/phone/domain — FR-CC-4).
-- keyset-курсор колонки: отдельный query-ключ + infinite-scroll паттерн (всплыл в §6.3).
+Veha G построила `overview`/`activity` (реализовано, `features/project-detail`). Этот раздел
+проектирует оставшиеся три пункта из бывшего «слоя 2, остаток» — **только те, у которых бэк уже
+есть** (`contacts.md`, `project-links.md`, `tasks.md` — все M1, не форвард-зависимость). Четвёртый
+бывший пункт (`FieldDefinition`-формы) в §13 не входит — см. §12, он блокирован M2-бэком, а не
+дизайном.
+
+### 13.1 Contacts tab — состав сделки
+
+`/projects/:id/contacts` (URL уже в карте, §5). `GET /projects/:id/contacts` → уже денормализован
+(`ProjectContactResponse{contactId,name,email,companyName?,roles}`) — рендерится без второго запроса
+за именами. `queryKeys.projectContacts(orgId, projectId)`.
+
+```
+список: строки контактов + чипы ролей (DealRole, локализовано) + «отвязать»
+  ↓ поиск существующего:  typeahead → GET /contacts?q= (debounced, НЕ в loader — §4.2 не про
+    interaction-запросы) → queryKeys.contactSearch(orgId, q), короткий staleTime
+  ↓ выбрать найденного →  POST /projects/:id/contacts { contactId, roles: [] }  (optimistic append)
+  ↓ ничего не найдено  →  «Создать и привязать» — инлайн-мини-форма (name/email/phone) →
+    dedup-aware create (§13.3) → POST /projects/:id/contacts с id нового контакта
+роли:  PATCH /projects/:id/contacts/:contactId { roles }  — ПОЛНАЯ замена (project-links.md §3),
+       не дельта; чекбоксы ролей локально собираются в массив перед PATCH, не шлются по одной.
+```
+
+**Audience-подсказка, не фильтр.** `validRolesFor(workspace.audience)` (`deal-roles.ts`) — уже
+существующая **recommendation model**, не validation (`project-links.md` §4: «никогда не 400»).
+FE обязан отразить это буквально: показать все 6 ролей, визуально выделить/сгруппировать
+рекомендованные для audience сверху — **не прятать** остальные. Прятать = превращать hint в gate,
+которого бэк сознательно не делает. `workspace.audience` не приходит с `project` — тянуть отдельным
+`ensureQueryData(workspaceQueryOptions(orgId, project.workspaceId))` в loader `contacts`-роута
+(второй `ensureQueryData` в `Promise.all`, §4.2 это разрешает).
+
+**409 «контакт смёржен»** (`project-links.md` §5.1) при попытке привязать смёрженный `contactId` —
+маппится в `ContactsError` по паттерну `phase-error.ts`/`board-error.ts` (§6.4). ⚠ **Открытый вопрос,
+не выдуманный ответ:** не подтверждено, что error `details` на этом 409 несёт `mergedIntoId` цели
+(в отличие от `GET :id` → 410, где он подтверждён контрактом, `contacts.md` §7.5). Проверить по
+живому payload при реализации; если `details` его не несёт — сообщение ограничивается «контакт уже
+объединён с другим», без прямой ссылки «привязать <target>».
+
+**Assignees (co-workers)** — секция ниже контактов, `GET/POST/DELETE /projects/:id/assignees`,
+Manager+ (`project-links.md` §2). До veha H (capabilities, §8.2) кнопки не прячутся ролью — это
+тот же временный разрыв, что у любого M1-действия без capabilities, не новый для этого среза.
+**Блокировано** пикером человека — см. §12 «org members-list эндпоинт отсутствует». Секция
+проектируется, но не реализуется, пока эндпоинта нет.
+
+### 13.2 Tasks tab — чеклист
+
+`/projects/:id/tasks`. `GET /projects/:id/tasks` → `TaskResponse[]` (`queryKeys.projectTasks`).
+
+```
+рендер: open сверху (сортировка dueAt asc, null — в конец) · done — свёрнутая секция «Выполнено (N)»
+  ↑ сортировка — КЛИЕНТСКАЯ, в select: у Task, в отличие от Project.rank, нет server-owned
+    порядка (нет /reorder, нет инварианта KAN-1) → сортировать в select/render не нарушает VM-1
+быстрое добавление: title-only инпут, Enter → POST /projects/:id/tasks { title }
+чекбокс: done=false→true → POST /tasks/:id/complete; true→false → POST /tasks/:id/reopen
+  optimistic: локальный флип done + (при complete) overdue пересчитывается на клиенте из dueAt/now
+  (безопасно: overdue — чистая функция dueAt+done+now, тот же вывод, что делает сервер, §4 tasks.md)
+удаление: инлайн-крестик, без confirm-диалога (низкая цена ошибки — чеклист, не лид)
+```
+
+`assigneeId` при создании/правке — тот же пикер-блокер, что owner/co-worker (§12). Quick-add остаётся
+title-only, пока пикера нет; `dueAt`/`assignee` — «развернуть» шаг формы, доступный уже сейчас (dueAt
+не требует пикера, обычный date-input).
+
+**Activity tab уже готова принять `task.created`/`task.completed`.** `select.ts` (veha G,
+`features/project-detail/select.ts`) парсит их через `projectEventSchema` — оба типа в discriminated
+union уже сегодня, `activity-view.tsx` уже умеет их отрендерить (`projectDetail.activity.taskCreated`/
+`taskCompleted`, i18n-ключи уже добавлены). Когда появится tasks tab — лента не потребует правок.
+
+### 13.3 Soft-dedup UX (FR-CC-4) — сквозной паттерн, не отдельный экран
+
+Два тачпоинта — ровно по числу существующих бэк-эндпоинтов (`contacts.md` §4.2), не придуманы сверху:
+
+```
+1. ПОДСКАЗКА НА ВВОДЕ (до создания):
+   debounce(email-поле, blur/change) → GET /contacts/dedup-check?email=
+     → если candidates.length>0: inline-хинт под полем, ненавязчивый, dismissible
+       («Похоже, уже есть: Иван Петров (i.petrov@acme.com) — использовать его?»)
+     → пользователь может прервать создание и выбрать существующего вместо сабмита
+
+2. FALLBACK ПОСЛЕ СОЗДАНИЯ (страховка от гонки/пропущенного blur):
+   POST /contacts → 201 { contact, dedupHint: { candidates } }  — контакт УЖЕ создан (§4.1 not
+   blocking), dedupHint — advisory
+     → если candidates.length>0: non-blocking баннер со списком кандидатов, на каждом:
+        - «Слить» (только O/A — merge=O/A, contacts.controller.ts) →
+          POST /contacts/:candidateId/merge { sourceId: <новый> }  (новый вливается В кандидата)
+        - «Не дубль» → dismiss
+```
+
+Один переиспользуемый компонент (`features/contacts/dedup-hint.tsx`, оба тачпоинта через него) —
+используется из inline create-and-link (§13.1) и позже из отдельной `/contacts` (org-wide адресная
+книга — сама эта страница вне объёма этого прохода, в карте URL уже есть, §5, но не запрошена
+сейчас). `useToast()` (veha F) не подходит для этого UI — хинт требует персистентного inline-состояния
+с действиями (кнопки «слить»/«не дубль»), не 5-секундного авто-dismiss тоста; это inline-баннер в
+потоке формы, не toast-стор.
+
+### 13.4 Keyset-курсор колонки — infinite scroll
+
+Бэк уже есть (`GET /phases/:phaseId/projects?cursorRank&cursorId&limit`, §7/§6.3 это анонсировали,
+не реализовав). Триггер на колонку: `board.phase.hasMore === true` (уже приходит в `BoardColumn`,
+из первой страницы `?limitPerPhase`).
+
+```
+UI: кнопка «Показать ещё» в подвале колонки (НЕ IntersectionObserver/auto-infinite — М1 держит
+    простое решение, тот же принцип, что и «виртуализация — по измеренному триггеру», §7)
+клик → GET /phases/:phaseId/projects?cursorRank=<rank последней карты>&cursorId=<id последней>&limit
+     → cursor непрозрачен, берётся из ПОСЛЕДНЕЙ карты уже загруженного массива колонки (KAN-1: клиент
+       никогда не вычисляет rank, только переносит его как ключ пагинации)
+```
+
+**Куда пишется ответ — ключевое решение.** KAN-1 требует ОДИН источник истины на колонку для DnD
+(`board-view.tsx` строит `serverOrder` из `board.columns`). Если новая страница ляжет в отдельный
+`queryKeys.column(phaseId, cursor)` кэш (как дословно предлагал черновик §6.3), DnD после первого
+«показать ещё» должен был бы читать порядок колонки из ДВУХ кэшей разом — двух источников истины
+там, где KAN-1 требует одного. Решение: страница **дозаписывается в кэш `board`** через тот же
+`setQueryData`-идиом, что `onSuccess` у `useMoveProject`/`useReorderPhases` — запрос физически GET,
+но моделируется `useMutation` (не `useQuery`): это разовое действие с побочным эффектом на чужом
+кэше, не самостоятельно рендерящийся ресурс.
+
+> ⚠ **Уточнение §6.3 задним числом.** §6.3 писала «board и column — разные запросы → разные ключи»
+> до того, как этот паттерн был спроектирован до конца. Уточнение: запрос физически отдельный (свой
+> путь/параметры), но его **результат** сливается в кэш `board`, не живёт в параллельном
+> `queryKeys.column`-кэше — иначе KAN-1 (единый источник порядка) ломается на второй странице
+> колонки. `queryKeys.column` как отдельная запись в фабрике ключей не заводится вовсе.
+
+**Стык с рекомпакцией (§7 уже называл этот риск).** После рекомпакции фазы `rank`-строки чужих карт
+в кэше устаревают; докрутка курсора — ровно то место, где это может укусить (повторный докрут может
+вернуть уже загруженные id). М1 принимает это, как и §7 (не чинится сейчас), но append обязан
+дедуплицировать по `id` (`Set`/`Map`, одна строка) как дешёвый защитный минимум — это не чинит
+стейл-ность, только не даёт дублю карточки появиться в DOM дважды.

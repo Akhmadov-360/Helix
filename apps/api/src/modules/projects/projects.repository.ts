@@ -176,6 +176,46 @@ export class ProjectsRepository {
     return new Map(rows.map((r) => [r.phaseId, Number(r.total)]));
   }
 
+  // Task-чеклист по карточке доски (redesign): batched по projectIds ОДНИМ запросом, не N+1 на
+  // карточку. done/total считаем в JS — объёмы малы (десятки тасков на страницу доски, §@@index
+  // [projectId, done] на Task всё равно не даёт GROUP BY дешевле для такого масштаба).
+  async taskCountsByProjectIds(
+    projectIds: string[],
+  ): Promise<Map<string, { done: number; total: number }>> {
+    if (projectIds.length === 0) return new Map();
+    const rows = await this.prisma.client.task.findMany({
+      where: { projectId: { in: projectIds } },
+      select: { projectId: true, done: true },
+    });
+    const counts = new Map<string, { done: number; total: number }>();
+    for (const row of rows) {
+      const entry = counts.get(row.projectId) ?? { done: 0, total: 0 };
+      entry.total += 1;
+      if (row.done) entry.done += 1;
+      counts.set(row.projectId, entry);
+    }
+    return counts;
+  }
+
+  // Co-workers по карточке доски (redesign): та же batched-логика, что у task-счётчика.
+  async assigneesByProjectIds(
+    projectIds: string[],
+  ): Promise<Map<string, Array<{ userId: string; name: string }>>> {
+    if (projectIds.length === 0) return new Map();
+    const rows = await this.prisma.client.projectAssignee.findMany({
+      where: { projectId: { in: projectIds } },
+      select: { projectId: true, userId: true, user: { select: { name: true } } },
+      orderBy: { userId: "asc" },
+    });
+    const byProject = new Map<string, Array<{ userId: string; name: string }>>();
+    for (const row of rows) {
+      const list = byProject.get(row.projectId) ?? [];
+      list.push({ userId: row.userId, name: row.user.name });
+      byProject.set(row.projectId, list);
+    }
+    return byProject;
+  }
+
   // Keyset-пагинация колонки (§8): (rank, id) > (cursor). Не OFFSET — при неуникальном
   // ранге offset недетерминирован. Курсор null → первая страница.
   columnPage(
