@@ -1,5 +1,5 @@
 import { useParams } from "@tanstack/react-router";
-import { KanbanSquare, SlidersHorizontal } from "lucide-react";
+import { KanbanSquare } from "lucide-react";
 import { LocaleSwitcher, useT } from "../../shared/i18n";
 import { getLastWorkspaceId } from "../../shared/lib/last-workspace";
 import { ThemeToggle } from "../../shared/theme";
@@ -7,13 +7,14 @@ import { SidebarNavItem } from "./nav-item";
 import { UserMenu } from "./user-menu";
 import { WorkspaceSwitcher } from "./workspace-switcher";
 
-// Постоянная навигация (веха редизайна, этап 1) — заменяет header-only AppShell. Board/Phases —
-// единственные реально существующие workspace-scoped разделы (§ui-inventory, до удаления файла):
-// раньше settings/phases была физически недостижима из UI, теперь это пункт меню.
+// Постоянная навигация (веха редизайна, этап 1) — заменяет header-only AppShell. Board —
+// единственный workspace-scoped раздел в сайдбаре: управление фазами переехало на саму доску
+// (trailing "+ колонка", rename/delete через меню колонки) — отдельная страница /settings/phases
+// удалена, дублировать один и тот же функционал в двух местах незачем.
 export function Sidebar({ orgId }: { orgId: string }) {
   const t = useT();
   // useParams({strict:false}) реактивен на текущий матч роута — если на нём есть :workspaceId
-  // (board/settings), берём его; иначе (напр. /projects/:id/*, /workspaces) — последний открытый.
+  // (board), берём его; иначе (напр. /projects/:id/*, /workspaces) — последний открытый.
   const params = useParams({ strict: false }) as { workspaceId?: string };
   const workspaceId = params.workspaceId ?? getLastWorkspaceId() ?? undefined;
 
@@ -29,20 +30,12 @@ export function Sidebar({ orgId }: { orgId: string }) {
 
       <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2">
         {workspaceId && (
-          <>
-            <SidebarNavItem
-              to="/workspaces/$workspaceId/board"
-              params={{ workspaceId }}
-              icon={KanbanSquare}
-              label={t("sidebar.nav.board")}
-            />
-            <SidebarNavItem
-              to="/workspaces/$workspaceId/settings/phases"
-              params={{ workspaceId }}
-              icon={SlidersHorizontal}
-              label={t("sidebar.nav.phases")}
-            />
-          </>
+          <SidebarNavItem
+            to="/workspaces/$workspaceId/board"
+            params={{ workspaceId }}
+            icon={KanbanSquare}
+            label={t("sidebar.nav.board")}
+          />
         )}
       </nav>
 

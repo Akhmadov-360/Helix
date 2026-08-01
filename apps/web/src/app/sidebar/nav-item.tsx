@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import type { ComponentType } from "react";
 import { cn } from "@helix/ui";
 
-type SidebarRoute = "/workspaces/$workspaceId/board" | "/workspaces/$workspaceId/settings/phases";
+type SidebarRoute = "/workspaces/$workspaceId/board";
 
 export function SidebarNavItem({
   to,

@@ -1,4 +1,4 @@
-import type { BoardResponse, LocalizedName } from "@helix/api-schemas";
+import type { BoardResponse, LocalizedName, PhaseType } from "@helix/api-schemas";
 
 export interface ProjectCardViewModel {
   id: string;
@@ -14,7 +14,11 @@ export interface ProjectCardViewModel {
 
 export interface BoardColumnViewModel {
   id: string;
+  workspaceId: string;
+  key: string;
   phaseName: LocalizedName;
+  type: PhaseType;
+  order: number;
   color: string | null;
   total: number;
   hasMore: boolean;
@@ -23,18 +27,25 @@ export interface BoardColumnViewModel {
 
 export interface BoardViewModel {
   workspaceId: string;
+  version: number;
   columns: BoardColumnViewModel[];
 }
 
 // select чист (§6.5): меняет ФОРМУ под колонку/карточку. phaseName остаётся сырым LocalizedName —
 // локализация не входит сюда, только на render (useLocalize). Порядок массивов не трогаем (KAN-1):
-// сервер уже вернул ORDER BY rank, id — клиент не пересортировывает.
+// сервер уже вернул ORDER BY rank, id — клиент не пересортировывает. version — нужен колоночному
+// drag-reorder (board-view.tsx): POST /phases/reorder требует workspace.version (§5.1 optimistic lock).
 export function toBoardViewModel(data: BoardResponse): BoardViewModel {
   return {
     workspaceId: data.workspaceId,
+    version: data.version,
     columns: data.phases.map((phase) => ({
       id: phase.id,
+      workspaceId: phase.workspaceId,
+      key: phase.key,
       phaseName: phase.name,
+      type: phase.type,
+      order: phase.order,
       color: phase.color,
       total: phase.total,
       hasMore: phase.hasMore,

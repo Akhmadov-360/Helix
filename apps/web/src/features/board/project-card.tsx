@@ -5,6 +5,7 @@ import { Link } from "@tanstack/react-router";
 import { Archive, Calendar, CheckSquare, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import {
   Avatar,
+  avatarVariants,
   Badge,
   Button,
   Card,
@@ -14,6 +15,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@helix/ui";
+
+// Больше 3 участников — "+N" вместо бесконечного стека аватаров (карта фиксированной ширины
+// w-72, стек не должен расти неограниченно).
+const MAX_VISIBLE_ASSIGNEES = 3;
 import { useCan } from "../../shared/auth/ability";
 import { useLocaleStore, useT } from "../../shared/i18n";
 import { DeleteProjectDialog } from "./delete-project-dialog";
@@ -142,9 +147,14 @@ export function ProjectCard({ project, orgId, workspaceId, overlay = false }: Pr
           </div>
           {project.assignees.length > 0 && (
             <div className="flex -space-x-2">
-              {project.assignees.map((assignee) => (
+              {project.assignees.slice(0, MAX_VISIBLE_ASSIGNEES).map((assignee) => (
                 <Avatar key={assignee.userId} name={assignee.name} size="sm" className="ring-2 ring-card" />
               ))}
+              {project.assignees.length > MAX_VISIBLE_ASSIGNEES && (
+                <span className={cn(avatarVariants({ size: "sm" }), "ring-2 ring-card")}>
+                  +{project.assignees.length - MAX_VISIBLE_ASSIGNEES}
+                </span>
+              )}
             </div>
           )}
         </div>

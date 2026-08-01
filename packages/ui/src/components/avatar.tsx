@@ -36,3 +36,5 @@ export function Avatar({ name, size, className, ...props }: AvatarProps) {
     </span>
   );
 }
+
+export { avatarVariants };
