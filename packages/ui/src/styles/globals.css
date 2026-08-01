@@ -92,3 +92,40 @@
     -webkit-font-smoothing: antialiased;
   }
 }
+
+/* Единая анимация появления для Radix-оверлеев (popover/dropdown/dialog) — §7 (duration-timing,
+   transform-performance, exit быстрее enter). transform+opacity only — не триггерит layout. */
+@layer utilities {
+  @keyframes ui-pop-in {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  @keyframes ui-pop-out {
+    from {
+      opacity: 1;
+      transform: scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+  }
+  .ui-pop-anim[data-state="open"] {
+    animation: ui-pop-in 150ms ease-out;
+  }
+  .ui-pop-anim[data-state="closed"] {
+    animation: ui-pop-out 100ms ease-in;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ui-pop-anim[data-state="open"],
+    .ui-pop-anim[data-state="closed"] {
+      animation: none;
+    }
+  }
+}

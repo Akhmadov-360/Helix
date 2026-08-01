@@ -1,5 +1,5 @@
 import type { TaskResponse } from "@helix/api-schemas";
-import { cn } from "@helix/ui";
+import { Badge, cn } from "@helix/ui";
 import { useLocaleStore, useT } from "../../shared/i18n";
 
 export function TaskRow({
@@ -32,11 +32,7 @@ export function TaskRow({
       <span className={cn("flex-1 text-sm", task.done && "text-muted-foreground line-through")}>
         {task.title}
       </span>
-      {task.overdue && (
-        <span className="shrink-0 rounded-full bg-destructive/10 px-2 py-0.5 text-xs text-destructive">
-          {t("tasks.list.overdue")}
-        </span>
-      )}
+      {task.overdue && <Badge variant="destructive" className="shrink-0">{t("tasks.list.overdue")}</Badge>}
       {task.dueAt && (
         <span className="shrink-0 text-xs text-muted-foreground">
           {new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(task.dueAt))}

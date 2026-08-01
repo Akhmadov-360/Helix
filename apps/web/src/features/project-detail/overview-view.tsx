@@ -1,5 +1,5 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { Card, CardContent } from "@helix/ui";
+import { Badge, Card, CardContent } from "@helix/ui";
 import { useLocaleStore, useT } from "../../shared/i18n";
 import { projectQueryOptions } from "./queries";
 
@@ -21,9 +21,9 @@ export function OverviewView({ orgId, projectId }: { orgId: string; projectId: s
   return (
     <Card>
       <CardContent className="flex flex-col gap-6 p-6">
-        <span className="w-fit rounded-full bg-secondary px-3 py-1 text-xs font-medium">
+        <Badge variant={project.status === "WON" ? "success" : project.status === "LOST" ? "destructive" : "default"}>
           {t(`projectDetail.status.${project.status}`)}
-        </span>
+        </Badge>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
           <Field label={t("projectDetail.overview.value")} value={value} />
           <Field

@@ -11,8 +11,14 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { Plus } from "lucide-react";
+import type { PhaseResponse } from "@helix/api-schemas";
+import { Button } from "@helix/ui";
+import { useCan } from "../../shared/auth/ability";
 import { useT } from "../../shared/i18n";
 import { useLocalize } from "../../shared/lib/localize";
+import { DeletePhaseDialog } from "./delete-phase-dialog";
+import { PhaseFormDialog } from "./phase-form-dialog";
 import { PhaseRow } from "./phase-row";
 import { useReorderPhases } from "./mutations";
 import { workspaceQueryOptions } from "./queries";
@@ -24,6 +30,20 @@ export function PhasesView({ orgId, workspaceId }: { orgId: string; workspaceId:
   const reorder = useReorderPhases(orgId, workspaceId);
   const localize = useLocalize();
   const t = useT();
+  const canCreate = useCan("Phase.create");
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingPhase, setEditingPhase] = useState<PhaseResponse | null>(null);
+  const [deletingPhase, setDeletingPhase] = useState<PhaseResponse | null>(null);
+
+  function openCreate() {
+    setEditingPhase(null);
+    setFormOpen(true);
+  }
+
+  function openEdit(phase: PhaseResponse) {
+    setEditingPhase(phase);
+    setFormOpen(true);
+  }
 
   const phasesById = useMemo(() => new Map((workspace.phases ?? []).map((phase) => [phase.id, phase])), [workspace]);
   const serverIds = useMemo(() => (workspace.phases ?? []).map((phase) => phase.id), [workspace]);
@@ -68,20 +88,47 @@ export function PhasesView({ orgId, workspaceId }: { orgId: string; workspaceId:
   }
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      accessibility={{ announcements }}
-      onDragEnd={handleDragEnd}
-    >
-      <SortableContext items={ids} strategy={verticalListSortingStrategy}>
-        <div className="flex max-w-md flex-col gap-2" role="list">
-          {ids.map((id) => {
-            const phase = phasesById.get(id);
-            return phase ? <PhaseRow key={id} phase={phase} name={nameOf(id)} /> : null;
-          })}
-        </div>
-      </SortableContext>
-    </DndContext>
+    <div className="flex max-w-md flex-col gap-3">
+      {canCreate && (
+        <Button type="button" size="sm" variant="outline" className="w-fit" onClick={openCreate}>
+          <Plus className="h-3.5 w-3.5" />
+          {t("phases.create.trigger")}
+        </Button>
+      )}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        accessibility={{ announcements }}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+          <div className="flex flex-col gap-2" role="list">
+            {ids.map((id) => {
+              const phase = phasesById.get(id);
+              return phase ? (
+                <PhaseRow key={id} phase={phase} name={nameOf(id)} onEdit={openEdit} onDelete={setDeletingPhase} />
+              ) : null;
+            })}
+          </div>
+        </SortableContext>
+      </DndContext>
+
+      <PhaseFormDialog
+        orgId={orgId}
+        workspaceId={workspaceId}
+        phase={editingPhase}
+        open={formOpen}
+        onOpenChange={setFormOpen}
+      />
+      <DeletePhaseDialog
+        orgId={orgId}
+        workspaceId={workspaceId}
+        phase={deletingPhase}
+        open={deletingPhase !== null}
+        onOpenChange={(next) => {
+          if (!next) setDeletingPhase(null);
+        }}
+      />
+    </div>
   );
 }

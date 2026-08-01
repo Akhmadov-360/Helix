@@ -1,11 +1,16 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { WorkspaceResponse } from "@helix/api-schemas";
-import { workspaceResponseSchema } from "@helix/api-schemas";
+import type { CreatePhaseInput, PhaseResponse, UpdatePhaseInput, WorkspaceResponse } from "@helix/api-schemas";
+import { phaseResponseSchema, workspaceResponseSchema } from "@helix/api-schemas";
+import { z } from "zod";
 import { request, queryKeys } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
 import { useToast } from "../../shared/toast/use-toast";
 import { workspaceQueryOptions } from "./queries";
 import { toPhaseError } from "./phase-error";
+
+function sortByOrder(phases: PhaseResponse[]): PhaseResponse[] {
+  return [...phases].sort((a, b) => a.order - b.order);
+}
 
 export interface ReorderPhasesVariables {
   phaseIds: string[];
@@ -31,6 +36,8 @@ function phaseErrorKey(kind: ReturnType<typeof toPhaseError>): MessageKey {
       return "phases.error.permissionDenied";
     case "notFound":
       return "phases.error.notFound";
+    case "notEmpty":
+      return "phases.error.notEmpty";
     default:
       return "phases.error.unexpected";
   }
@@ -72,6 +79,100 @@ export function useReorderPhases(orgId: string, workspaceId: string) {
     },
     onSuccess: (workspace) => {
       queryClient.setQueryData(queryKey, workspace);
+    },
+  });
+}
+
+export function useCreatePhase(orgId: string, workspaceId: string) {
+  const queryClient = useQueryClient();
+  const { queryKey } = workspaceQueryOptions(orgId, workspaceId);
+  const t = useT();
+  const toast = useToast();
+
+  return useMutation({
+    mutationFn: (input: CreatePhaseInput) =>
+      request({
+        method: "POST",
+        path: `/v1/workspaces/${workspaceId}/phases`,
+        body: input,
+        schema: phaseResponseSchema,
+      }),
+    onError: (error) => {
+      const kind = toPhaseError(error);
+      if (kind === "permissionDenied") void queryClient.invalidateQueries({ queryKey: queryKeys.me() });
+      toast.error(t(phaseErrorKey(kind)));
+    },
+    onSuccess: (phase) => {
+      queryClient.setQueryData<WorkspaceResponse>(
+        queryKey,
+        (current) => current && { ...current, phases: sortByOrder([...(current.phases ?? []), phase]) },
+      );
+      toast.show(t("phases.create.success", { name: phase.name.ru ?? phase.name.en ?? phase.name.uz ?? "" }));
+    },
+  });
+}
+
+export function useUpdatePhase(orgId: string, workspaceId: string) {
+  const queryClient = useQueryClient();
+  const { queryKey } = workspaceQueryOptions(orgId, workspaceId);
+  const t = useT();
+  const toast = useToast();
+
+  return useMutation({
+    mutationFn: (vars: { phaseId: string; input: UpdatePhaseInput }) =>
+      request({
+        method: "PATCH",
+        path: `/v1/phases/${vars.phaseId}`,
+        body: vars.input,
+        schema: phaseResponseSchema,
+      }),
+    onError: (error) => {
+      const kind = toPhaseError(error);
+      if (kind === "permissionDenied") void queryClient.invalidateQueries({ queryKey: queryKeys.me() });
+      toast.error(t(phaseErrorKey(kind)));
+    },
+    onSuccess: (phase) => {
+      queryClient.setQueryData<WorkspaceResponse>(
+        queryKey,
+        (current) =>
+          current && {
+            ...current,
+            phases: sortByOrder((current.phases ?? []).map((p) => (p.id === phase.id ? phase : p))),
+          },
+      );
+      toast.show(t("phases.edit.success"));
+    },
+  });
+}
+
+export function useDeletePhase(orgId: string, workspaceId: string) {
+  const queryClient = useQueryClient();
+  const { queryKey } = workspaceQueryOptions(orgId, workspaceId);
+  const t = useT();
+  const toast = useToast();
+
+  return useMutation({
+    mutationFn: (vars: { phaseId: string; reassignTo?: string }) =>
+      request({
+        method: "DELETE",
+        path: `/v1/phases/${vars.phaseId}`,
+        searchParams: { reassignTo: vars.reassignTo },
+        schema: z.null(),
+      }),
+    // notEmpty — не ошибка в привычном смысле, а развилка (нужен reassignTo от пользователя);
+    // тост/рефетч me не нужны, вызывающий диалог сам покажет пикер кандидатов (phase-error.ts).
+    onError: (error) => {
+      const kind = toPhaseError(error);
+      if (kind === "notEmpty") return;
+      if (kind === "permissionDenied") void queryClient.invalidateQueries({ queryKey: queryKeys.me() });
+      toast.error(t(phaseErrorKey(kind)));
+    },
+    onSuccess: (_data, vars) => {
+      queryClient.setQueryData<WorkspaceResponse>(
+        queryKey,
+        (current) => current && { ...current, phases: (current.phases ?? []).filter((p) => p.id !== vars.phaseId) },
+      );
+      toast.show(t("phases.delete.success"));
     },
   });
 }

@@ -7,11 +7,16 @@ import { router } from "./app/router";
 import { onSessionExpired } from "./shared/api";
 import { invalidateSecurityContext } from "./shared/auth/invalidate-session";
 import { installI18n } from "./shared/i18n";
+import { installTheme } from "./shared/theme";
 import "@fontsource-variable/inter";
 import "./index.css";
 
 // Локализованные сообщения валидации zod (глобально, до первого парса).
 installI18n();
+
+// Класс .dark на <html> — до первого рендера, синхронно (persist читает localStorage сразу),
+// без мигания темы при загрузке.
+installTheme();
 
 // Hard logout при неудачном silent-refresh (§8.1, P0-AUTH-FE): shared/api не знает про Router/Query
 // (NET-2), поэтому единственный обработчик регистрируется здесь, в app-бутстрапе, а не в клиенте.
