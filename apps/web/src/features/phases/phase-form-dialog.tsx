@@ -97,7 +97,7 @@ function PhaseFormFields({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="phase-name">{t("phases.form.name")}</Label>
+        <Label htmlFor="phase-name" required>{t("phases.form.name")}</Label>
         <Input
           id="phase-name"
           value={name}

@@ -64,7 +64,7 @@ export function CreateWorkspaceDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="workspace-name">{t("workspaces.create.name")}</Label>
+            <Label htmlFor="workspace-name" required>{t("workspaces.create.name")}</Label>
             <Input
               id="workspace-name"
               value={name}

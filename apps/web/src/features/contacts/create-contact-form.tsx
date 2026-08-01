@@ -33,7 +33,7 @@ export function CreateContactForm({
       <form onSubmit={handleSubmit} className="flex flex-col gap-2">
         <p className="text-sm font-medium">{t("contacts.create.title")}</p>
         <div className="flex flex-col gap-1">
-          <Label htmlFor="contact-name">{t("contacts.create.name")}</Label>
+          <Label htmlFor="contact-name" required>{t("contacts.create.name")}</Label>
           <Input id="contact-name" value={name} onChange={(e) => setName(e.target.value)} required />
         </div>
         <div className="flex flex-col gap-1">

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
+import { Users } from "lucide-react";
 import type { Audience, ContactResponse, DedupHint as DedupHintData } from "@helix/api-schemas";
-import { Button, Card } from "@helix/ui";
+import { Button, Card, cn } from "@helix/ui";
 import { useCan } from "../../shared/auth/ability";
 import { useT } from "../../shared/i18n";
 import { ContactSearch } from "./contact-search";
@@ -11,7 +12,7 @@ import { useLinkContact, useMergeContact, useUnlinkContact, useUpdateContactRole
 import { projectContactsQueryOptions } from "./queries";
 
 // audience приходит пропом, не собственным запросом воркспейса: features/* не импортируют друг
-// друга напрямую (composition на уровне routes/, скелет apps/web §2) — маршрут contacts.tsx уже
+// друга напрямую (композиция на уровне routes/, скелет apps/web §2) — маршрут contacts.tsx уже
 // грузит workspace ради этого и передаёт audience сюда.
 export function ContactsView({
   orgId,
@@ -37,12 +38,18 @@ export function ContactsView({
   const [dedup, setDedup] = useState<{ hint: DedupHintData; newContactId: string } | null>(null);
 
   const excludeIds = new Set(contacts.map((c) => c.contactId));
+  // Связь баннера с карточками ниже (UI-обзор): без этого пользователь сопоставляет текст баннера
+  // с карточками вручную. Подсвечиваем и новый контакт, и предложенных кандидатов — обе стороны
+  // потенциального дубля.
+  const dedupHighlight = dedup
+    ? new Set([dedup.newContactId, ...dedup.hint.candidates.map((c) => c.id)])
+    : null;
 
   function linkExisting(contact: ContactResponse) {
     link.mutate({
       contactId: contact.id,
       roles: [],
-      optimistic: { contactId: contact.id, name: contact.name, email: contact.email },
+      optimistic: { contactId: contact.id, name: contact.name, email: contact.email, phone: contact.phone },
     });
   }
 
@@ -50,7 +57,7 @@ export function ContactsView({
     link.mutate({
       contactId: contact.id,
       roles: [],
-      optimistic: { contactId: contact.id, name: contact.name, email: contact.email },
+      optimistic: { contactId: contact.id, name: contact.name, email: contact.email, phone: contact.phone },
     });
     if (hint.candidates.length > 0) setDedup({ hint, newContactId: contact.id });
   }
@@ -74,20 +81,28 @@ export function ContactsView({
       )}
 
       {contacts.length === 0 ? (
-        <p className="text-muted-foreground">{t("contacts.list.empty")}</p>
+        <div className="flex flex-col items-center gap-2 py-8 text-center text-muted-foreground">
+          <Users className="h-8 w-8" />
+          <p>{t("contacts.list.empty")}</p>
+        </div>
       ) : (
         <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {contacts.map((contact) => (
             <li key={contact.contactId}>
-              <Card className="flex flex-col gap-2 p-3">
+              <Card
+                className={cn(
+                  "flex flex-col gap-2 p-3",
+                  dedupHighlight?.has(contact.contactId) && "border-amber-500/50 ring-1 ring-amber-500/30",
+                )}
+              >
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="text-sm font-medium">{contact.name}</p>
-                    {(contact.email ?? contact.companyName) && (
-                      <p className="text-xs text-muted-foreground">
-                        {[contact.email, contact.companyName].filter(Boolean).join(" · ")}
-                      </p>
-                    )}
+                    {/* Строка всегда занимает место (redesign): без плейсхолдера карточки без
+                        email/компании были ниже соседних — сетка выглядела рваной. */}
+                    <p className="text-xs text-muted-foreground">
+                      {[contact.email, contact.phone, contact.companyName].filter(Boolean).join(" · ") || " "}
+                    </p>
                   </div>
                   {canUnlink && (
                     <Button

@@ -99,7 +99,7 @@ function EditDealFields({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="edit-deal-title">{t("board.create.name")}</Label>
+        <Label htmlFor="edit-deal-title" required>{t("board.create.name")}</Label>
         <Input
           id="edit-deal-title"
           value={title}

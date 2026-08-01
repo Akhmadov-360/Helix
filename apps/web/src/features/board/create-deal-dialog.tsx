@@ -71,7 +71,7 @@ export function CreateDealDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="deal-title">{t("board.create.name")}</Label>
+            <Label htmlFor="deal-title" required>{t("board.create.name")}</Label>
             <Input
               id="deal-title"
               value={title}
