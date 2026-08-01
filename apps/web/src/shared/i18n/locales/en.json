@@ -56,6 +56,7 @@
   "board.error.notFound": "Card or phase not found",
   "board.error.unexpected": "Could not move the card. Please try again",
   "phases.title": "Phases",
+  "phases.empty": "No phases yet.",
   "phases.dnd.picked": "Phase \"{title}\" picked up",
   "phases.dnd.movedOver": "\"{title}\" — position {position} of {total}",
   "phases.dnd.dropped": "\"{title}\" moved to position {position} of {total}",

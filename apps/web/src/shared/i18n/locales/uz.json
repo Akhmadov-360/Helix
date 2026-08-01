@@ -56,6 +56,7 @@
   "board.error.notFound": "Karta yoki faza topilmadi",
   "board.error.unexpected": "Kartani ko‘chirib bo‘lmadi. Qaytadan urinib ko‘ring",
   "phases.title": "Fazalar",
+  "phases.empty": "Hozircha fazalar yo‘q.",
   "phases.dnd.picked": "«{title}» fazasi ko‘tarildi",
   "phases.dnd.movedOver": "«{title}» — {position} / {total} pozitsiya",
   "phases.dnd.dropped": "«{title}» {position} / {total} pozitsiyaga ko‘chirildi",

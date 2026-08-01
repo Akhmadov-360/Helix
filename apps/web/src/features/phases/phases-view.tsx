@@ -95,23 +95,27 @@ export function PhasesView({ orgId, workspaceId }: { orgId: string; workspaceId:
           {t("phases.create.trigger")}
         </Button>
       )}
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        accessibility={{ announcements }}
-        onDragEnd={handleDragEnd}
-      >
-        <SortableContext items={ids} strategy={verticalListSortingStrategy}>
-          <div className="flex flex-col gap-2" role="list">
-            {ids.map((id) => {
-              const phase = phasesById.get(id);
-              return phase ? (
-                <PhaseRow key={id} phase={phase} name={nameOf(id)} onEdit={openEdit} onDelete={setDeletingPhase} />
-              ) : null;
-            })}
-          </div>
-        </SortableContext>
-      </DndContext>
+      {ids.length === 0 ? (
+        <p className="text-muted-foreground">{t("phases.empty")}</p>
+      ) : (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          accessibility={{ announcements }}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+            <div className="flex flex-col gap-2" role="list">
+              {ids.map((id) => {
+                const phase = phasesById.get(id);
+                return phase ? (
+                  <PhaseRow key={id} phase={phase} name={nameOf(id)} onEdit={openEdit} onDelete={setDeletingPhase} />
+                ) : null;
+              })}
+            </div>
+          </SortableContext>
+        </DndContext>
+      )}
 
       <PhaseFormDialog
         orgId={orgId}
