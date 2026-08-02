@@ -23,6 +23,7 @@ import { useCan } from "../../shared/auth/ability";
 import { useLocaleStore, useT } from "../../shared/i18n";
 import { DeleteProjectDialog } from "./delete-project-dialog";
 import { EditDealDialog } from "./edit-deal-dialog";
+import { formatAmount } from "./format";
 import { useArchiveProject } from "./mutations";
 import type { ProjectCardViewModel } from "./select";
 
@@ -190,8 +191,4 @@ export function ProjectCard({ project, orgId, workspaceId, overlay = false }: Pr
       )}
     </div>
   );
-}
-
-function formatAmount(amount: { value: number; currency: string }, locale: string): string {
-  return new Intl.NumberFormat(locale, { style: "currency", currency: amount.currency }).format(amount.value);
 }

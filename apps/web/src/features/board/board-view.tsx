@@ -23,7 +23,6 @@ import { useLocalize } from "../../shared/lib/localize";
 import { useReorderPhases } from "../phases/mutations";
 import { PhaseFormDialog } from "../phases/phase-form-dialog";
 import { BoardColumn } from "./board-column";
-import { CreateDealDialog } from "./create-deal-dialog";
 import { useLoadMoreColumn, useMoveProject } from "./mutations";
 import { ProjectCard } from "./project-card";
 import { boardQueryOptions } from "./queries";
@@ -73,9 +72,7 @@ export function BoardView({ orgId, workspaceId }: { orgId: string; workspaceId: 
   const loadMore = useLoadMoreColumn(orgId, workspaceId);
   const localize = useLocalize();
   const t = useT();
-  const canCreate = useCan("Project.create");
   const canCreatePhase = useCan("Phase.create");
-  const [createOpen, setCreateOpen] = useState(false);
   const [createPhaseOpen, setCreatePhaseOpen] = useState(false);
 
   const columnsById = useMemo(() => new Map(board.columns.map((c) => [c.id, c])), [board]);
@@ -241,12 +238,6 @@ export function BoardView({ orgId, workspaceId }: { orgId: string; workspaceId: 
     // h-full: заполняет main (app-shell.tsx: h-dvh + overflow-y-auto) без второго page-scroll —
     // единственный скролл внутри доски теперь горизонтальный (колонки) и по одной колонке (карты).
     <div className="flex h-full flex-col gap-3">
-      {canCreate && (
-        <Button type="button" size="sm" className="w-fit shrink-0" onClick={() => setCreateOpen(true)}>
-          <Plus className="h-3.5 w-3.5" />
-          {t("board.create.trigger")}
-        </Button>
-      )}
       <DndContext
         sensors={sensors}
         collisionDetection={collisionDetectionStrategy}
@@ -298,7 +289,6 @@ export function BoardView({ orgId, workspaceId }: { orgId: string; workspaceId: 
           ) : null}
         </DragOverlay>
       </DndContext>
-      <CreateDealDialog orgId={orgId} workspaceId={workspaceId} open={createOpen} onOpenChange={setCreateOpen} />
       <PhaseFormDialog
         orgId={orgId}
         workspaceId={workspaceId}
