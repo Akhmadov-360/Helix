@@ -1,6 +1,6 @@
 import { Controller, Get, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
-import type { OrgMemberListResponse } from "@helix/api-schemas";
+import type { MyOrgListResponse, OrgMemberListResponse } from "@helix/api-schemas";
 import { CurrentAuth, type AuthContext } from "../../core/auth-context";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { OrganizationsService } from "./organizations.service";
@@ -17,5 +17,11 @@ export class OrganizationsController {
   @Get("members")
   listMembers(@CurrentAuth() auth: AuthContext): Promise<OrgMemberListResponse> {
     return this.organizations.listMembers(auth.activeOrgId);
+  }
+
+  // FR-ORG-2: список орг ТЕКУЩЕГО пользователя (не activeOrgId) — под org-switcher.
+  @Get("mine")
+  listMine(@CurrentAuth() auth: AuthContext): Promise<MyOrgListResponse> {
+    return this.organizations.listMine(auth.userId);
   }
 }

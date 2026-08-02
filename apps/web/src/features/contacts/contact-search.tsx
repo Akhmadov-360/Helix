@@ -34,6 +34,7 @@ export function ContactSearch({
   if (creating) {
     return (
       <CreateContactForm
+        orgId={orgId}
         initialName={query}
         onDone={(contact, dedupHint) => {
           setCreating(false);

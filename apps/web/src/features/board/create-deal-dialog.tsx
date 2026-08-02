@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { CompanyResponse } from "@helix/api-schemas";
 import {
   Button,
   Dialog,
@@ -18,14 +19,18 @@ import { useT } from "../../shared/i18n";
 import { CURRENCIES } from "./currencies";
 import { useCreateProject } from "./mutations";
 
+const NO_COMPANY = "__none__";
+
 export function CreateDealDialog({
   orgId,
   workspaceId,
+  companies,
   open,
   onOpenChange,
 }: {
   orgId: string;
   workspaceId: string;
+  companies: CompanyResponse[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -35,12 +40,14 @@ export function CreateDealDialog({
   const [value, setValue] = useState("");
   const [currency, setCurrency] = useState("USD");
   const [source, setSource] = useState("");
+  const [companyId, setCompanyId] = useState(NO_COMPANY);
 
   function reset() {
     setTitle("");
     setValue("");
     setCurrency("USD");
     setSource("");
+    setCompanyId(NO_COMPANY);
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -53,6 +60,7 @@ export function CreateDealDialog({
         value: parsedValue,
         currency: parsedValue !== undefined ? currency.trim().toUpperCase() : undefined,
         source: source.trim() || undefined,
+        companyId: companyId === NO_COMPANY ? undefined : companyId,
       },
       {
         onSuccess: () => {
@@ -119,6 +127,22 @@ export function CreateDealDialog({
               disabled={create.isPending}
             />
             <p className="text-xs text-muted-foreground">{t("board.create.sourceHint")}</p>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="deal-company">{t("board.create.company")}</Label>
+            <Select value={companyId} onValueChange={setCompanyId} disabled={create.isPending}>
+              <SelectTrigger id="deal-company">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_COMPANY}>{t("contacts.form.companyNone")}</SelectItem>
+                {companies.map((company) => (
+                  <SelectItem key={company.id} value={company.id}>
+                    {company.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={create.isPending}>

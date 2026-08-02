@@ -1,12 +1,19 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
-import type { CreateContactInput, DealRole, ProjectContactResponse } from "@helix/api-schemas";
+import type { ContactListResponse, CreateContactInput, DealRole, ProjectContactResponse, UpdateContactInput } from "@helix/api-schemas";
 import { contactResponseSchema, createContactResponseSchema, projectContactResponseSchema } from "@helix/api-schemas";
 import { queryKeys, request } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
 import { useToast } from "../../shared/toast/use-toast";
-import { projectContactsQueryOptions } from "./queries";
+import { contactQueryOptions, projectContactsQueryOptions } from "./queries";
 import { toContactError, toLinkContactError } from "./contact-error";
+
+// Список — единственный query-key с параметрами (contactsList(orgId, query), см. query-keys.ts),
+// тот же приём, что companies/mutations.ts: инвалидируем по общему префиксу, а не setQueryData,
+// раз конкретный q/companyId-фильтр вызывающему компоненту неизвестен.
+function invalidateContactsList(queryClient: ReturnType<typeof useQueryClient>, orgId: string) {
+  void queryClient.invalidateQueries({ queryKey: ["org", orgId, "contacts", "list"] });
+}
 
 function linkErrorKey(err: ReturnType<typeof toLinkContactError>): MessageKey {
   switch (err.kind) {
@@ -151,9 +158,11 @@ export function useUnlinkContact(orgId: string, projectId: string) {
 }
 
 // Создание контакта (§13.3) — не трогает projectContacts-кэш сам по себе: вызывающий компонент
-// связывает create → link отдельным шагом (POST /contacts затем POST /projects/:id/contacts).
-// Без orgId-параметра: POST /contacts org-scoped через токен, кэш-ключ ему не нужен.
-export function useCreateContact() {
+// (per-project link-флоу) связывает create → link отдельным шагом (POST /contacts затем
+// POST /projects/:id/contacts). orgId нужен только чтобы держать глобальную адресную книгу
+// (contactsList) свежей для ОБОИХ входов создания контакта — из проекта и с /contacts напрямую.
+export function useCreateContact(orgId: string) {
+  const queryClient = useQueryClient();
   const t = useT();
   const toast = useToast();
 
@@ -168,6 +177,57 @@ export function useCreateContact() {
     onError: (error) => {
       const kind = toContactError(error);
       toast.error(t(contactErrorKey(kind)));
+    },
+    onSuccess: () => invalidateContactsList(queryClient, orgId),
+  });
+}
+
+export function useUpdateContact(orgId: string) {
+  const queryClient = useQueryClient();
+  const t = useT();
+  const toast = useToast();
+
+  return useMutation({
+    mutationFn: (vars: { contactId: string; input: UpdateContactInput }) =>
+      request({
+        method: "PATCH",
+        path: `/v1/contacts/${vars.contactId}`,
+        body: vars.input,
+        schema: contactResponseSchema,
+      }),
+    onError: (error) => {
+      const kind = toContactError(error);
+      if (kind === "permissionDenied") void queryClient.invalidateQueries({ queryKey: queryKeys.me() });
+      toast.error(t(contactErrorKey(kind)));
+    },
+    onSuccess: (contact) => {
+      queryClient.setQueryData(contactQueryOptions(orgId, contact.id).queryKey, contact);
+      invalidateContactsList(queryClient, orgId);
+      toast.show(t("contacts.edit.success"));
+    },
+  });
+}
+
+export function useDeleteContact(orgId: string) {
+  const queryClient = useQueryClient();
+  const t = useT();
+  const toast = useToast();
+
+  return useMutation({
+    mutationFn: (vars: { contactId: string }) =>
+      request({ method: "DELETE", path: `/v1/contacts/${vars.contactId}`, schema: z.null() }),
+    onError: (error) => {
+      const kind = toContactError(error);
+      if (kind === "permissionDenied") void queryClient.invalidateQueries({ queryKey: queryKeys.me() });
+      toast.error(t(contactErrorKey(kind)));
+    },
+    onSuccess: (_data, vars) => {
+      queryClient.setQueriesData<ContactListResponse>(
+        { queryKey: ["org", orgId, "contacts", "list"] },
+        (current) => current && { ...current, contacts: current.contacts.filter((c) => c.id !== vars.contactId) },
+      );
+      invalidateContactsList(queryClient, orgId);
+      toast.show(t("contacts.delete.success"));
     },
   });
 }

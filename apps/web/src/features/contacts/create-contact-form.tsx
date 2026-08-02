@@ -5,16 +5,18 @@ import { useT } from "../../shared/i18n";
 import { useCreateContact } from "./mutations";
 
 export function CreateContactForm({
+  orgId,
   initialName,
   onDone,
   onCancel,
 }: {
+  orgId: string;
   initialName: string;
   onDone: (contact: ContactResponse, dedupHint: DedupHint) => void;
   onCancel: () => void;
 }) {
   const t = useT();
-  const create = useCreateContact();
+  const create = useCreateContact(orgId);
   const [name, setName] = useState(initialName);
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");

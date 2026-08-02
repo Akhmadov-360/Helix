@@ -8,6 +8,7 @@ import {
 import { useNavigate } from "@tanstack/react-router";
 import { currentUserSchema } from "@helix/api-schemas";
 import { queryKeys, request, setAccessToken } from "../api";
+import { clearLastWorkspaceId } from "../lib/last-workspace";
 import { invalidateSecurityContext } from "./invalidate-session";
 
 // Идентичность запроса: профиль + activeOrgId + role (свежая из Membership, auth.md §6).
@@ -35,6 +36,7 @@ export function useLogout() {
     // onSuccess: сессию на клиенте гасим даже если запрос не дошёл (цель «выйти» уже достигнута).
     onSettled: async () => {
       setAccessToken(null);
+      clearLastWorkspaceId();
       await invalidateSecurityContext(queryClient);
       void navigate({ to: "/login" });
     },

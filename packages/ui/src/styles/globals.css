@@ -19,7 +19,10 @@
   --secondary-foreground: #0f172a;
   --muted: #f1f5fd;
   --muted-foreground: #64748b;
-  --accent: #059669;
+  /* emerald-600 (#059669) как text-accent на белом/card давал 3.77:1 — ниже 4.5:1 AA (деньги на
+     карточке лида, WON-бейдж). emerald-700 держит тот же оттенок и проходит везде, где accent
+     используется как ТЕКСТ (сплошного bg-accent в кодовой базе нет — foreground не завязан). */
+  --accent: #047857;
   --accent-foreground: #ffffff;
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;

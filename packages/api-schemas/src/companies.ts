@@ -54,3 +54,17 @@ export const companyListResponseSchema = z.object({
   hasMore: z.boolean(),
 });
 export type CompanyListResponse = z.infer<typeof companyListResponseSchema>;
+
+// Дедуп по домену (FR-CC-4, тот же паттерн, что contacts.ts dedupHintSchema) — кандидат минимум
+// для «возможно, эта компания уже есть».
+export const companyDedupHintSchema = z.object({
+  candidates: z.array(z.object({ id: z.string(), name: z.string(), domain: z.string().nullable() })),
+});
+export type CompanyDedupHint = z.infer<typeof companyDedupHintSchema>;
+
+// POST /companies → компания создана + хинт (не блокирует, §4.1, как createContactResponseSchema).
+export const createCompanyResponseSchema = z.object({
+  company: companyResponseSchema,
+  dedupHint: companyDedupHintSchema,
+});
+export type CreateCompanyResponse = z.infer<typeof createCompanyResponseSchema>;

@@ -3,6 +3,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Link } from "@tanstack/react-router";
 import { Archive, Calendar, CheckSquare, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import type { CompanyResponse } from "@helix/api-schemas";
 import {
   Avatar,
   avatarVariants,
@@ -31,12 +32,13 @@ interface Props {
   project: ProjectCardViewModel;
   orgId: string;
   workspaceId: string;
+  companies: CompanyResponse[];
   overlay?: boolean;
 }
 
 // `Card` (packages/ui) не forwardRef — dnd-kit нужен реальный DOM-узел, поэтому ref/drag-атрибуты
 // на обёртке, Card остаётся чистым визуальным примитивом (композиция, не форк).
-export function ProjectCard({ project, orgId, workspaceId, overlay = false }: Props) {
+export function ProjectCard({ project, orgId, workspaceId, companies, overlay = false }: Props) {
   const t = useT();
   const locale = useLocaleStore((state) => state.locale);
   // §8.2: FE-capability — косметика (сервер всё равно единственный энфорсер move), но без неё
@@ -173,6 +175,7 @@ export function ProjectCard({ project, orgId, workspaceId, overlay = false }: Pr
           <EditDealDialog
             orgId={orgId}
             workspaceId={workspaceId}
+            companies={companies}
             project={
               editOpen
                 ? {
@@ -181,6 +184,7 @@ export function ProjectCard({ project, orgId, workspaceId, overlay = false }: Pr
                     value: project.amount?.value ?? null,
                     currency: project.amount?.currency ?? null,
                     source: project.source,
+                    companyId: project.companyId,
                   }
                 : null
             }

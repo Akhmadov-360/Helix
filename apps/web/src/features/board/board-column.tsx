@@ -3,7 +3,7 @@ import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
-import type { PhaseResponse } from "@helix/api-schemas";
+import type { CompanyResponse, PhaseResponse } from "@helix/api-schemas";
 import {
   Button,
   cn,
@@ -26,6 +26,7 @@ interface Props {
   projectsById: Map<string, ProjectCardViewModel>;
   orgId: string;
   workspaceId: string;
+  companies: CompanyResponse[];
   onLoadMore: () => void;
   loadingMore: boolean;
 }
@@ -53,7 +54,7 @@ function toPhaseResponse(column: BoardColumnViewModel): PhaseResponse {
 // header (тот же приём, что ProjectCard — вся карточка тащится, включая ссылку/меню внутри,
 // PointerSensor activationConstraint distance:4 не даёт короткому клику стартовать drag).
 // useDroppable (карты) остаётся на внутреннем div — другой DOM-узел, конфликта с useSortable нет.
-export function BoardColumn({ column, name, order, projectsById, orgId, workspaceId, onLoadMore, loadingMore }: Props) {
+export function BoardColumn({ column, name, order, projectsById, orgId, workspaceId, companies, onLoadMore, loadingMore }: Props) {
   const t = useT();
   const { setNodeRef: setDroppableRef } = useDroppable({ id: column.id });
   const canUpdate = useCan("Phase.update");
@@ -137,7 +138,7 @@ export function BoardColumn({ column, name, order, projectsById, orgId, workspac
           {order.map((id) => {
             const project = projectsById.get(id);
             return project ? (
-              <ProjectCard key={id} project={project} orgId={orgId} workspaceId={workspaceId} />
+              <ProjectCard key={id} project={project} orgId={orgId} workspaceId={workspaceId} companies={companies} />
             ) : null;
           })}
         </div>

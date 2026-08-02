@@ -71,6 +71,19 @@ export class CompaniesRepository {
     });
   }
 
+  // Дедуп по домену (FR-CC-4) — тот же приём, что Contact.findDedupCandidates (contacts.repository.ts).
+  findDedupCandidates(
+    orgId: string,
+    domainNormalized: string,
+  ): Promise<Array<{ id: string; name: string; domain: string | null }>> {
+    return this.prisma.client.company.findMany({
+      where: { orgId, domainNormalized },
+      select: { id: true, name: true, domain: true },
+      orderBy: { id: "asc" },
+      take: 20,
+    });
+  }
+
   // Keyset по id (§2): стабилен, детерминирован при равных именах. take limit+1 → hasMore.
   // q — подстрочный поиск по name (case-insensitive).
   listByOrg(

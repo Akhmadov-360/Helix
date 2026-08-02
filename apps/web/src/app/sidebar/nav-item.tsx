@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import type { ComponentType } from "react";
 import { cn } from "@helix/ui";
 
-type SidebarRoute = "/workspaces/$workspaceId/board";
+type SidebarRoute = "/workspaces/$workspaceId/board" | "/contacts" | "/companies";
 
 export function SidebarNavItem({
   to,
@@ -11,7 +11,7 @@ export function SidebarNavItem({
   label,
 }: {
   to: SidebarRoute;
-  params: { workspaceId: string };
+  params?: { workspaceId: string };
   icon: ComponentType<{ className?: string }>;
   label: string;
 }) {

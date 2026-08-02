@@ -1,9 +1,10 @@
 import { useParams } from "@tanstack/react-router";
-import { KanbanSquare } from "lucide-react";
+import { Building2, KanbanSquare, Users } from "lucide-react";
 import { LocaleSwitcher, useT } from "../../shared/i18n";
 import { getLastWorkspaceId } from "../../shared/lib/last-workspace";
 import { ThemeToggle } from "../../shared/theme";
 import { SidebarNavItem } from "./nav-item";
+import { OrgSwitcher } from "./org-switcher";
 import { UserMenu } from "./user-menu";
 import { WorkspaceSwitcher } from "./workspace-switcher";
 
@@ -11,6 +12,11 @@ import { WorkspaceSwitcher } from "./workspace-switcher";
 // единственный workspace-scoped раздел в сайдбаре: управление фазами переехало на саму доску
 // (trailing "+ колонка", rename/delete через меню колонки) — отдельная страница /settings/phases
 // удалена, дублировать один и тот же функционал в двух местах незачем.
+//
+// Контакты/Компании — ПЕРВЫЙ org-scoped (не workspace-scoped) раздел в сайдбаре (архитектура
+// Contacts/Companies pages, п.1): Contact/Company живут на уровне орги, не воркспейса (docs/
+// decisions.md — "org-scoped SHARED resource"), поэтому не гейтятся на workspaceId и рендерятся
+// отдельным блоком, а не внутри "if (workspaceId)".
 export function Sidebar({ orgId }: { orgId: string }) {
   const t = useT();
   // useParams({strict:false}) реактивен на текущий матч роута — если на нём есть :workspaceId
@@ -25,18 +31,27 @@ export function Sidebar({ orgId }: { orgId: string }) {
       </div>
 
       <div className="border-b border-border p-2">
+        <OrgSwitcher activeOrgId={orgId} />
+      </div>
+
+      <div className="border-b border-border p-2">
         <WorkspaceSwitcher orgId={orgId} currentWorkspaceId={workspaceId} />
       </div>
 
       <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2">
         {workspaceId && (
-          <SidebarNavItem
-            to="/workspaces/$workspaceId/board"
-            params={{ workspaceId }}
-            icon={KanbanSquare}
-            label={t("sidebar.nav.board")}
-          />
+          <>
+            <SidebarNavItem
+              to="/workspaces/$workspaceId/board"
+              params={{ workspaceId }}
+              icon={KanbanSquare}
+              label={t("sidebar.nav.board")}
+            />
+            <div className="my-2 border-t border-border" />
+          </>
         )}
+        <SidebarNavItem to="/contacts" icon={Users} label={t("sidebar.nav.contacts")} />
+        <SidebarNavItem to="/companies" icon={Building2} label={t("sidebar.nav.companies")} />
       </nav>
 
       <div className="flex flex-col gap-1 border-t border-border p-2">

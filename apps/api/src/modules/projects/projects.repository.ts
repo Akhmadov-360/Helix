@@ -94,7 +94,7 @@ export class ProjectsRepository {
       value?: number;
       currency?: string;
       source?: string;
-      companyId?: string;
+      companyId?: string | null;
     },
     tx?: Prisma.TransactionClient,
   ): Promise<ProjectRow> {
