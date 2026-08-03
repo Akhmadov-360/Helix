@@ -119,7 +119,8 @@ describe("ProjectAssignee CRUD (§2/§6.3, unit 4)", () => {
       const co = await addOrgMember();
       await assign(projectId, co).expect(201);
       const row = await prisma.project.findUnique({ where: { id: projectId }, select: { ownerId: true } });
-      expect(row?.ownerId).toBeNull(); // owner как был (в пуле)
+      // owner как был — создатель по дефолту (decisions.md ADR), не пул: assignee его не трогает.
+      expect(row?.ownerId).toBe(userId);
     });
 
     it("reassign owner НЕ трогает список assignee", async () => {

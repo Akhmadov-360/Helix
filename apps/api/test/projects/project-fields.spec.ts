@@ -153,4 +153,30 @@ describe("Project.fields — валидация по FieldDefinition[] и requir
     expect(patched.body.data.fields[budget.body.data.key]).toBe(100);
     expect(patched.body.data.fields[note.body.data.key]).toBe("hi");
   });
+
+  // Регрессия (custom-fields.md §7, decisions.md ADR): PATCH required больше НЕ проверяет
+  // весь смёрженный набор — исторический пробел в НЕтронутом required-поле (появилось после
+  // создания лида) не должен блокировать несвязанную правку другого поля.
+  it("PATCH другого поля не спотыкается о чужой исторический пробел в required-поле", async () => {
+    const token = await signUp(app);
+    const wsId = await makeBoard(token);
+    const note = await addField(token, wsId, { label: { en: "Note" }, type: "text" }).expect(201);
+    const created = await create(token, wsId, { title: "Lead" }).expect(201);
+
+    // required появляется ПОСЛЕ создания лида — у лида уже есть исторический пробел.
+    const budget = await addField(token, wsId, {
+      label: { en: "Budget" },
+      type: "number",
+      required: true,
+    }).expect(201);
+
+    const patched = await request(app.getHttpServer())
+      .patch(`/v1/projects/${created.body.data.id}`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ fields: { [note.body.data.key]: "hi" } })
+      .expect(200);
+
+    expect(patched.body.data.fields[note.body.data.key]).toBe("hi");
+    expect(patched.body.data.fields[budget.body.data.key]).toBeUndefined();
+  });
 });

@@ -1,6 +1,7 @@
 export { cn } from "./lib/cn";
 export { Button, buttonVariants, type ButtonProps } from "./components/button";
 export { Input } from "./components/input";
+export { Textarea } from "./components/textarea";
 export { Label, type LabelProps } from "./components/label";
 export {
   Card,

@@ -8,6 +8,7 @@ import { useCan } from "../../shared/auth/ability";
 import { useLocaleStore, useT } from "../../shared/i18n";
 import { orgMembersQueryOptions } from "../../shared/org/queries";
 import { AssigneesPanel } from "./assignees-panel";
+import { CustomFieldsPanel } from "./custom-fields-panel";
 import { useReassignProject } from "./mutations";
 import { projectQueryOptions } from "./queries";
 import { ProjectTabs } from "./project-tabs";
@@ -160,6 +161,8 @@ export function ProjectDetailShell({
               />
             </dl>
           </div>
+
+          <CustomFieldsPanel orgId={orgId} workspaceId={project.workspaceId} projectId={projectId} fields={project.fields} />
 
           <AssigneesPanel orgId={orgId} projectId={projectId} />
         </aside>

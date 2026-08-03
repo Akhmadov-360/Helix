@@ -77,12 +77,12 @@ export class ProjectsService {
       const before = await this.projects.findByIdInOrg(projectId, orgId, tx);
       if (!before) throw new ResourceNotFoundError("Project not found");
 
-      // §7: required enforcement — только если запрос трогает fields (иначе title-only патч
-      // на лид с незаполненным required не должен ломаться). Смёрженный набор (существующие
-      // значения + патч) обязан по-прежнему satisфy required.
+      // §7 (пересмотрено): required проверяется ТОЛЬКО на create, не на каждый PATCH, трогающий
+      // fields. Исторический пробел в НЕтронутом required-поле (появилось после создания лида —
+      // легитимный сценарий, см. тест ниже) не должен блокировать несвязанную правку другого поля.
       const fields =
         input.fields !== undefined
-          ? await this.resolveProjectFields(
+          ? await this.resolveFieldsForUpdate(
               before.workspaceId,
               tx,
               input.fields,
@@ -431,10 +431,20 @@ export class ProjectsService {
     const rank = rankBetween(null, topRank); // наверх: перед текущим первым
     const actor = await this.users.findProfileById(userId);
 
+    // ADR (decisions.md): дефолт — сам создатель, не голый input.ownerId. Без дефолта большинство
+    // лидов создавались бы без владельца (диалог создания его не требует) — "уведомить владельца
+    // о новом лиде" выродилось бы в "уведомить почти никого". Начальное назначение при create —
+    // та же легитимная операция, что явный ownerId в теле (не переоткрывает reassign-guard, см. ADR).
+    const ownerId = input.ownerId ?? userId;
+
     const created = await this.prisma.client.$transaction(async (tx) => {
-      // §7: required enforcement — итоговый набор здесь ВСЕГДА равен input.fields (лид новый,
-      // сливать не с чем).
-      const fields = await this.resolveProjectFields(workspaceId, tx, input.fields, {});
+      // Явно переданный (или дефолтный) владелец обязан быть членом ЭТОЙ орги — composite-FK не
+      // ловит (Project.owner → User(id), не Membership), тот же guard, что reassign (§6.3).
+      await assertOrgMember(this.orgs, ownerId, orgId, tx);
+
+      // §7: required проверяется строго на create — новый лид обязан сразу удовлетворять все
+      // required-поля воркспейса, откатываться не на что (existing = {} по определению).
+      const fields = await this.resolveFieldsForCreate(workspaceId, tx, input.fields);
 
       const project = await this.projects.create(
         {
@@ -448,7 +458,7 @@ export class ProjectsService {
           currency: input.currency,
           source: input.source,
           companyId: input.companyId,
-          ownerId: input.ownerId,
+          ownerId,
           fields: fields as Prisma.InputJsonValue,
         },
         tx,
@@ -469,10 +479,33 @@ export class ProjectsService {
     return toProjectResponse(created);
   }
 
-  // custom-fields.md §10 шаг 5/6: типизирует incoming по актуальному FieldDefinition[]
-  // воркспейса, сливает с existing (PATCH — партиальный набор, create — existing = {}) и
-  // проверяет required (§7) на ИТОГОВОМ наборе. Бросает MISSING_REQUIRED_FIELDS при пробеле.
-  private async resolveProjectFields(
+  // custom-fields.md §10 шаг 5/6, §7: типизирует incoming по актуальному FieldDefinition[]
+  // воркспейса и проверяет required на ИТОГОВОМ наборе — новый лид без fallback на existing,
+  // обязан удовлетворять все required срезу.
+  private async resolveFieldsForCreate(
+    workspaceId: string,
+    tx: Prisma.TransactionClient,
+    incoming: Record<string, unknown> | undefined,
+  ): Promise<Record<string, unknown>> {
+    const definitions = (await this.fields.listByWorkspaceOrdered(workspaceId, tx)).map(
+      toFieldDefinitionResponse,
+    );
+    const parsed = buildProjectFieldsSchema(definitions).parse(incoming ?? {});
+
+    const missing = missingRequiredFieldKeys(definitions, parsed);
+    if (missing.length > 0) throw new MissingRequiredFieldsError({ keys: missing });
+
+    return parsed;
+  }
+
+  // §7 (пересмотрено): PATCH НЕ перепроверяет required на весь смёрженный набор — только
+  // типизирует и сливает. Обнулить УЖЕ заполненное required-поле через API и так невозможно:
+  // null не проходит per-type Zod-валидацию ни для одного FieldType (buildProjectFieldsSchema),
+  // а «удалить ключ» контракт не умеет. Значит требовать здесь ещё и присутствие ВСЕХ required —
+  // значит блокировать несвязанную правку из-за чужого исторического пробела (поле стало
+  // required уже после создания лида, §10 шаг 6 теста «PATCH без ключа fields...») без какой-либо
+  // защиты взамен. Единственное место, где новый лид обязан быть required-complete — create.
+  private async resolveFieldsForUpdate(
     workspaceId: string,
     tx: Prisma.TransactionClient,
     incoming: Record<string, unknown> | undefined,
@@ -482,11 +515,6 @@ export class ProjectsService {
       toFieldDefinitionResponse,
     );
     const parsedIncoming = buildProjectFieldsSchema(definitions).parse(incoming ?? {});
-    const merged = { ...existing, ...parsedIncoming };
-
-    const missing = missingRequiredFieldKeys(definitions, merged);
-    if (missing.length > 0) throw new MissingRequiredFieldsError({ keys: missing });
-
-    return merged;
+    return { ...existing, ...parsedIncoming };
   }
 }

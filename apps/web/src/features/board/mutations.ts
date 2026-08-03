@@ -109,6 +109,8 @@ function boardErrorKey(kind: ReturnType<typeof toBoardError>): MessageKey {
   switch (kind) {
     case "staleNeighbors":
       return "board.error.staleNeighbors";
+    case "missingRequiredFields":
+      return "board.error.missingRequiredFields";
     case "permissionDenied":
       return "board.error.permissionDenied";
     case "notFound":
@@ -169,8 +171,11 @@ export function useCreateProject(orgId: string, workspaceId: string) {
         body: input,
         schema: projectResponseSchema,
       }),
+    // missingRequiredFields — развилка, которую показывает сама форма (подсветка полей, §7), не
+    // тост-ошибка (тот же приём, что notEmpty у useDeletePhase).
     onError: (error) => {
       const kind = toBoardError(error);
+      if (kind === "missingRequiredFields") return;
       if (kind === "permissionDenied") void queryClient.invalidateQueries({ queryKey: queryKeys.me() });
       toast.error(t(boardErrorKey(kind)));
     },

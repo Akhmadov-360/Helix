@@ -1,7 +1,12 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { ChevronRight } from "lucide-react";
 import type { CompanyResponse } from "@helix/api-schemas";
 import {
   Button,
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
   Dialog,
   DialogContent,
   DialogFooter,
@@ -16,6 +21,12 @@ import {
   SelectValue,
 } from "@helix/ui";
 import { useT } from "../../shared/i18n";
+import { useMe } from "../../shared/auth/session";
+import { orgMembersQueryOptions } from "../../shared/org/queries";
+import { CustomFieldsSection } from "../fields/custom-fields-section";
+import { ManageFieldsHint } from "../fields/manage-fields-hint";
+import { fieldsQueryOptions } from "../fields/queries";
+import { missingFieldKeysFrom, toBoardError } from "./board-error";
 import { CURRENCIES } from "./currencies";
 import { useCreateProject } from "./mutations";
 
@@ -35,12 +46,20 @@ export function CreateDealDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const t = useT();
+  const me = useMe();
   const create = useCreateProject(orgId, workspaceId);
+  const { data: fieldDefinitions = [] } = useQuery(fieldsQueryOptions(orgId, workspaceId));
+  const { data: members = [] } = useQuery(orgMembersQueryOptions(orgId));
   const [title, setTitle] = useState("");
   const [value, setValue] = useState("");
   const [currency, setCurrency] = useState("USD");
   const [source, setSource] = useState("");
   const [companyId, setCompanyId] = useState(NO_COMPANY);
+  // Дефолт — сам создатель (decisions.md ADR "ownerId дефолтится создателем"): без владельца
+  // «уведомить владельца о новом лиде» выродилось бы в «уведомить почти никого». Явный пикер,
+  // а не тихий бэкенд-фолбэк — так владелец виден и его сразу можно поменять, не уходя в reassign.
+  const [ownerId, setOwnerId] = useState(me.id);
+  const [fields, setFields] = useState<Record<string, unknown>>({});
 
   function reset() {
     setTitle("");
@@ -48,6 +67,8 @@ export function CreateDealDialog({
     setCurrency("USD");
     setSource("");
     setCompanyId(NO_COMPANY);
+    setOwnerId(me.id);
+    setFields({});
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -61,6 +82,8 @@ export function CreateDealDialog({
         currency: parsedValue !== undefined ? currency.trim().toUpperCase() : undefined,
         source: source.trim() || undefined,
         companyId: companyId === NO_COMPANY ? undefined : companyId,
+        ownerId,
+        fields: fieldDefinitions.length > 0 ? fields : undefined,
       },
       {
         onSuccess: () => {
@@ -70,6 +93,17 @@ export function CreateDealDialog({
       },
     );
   }
+
+  const missingKeys = create.error && toBoardError(create.error) === "missingRequiredFields"
+    ? new Set(missingFieldKeysFrom(create.error))
+    : undefined;
+
+  // Свёрнуто по умолчанию всегда (не раздуваем форму опциональными полями) — но обязано
+  // раскрыться само при MISSING_REQUIRED_FIELDS, иначе ошибка на required-поле осталась бы
+  // невидимой под свёрнутой секцией. manualOpen — юзер уже разворачивал/сворачивал сам, его
+  // выбор перекрывает дефолт.
+  const [manualOpen, setManualOpen] = useState<boolean | null>(null);
+  const customFieldsOpen = manualOpen ?? missingKeys !== undefined;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -144,6 +178,45 @@ export function CreateDealDialog({
               </SelectContent>
             </Select>
           </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="deal-owner">{t("board.create.owner")}</Label>
+            <Select value={ownerId} onValueChange={setOwnerId} disabled={create.isPending}>
+              <SelectTrigger id="deal-owner">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {members.map((member) => (
+                  <SelectItem key={member.userId} value={member.userId}>
+                    {member.userId === me.id ? t("board.create.ownerMe", { name: member.name }) : member.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {fieldDefinitions.length > 0 ? (
+            <Collapsible open={customFieldsOpen} onOpenChange={setManualOpen}>
+              <CollapsibleTrigger className="group flex w-full items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+                <ChevronRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-150 group-data-[state=open]:rotate-90" />
+                {t("fields.section.trigger", { count: fieldDefinitions.length })}
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CustomFieldsSection
+                  orgId={orgId}
+                  definitions={fieldDefinitions}
+                  values={fields}
+                  onChange={(key, v) => setFields((prev) => ({ ...prev, [key]: v }))}
+                  disabled={create.isPending}
+                  errorKeys={missingKeys}
+                  className="pt-3"
+                />
+                <div className="pt-2">
+                  <ManageFieldsHint workspaceId={workspaceId} />
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          ) : (
+            <ManageFieldsHint workspaceId={workspaceId} />
+          )}
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={create.isPending}>
               {t("board.create.cancel")}

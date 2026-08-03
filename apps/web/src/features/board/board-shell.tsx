@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { LayoutGrid, Plus, Table2 } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { LayoutGrid, Plus, SlidersHorizontal, Table2 } from "lucide-react";
 import type { CompanyResponse } from "@helix/api-schemas";
 import { Button, cn } from "@helix/ui";
 import { useCan } from "../../shared/auth/ability";
@@ -37,9 +38,19 @@ export function BoardShell({ orgId, workspaceId, companies, view, onViewChange }
         ) : (
           <div />
         )}
-        <div role="group" aria-label={t("board.view.toggle")} className="flex items-center rounded-lg border border-border p-0.5">
-          <ViewToggleButton active={view === "board"} icon={LayoutGrid} label={t("board.view.board")} onClick={() => onViewChange("board")} />
-          <ViewToggleButton active={view === "table"} icon={Table2} label={t("board.view.table")} onClick={() => onViewChange("table")} />
+        <div className="flex items-center gap-2">
+          <div role="group" aria-label={t("board.view.toggle")} className="flex items-center rounded-lg border border-border p-0.5">
+            <ViewToggleButton active={view === "board"} icon={LayoutGrid} label={t("board.view.board")} onClick={() => onViewChange("board")} />
+            <ViewToggleButton active={view === "table"} icon={Table2} label={t("board.view.table")} onClick={() => onViewChange("table")} />
+          </div>
+          <Link
+            to="/workspaces/$workspaceId/fields"
+            params={{ workspaceId }}
+            aria-label={t("fields.page.trigger")}
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+          </Link>
         </div>
       </div>
       <div className="min-h-0 flex-1">

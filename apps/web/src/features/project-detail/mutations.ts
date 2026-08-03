@@ -10,6 +10,8 @@ import { projectQueryOptions } from "./queries";
 
 function errorKey(kind: ReturnType<typeof toBoardError>): MessageKey {
   switch (kind) {
+    case "missingRequiredFields":
+      return "board.error.missingRequiredFields";
     case "permissionDenied":
       return "board.error.permissionDenied";
     case "notFound":
@@ -32,8 +34,10 @@ export function useUpdateProject(orgId: string, workspaceId: string, projectId: 
   return useMutation({
     mutationFn: (input: UpdateProjectInput) =>
       request({ method: "PATCH", path: `/v1/projects/${projectId}`, body: input, schema: projectResponseSchema }),
+    // missingRequiredFields — подсвечивается прямо в форме (custom-fields.md §7), не тост.
     onError: (error) => {
       const kind = toBoardError(error);
+      if (kind === "missingRequiredFields") return;
       if (kind === "permissionDenied") void queryClient.invalidateQueries({ queryKey: queryKeys.me() });
       toast.error(t(errorKey(kind)));
     },
