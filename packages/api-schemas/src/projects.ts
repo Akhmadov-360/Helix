@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { contactLinkSchema } from "./common";
 import { phaseResponseSchema } from "./phases";
 
 // ISO-4217: три заглавные буквы. Не enum (~180 валют), не свободная строка («LOL»).
@@ -88,6 +89,10 @@ export const boardProjectResponseSchema = projectResponseSchema.extend({
   doneTasksCount: z.number().int().nonnegative(),
   totalTasksCount: z.number().int().nonnegative(),
   assignees: z.array(z.object({ userId: z.string(), name: z.string() })),
+  // Контакты сделки (ProjectContact→Contact, design review) — НЕ assignees (co-workers/User),
+  // это внешние люди. contactLinkSchema переиспользован из common.ts (та же форма {id,name},
+  // что Company.contacts).
+  contacts: z.array(contactLinkSchema),
 });
 export type BoardProjectResponse = z.infer<typeof boardProjectResponseSchema>;
 

@@ -23,11 +23,17 @@ export function toLinkContactError(error: unknown): LinkContactError {
 
 // Общая доменная ошибка на прочие мутации (unlink/update roles/create contact) — тот же паттерн,
 // что board-error.ts/phase-error.ts.
-export type ContactError = "permissionDenied" | "notFound" | "unexpected";
+//
+// "linkedToDeal" — 409 FK_VIOLATION на DELETE /contacts/:id: Contact→ProjectContact это
+// onDelete: Restrict, не Cascade (decisions.md D2, contacts.repository.ts) — контакт, ещё
+// привязанный участником к сделке, не удаляется молча. Без этого кейса ошибка падала в
+// "unexpected" и юзер видел бесполезный "попробуйте ещё раз" вместо причины.
+export type ContactError = "permissionDenied" | "notFound" | "linkedToDeal" | "unexpected";
 
 export function toContactError(error: unknown): ContactError {
   if (!(error instanceof TransportError)) return "unexpected";
   if (error.kind === "forbidden") return "permissionDenied";
   if (error.kind === "notFound") return "notFound";
+  if (error.kind === "conflict" && error.code === "FK_VIOLATION") return "linkedToDeal";
   return "unexpected";
 }

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { dealLinkSchema } from "./common";
 
 // Email контакта: trim (пробелы в email не значимы), но регистр СОХРАНЯЕМ — это PII, показываем
 // как ввёл оператор. Нормализация (lower) живёт только в emailNormalized на сервере (§4.2), не тут.
@@ -57,6 +58,10 @@ export const contactResponseSchema = z.object({
   companyId: z.string().nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
+  // Взаимоисключающе опционально, как Workspace.phases/phaseCount: только list() джойнит и
+  // заполняет (глобальная адресная книга должна показывать, к каким сделкам привязан контакт),
+  // create/update/getById/merge — нет (P3, не тянуть лишний join там, где он не нужен).
+  projects: z.array(dealLinkSchema).optional(),
 });
 export type ContactResponse = z.infer<typeof contactResponseSchema>;
 

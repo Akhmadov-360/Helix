@@ -40,11 +40,13 @@ export function toBoardProjectResponse(
   p: ProjectRow,
   taskCounts: { done: number; total: number } | undefined,
   assignees: Array<{ userId: string; name: string }> | undefined,
+  contacts: Array<{ id: string; name: string }> | undefined,
 ): BoardProjectResponse {
   return {
     ...toProjectResponse(p),
     doneTasksCount: taskCounts?.done ?? 0,
     totalTasksCount: taskCounts?.total ?? 0,
     assignees: assignees ?? [],
+    contacts: contacts ?? [],
   };
 }

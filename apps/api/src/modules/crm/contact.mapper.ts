@@ -33,7 +33,10 @@ export interface ContactInternalRow extends ContactRow {
   mergedIntoId: string | null;
 }
 
-export function toContactResponse(c: ContactRow): ContactResponse {
+export function toContactResponse(
+  c: ContactRow,
+  projects?: Array<{ id: string; title: string }>,
+): ContactResponse {
   return {
     id: c.id,
     orgId: c.orgId,
@@ -43,5 +46,6 @@ export function toContactResponse(c: ContactRow): ContactResponse {
     companyId: c.companyId,
     createdAt: c.createdAt.toISOString(),
     updatedAt: c.updatedAt.toISOString(),
+    ...(projects ? { projects } : {}),
   };
 }

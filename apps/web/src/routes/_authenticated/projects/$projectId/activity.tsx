@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { companiesListQueryOptions } from "../../../../features/companies/queries";
 import {
   projectActivityQueryOptions,
   projectAssigneesQueryOptions,
@@ -16,9 +18,10 @@ export const Route = createFileRoute("/_authenticated/projects/$projectId/activi
       context.queryClient.ensureQueryData(projectQueryOptions(me.activeOrgId, params.projectId)),
       context.queryClient.ensureQueryData(projectActivityQueryOptions(me.activeOrgId, params.projectId)),
       // Сайдбар project-detail-shell.tsx рендерится на ЛЮБОЙ вкладке (redesign) — грузим его
-      // данные (co-workers) и здесь.
+      // данные (co-workers, компания сделки) и здесь.
       context.queryClient.ensureQueryData(projectAssigneesQueryOptions(me.activeOrgId, params.projectId)),
       context.queryClient.ensureQueryData(orgMembersQueryOptions(me.activeOrgId)),
+      context.queryClient.ensureQueryData(companiesListQueryOptions(me.activeOrgId)),
     ]);
   },
   component: ActivityPage,
@@ -27,9 +30,10 @@ export const Route = createFileRoute("/_authenticated/projects/$projectId/activi
 function ActivityPage() {
   const { projectId } = Route.useParams();
   const me = useMe();
+  const { companies } = useSuspenseQuery(companiesListQueryOptions(me.activeOrgId)).data;
 
   return (
-    <ProjectDetailShell orgId={me.activeOrgId} projectId={projectId}>
+    <ProjectDetailShell orgId={me.activeOrgId} projectId={projectId} companies={companies}>
       <ActivityView orgId={me.activeOrgId} projectId={projectId} />
     </ProjectDetailShell>
   );

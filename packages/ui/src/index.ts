@@ -51,4 +51,6 @@ export {
   TableHead,
   TableCell,
   SortableTableHead,
+  TableToolbar,
 } from "./components/table";
+export { Collapsible, CollapsibleTrigger, CollapsibleContent } from "./components/collapsible";

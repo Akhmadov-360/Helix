@@ -71,7 +71,10 @@ export class ContactsService {
       limit: query.limit,
     });
     const hasMore = rows.length > query.limit;
-    return { contacts: rows.slice(0, query.limit).map(toContactResponse), hasMore };
+    return {
+      contacts: rows.slice(0, query.limit).map((row) => toContactResponse(row, row.projects.map((p) => p.project))),
+      hasMore,
+    };
   }
 
   async getById(orgId: string, id: string): Promise<ContactResponse> {

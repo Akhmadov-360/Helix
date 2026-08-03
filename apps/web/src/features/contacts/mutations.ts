@@ -1,17 +1,17 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import type { ContactListResponse, CreateContactInput, DealRole, ProjectContactResponse, UpdateContactInput } from "@helix/api-schemas";
-import { contactResponseSchema, createContactResponseSchema, projectContactResponseSchema } from "@helix/api-schemas";
+import { contactListResponseSchema, contactResponseSchema, createContactResponseSchema, projectContactResponseSchema } from "@helix/api-schemas";
 import { queryKeys, request } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
 import { useToast } from "../../shared/toast/use-toast";
-import { contactQueryOptions, projectContactsQueryOptions } from "./queries";
+import { contactQueryOptions, projectContactsQueryOptions, type ContactsListQuery } from "./queries";
 import { toContactError, toLinkContactError } from "./contact-error";
 
 // Список — единственный query-key с параметрами (contactsList(orgId, query), см. query-keys.ts),
 // тот же приём, что companies/mutations.ts: инвалидируем по общему префиксу, а не setQueryData,
 // раз конкретный q/companyId-фильтр вызывающему компоненту неизвестен.
-function invalidateContactsList(queryClient: ReturnType<typeof useQueryClient>, orgId: string) {
+export function invalidateContactsList(queryClient: ReturnType<typeof useQueryClient>, orgId: string) {
   void queryClient.invalidateQueries({ queryKey: ["org", orgId, "contacts", "list"] });
 }
 
@@ -36,6 +36,8 @@ function contactErrorKey(kind: ReturnType<typeof toContactError>): MessageKey {
       return "contacts.error.permissionDenied";
     case "notFound":
       return "contacts.error.notFound";
+    case "linkedToDeal":
+      return "contacts.error.linkedToDeal";
     default:
       return "contacts.error.unexpected";
   }
@@ -254,6 +256,33 @@ export function useMergeContact(orgId: string, projectId: string) {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: projectContactsQueryOptions(orgId, projectId).queryKey });
+    },
+  });
+}
+
+// Курсорная догрузка (§2, тот же приём, что board's useLoadMoreColumn): один query-key на весь
+// фильтр {q, companyId} (query-keys.ts contactsList), страницы дописываются в его кэш — смена
+// поиска меняет query-key целиком и сама сбрасывает пагинацию, отдельно сбрасывать курсор не надо.
+export function useLoadMoreContacts(orgId: string, query: ContactsListQuery) {
+  const queryClient = useQueryClient();
+  const queryKey = queryKeys.contactsList(orgId, query);
+
+  return useMutation({
+    mutationFn: () => {
+      const current = queryClient.getQueryData<ContactListResponse>(queryKey);
+      const cursorId = current?.contacts.at(-1)?.id;
+      return request({
+        path: "/v1/contacts",
+        searchParams: { ...query, cursorId },
+        schema: contactListResponseSchema,
+      });
+    },
+    onSuccess: (page) => {
+      queryClient.setQueryData<ContactListResponse>(queryKey, (existing) =>
+        existing
+          ? { contacts: [...existing.contacts, ...page.contacts], hasMore: page.hasMore }
+          : page,
+      );
     },
   });
 }

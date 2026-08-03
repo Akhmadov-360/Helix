@@ -30,6 +30,15 @@
   --input: #e4ecfc;
   --ring: #2563eb;
   --radius: 0.625rem;
+
+  /* Сайдбар — постоянное тёмное "шасси" (Linear/Trello-паттерн), НЕ переключается вместе с
+     --background по .dark: это хром приложения, не поверхность контента, поэтому живёт только
+     в :root, без переопределения в .dark ниже. */
+  --sidebar: #0d1424;
+  --sidebar-foreground: #cbd5e1;
+  --sidebar-border: #1e293b;
+  --sidebar-accent: #1a2540;
+  --sidebar-accent-foreground: #f1f5f9;
 }
 
 .dark {
@@ -75,6 +84,12 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -128,6 +143,97 @@
   @media (prefers-reduced-motion: reduce) {
     .ui-pop-anim[data-state="open"],
     .ui-pop-anim[data-state="closed"] {
+      animation: none;
+    }
+  }
+
+  /* Side-popout вариант ui-pop-anim — для меню, открывающихся сбоку (OrgSwitcher, side="right"):
+     та же fade+scale, плюс лёгкий translateX от края триггера. Правило намеренно объявлено ПОСЛЕ
+     .ui-pop-anim ниже по файлу — при одинаковой специфичности выигрывает по порядку в каскаде,
+     переопределяя базовую анимацию на DropdownMenuContent (обе utility-класса присутствуют в DOM
+     одновременно, cn() их не дедуплицирует, т.к. это не Tailwind-утилиты). */
+  @keyframes ui-pop-in-side {
+    from {
+      opacity: 0;
+      transform: translateX(-6px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0) scale(1);
+    }
+  }
+  @keyframes ui-pop-out-side {
+    from {
+      opacity: 1;
+      transform: translateX(0) scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: translateX(-6px) scale(0.98);
+    }
+  }
+  .ui-pop-anim-side[data-state="open"] {
+    animation: ui-pop-in-side 150ms ease-out;
+  }
+  .ui-pop-anim-side[data-state="closed"] {
+    animation: ui-pop-out-side 100ms ease-in;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ui-pop-anim-side[data-state="open"],
+    .ui-pop-anim-side[data-state="closed"] {
+      animation: none;
+    }
+  }
+
+  /* Radix Collapsible экспонирует высоту контента как CSS-переменную на самом Content —
+     анимируем её, а не max-height (без произвольной "достаточно большой" константы). */
+  @keyframes ui-collapsible-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-collapsible-content-height);
+    }
+  }
+  @keyframes ui-collapsible-up {
+    from {
+      height: var(--radix-collapsible-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
+  .ui-collapsible-anim[data-state="open"] {
+    animation: ui-collapsible-down 200ms ease-out;
+  }
+  .ui-collapsible-anim[data-state="closed"] {
+    animation: ui-collapsible-up 150ms ease-in;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ui-collapsible-anim[data-state="open"],
+    .ui-collapsible-anim[data-state="closed"] {
+      animation: none;
+    }
+  }
+
+  /* Появление сетки карточек (workspaces и т.п.) — стаггер через инлайновый animation-delay на
+     каждом элементе, сама анимация одна на всех. Без Framer Motion: эффект чисто CSS-шный
+     (opacity+translateY), новая JS-библиотека ради него была бы неоправданным весом бандла. */
+  @keyframes ui-fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .ui-fade-up {
+    animation: ui-fade-up 300ms ease-out both;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ui-fade-up {
       animation: none;
     }
   }

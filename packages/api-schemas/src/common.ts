@@ -73,3 +73,15 @@ export function localize(value: LocalizedName, locale: Locale): string {
   }
   return "";
 }
+
+// ────────────────────────────────── DealLink ────────────────────────────────
+// Минимальная проекция Project для "к каким сделкам привязан X" (Contact.projects,
+// Company.projects) — одна форма на обоих контрактах, не два дубля {id,title}.
+export const dealLinkSchema = z.object({ id: z.string(), title: z.string() });
+export type DealLink = z.infer<typeof dealLinkSchema>;
+
+// ─────────────────────────────────── ContactLink ────────────────────────────
+// Минимальная проекция Contact для "кто привязан к X" (Company.contacts в списке) — имя
+// достаточно для avatar-инициалов + popover-список, полный Contact не нужен (P3).
+export const contactLinkSchema = z.object({ id: z.string(), name: z.string() });
+export type ContactLink = z.infer<typeof contactLinkSchema>;

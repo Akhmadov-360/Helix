@@ -23,6 +23,17 @@ export function contactSearchQueryOptions(orgId: string, q: string) {
   });
 }
 
+// Подсказка "контакты компании X" в ContactSearch (design review) — та же форма ответа, что
+// typeahead, но фильтр companyId вместо q. Отдельный query-key: смена компании не должна
+// путаться с текстовым поиском в кэше.
+export function companyContactsQueryOptions(orgId: string, companyId: string) {
+  return queryOptions({
+    queryKey: ["org", orgId, "contacts", "byCompany", companyId] as const,
+    queryFn: () =>
+      request({ path: "/v1/contacts", searchParams: { companyId, limit: 20 }, schema: contactListResponseSchema }),
+  });
+}
+
 export interface ContactsListQuery {
   q?: string;
   companyId?: string;

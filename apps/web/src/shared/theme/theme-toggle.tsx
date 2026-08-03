@@ -1,6 +1,7 @@
 import { Check, Monitor, Moon, Sun } from "lucide-react";
 import {
   Button,
+  cn,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -11,7 +12,7 @@ import { THEMES, useThemeStore, type ThemePreference } from "./store";
 
 const ICONS: Record<ThemePreference, typeof Sun> = { light: Sun, dark: Moon, system: Monitor };
 
-export function ThemeToggle() {
+export function ThemeToggle({ className }: { className?: string }) {
   const t = useT();
   const theme = useThemeStore((state) => state.theme);
   const setTheme = useThemeStore((state) => state.setTheme);
@@ -25,7 +26,7 @@ export function ThemeToggle() {
           variant="ghost"
           size="icon"
           aria-label={t("theme.toggle.label")}
-          className="text-muted-foreground hover:text-foreground"
+          className={cn("text-muted-foreground hover:text-foreground", className)}
         >
           <Icon className="h-4 w-4" />
         </Button>

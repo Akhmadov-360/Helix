@@ -47,7 +47,10 @@ export class CompaniesService {
       limit: query.limit,
     });
     const hasMore = rows.length > query.limit;
-    return { companies: rows.slice(0, query.limit).map(toCompanyResponse), hasMore };
+    return {
+      companies: rows.slice(0, query.limit).map((row) => toCompanyResponse(row, row.projects, row.contacts)),
+      hasMore,
+    };
   }
 
   async getById(orgId: string, id: string): Promise<CompanyDetailResponse> {

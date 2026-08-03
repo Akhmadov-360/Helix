@@ -69,12 +69,18 @@ function patchProject(board: BoardResponse, project: ProjectResponse): BoardResp
 
 // Лид создаётся всегда в первой фазе, наверху колонки (§1, projects.controller.ts create()) —
 // прекатенируем локально теми же правилами, сервер уже так и создал. Свежесозданный лид точно
-// без задач/co-workers — 0/0/[] корректны, не выдумка (в отличие от отсутствующих в ProjectResponse
-// полей, которые пришлось бы гадать).
+// без задач/co-workers/контактов сделки — 0/0/[]/[] корректны, не выдумка (в отличие от
+// отсутствующих в ProjectResponse полей, которые пришлось бы гадать).
 function prependProject(board: BoardResponse, project: ProjectResponse): BoardResponse {
   const firstPhase = board.phases[0];
   if (!firstPhase || firstPhase.id !== project.phaseId) return board;
-  const boardProject: BoardProjectResponse = { ...project, doneTasksCount: 0, totalTasksCount: 0, assignees: [] };
+  const boardProject: BoardProjectResponse = {
+    ...project,
+    doneTasksCount: 0,
+    totalTasksCount: 0,
+    assignees: [],
+    contacts: [],
+  };
   return {
     ...board,
     phases: board.phases.map((phase) =>

@@ -46,7 +46,7 @@ export function BoardShell({ orgId, workspaceId, companies, view, onViewChange }
         {view === "board" ? (
           <BoardView orgId={orgId} workspaceId={workspaceId} companies={companies} />
         ) : (
-          <TableView orgId={orgId} workspaceId={workspaceId} />
+          <TableView orgId={orgId} workspaceId={workspaceId} companies={companies} />
         )}
       </div>
       <CreateDealDialog orgId={orgId} workspaceId={workspaceId} companies={companies} open={createOpen} onOpenChange={setCreateOpen} />

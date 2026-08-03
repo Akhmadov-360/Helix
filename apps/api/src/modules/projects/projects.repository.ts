@@ -216,6 +216,28 @@ export class ProjectsRepository {
     return byProject;
   }
 
+  // Контакты сделки на карточке/в таблице доски (design review) — та же batched-логика, что у
+  // assigneesByProjectIds, но по ProjectContact→Contact (не ProjectAssignee→User): это ВНЕШНИЕ
+  // люди сделки, не co-workers. Смёрженные (mergedIntoId != null) исключены — тот же фильтр,
+  // что у company.contacts/contacts.list (§7.5, тумбстоны не показываем).
+  async contactsByProjectIds(
+    projectIds: string[],
+  ): Promise<Map<string, Array<{ id: string; name: string }>>> {
+    if (projectIds.length === 0) return new Map();
+    const rows = await this.prisma.client.projectContact.findMany({
+      where: { projectId: { in: projectIds }, contact: { mergedIntoId: null } },
+      select: { projectId: true, contact: { select: { id: true, name: true } } },
+      orderBy: { contactId: "asc" },
+    });
+    const byProject = new Map<string, Array<{ id: string; name: string }>>();
+    for (const row of rows) {
+      const list = byProject.get(row.projectId) ?? [];
+      list.push({ id: row.contact.id, name: row.contact.name });
+      byProject.set(row.projectId, list);
+    }
+    return byProject;
+  }
+
   // Keyset-пагинация колонки (§8): (rank, id) > (cursor). Не OFFSET — при неуникальном
   // ранге offset недетерминирован. Курсор null → первая страница.
   columnPage(

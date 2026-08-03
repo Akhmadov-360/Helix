@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Inbox } from "lucide-react";
-import type { PhaseType } from "@helix/api-schemas";
+import { Building2, Inbox } from "lucide-react";
+import type { CompanyResponse, PhaseType } from "@helix/api-schemas";
 import {
   Avatar,
   avatarVariants,
@@ -18,6 +18,7 @@ import {
 } from "@helix/ui";
 import { useLocaleStore, useT } from "../../shared/i18n";
 import { useLocalize } from "../../shared/lib/localize";
+import { ContactsAvatarPopover } from "./contacts-popover";
 import { formatAmount, phaseTypeBadgeVariant } from "./format";
 import { boardQueryOptions } from "./queries";
 import { toBoardViewModel, type ProjectCardViewModel } from "./select";
@@ -59,12 +60,21 @@ function sortRows(rows: TableRowModel[], sort: SortState): TableRowModel[] {
 // Табличная альтернатива канбану (FR-PRJ-7): та же board-кэш-запись, что у BoardView (общий
 // query key — переключение Доска/Таблица без лишнего запроса и without loading-flash), но плоский
 // список всех фаз сразу — удобно сканировать/сортировать много лидов, не листая колонки.
-export function TableView({ orgId, workspaceId }: { orgId: string; workspaceId: string }) {
+export function TableView({
+  orgId,
+  workspaceId,
+  companies,
+}: {
+  orgId: string;
+  workspaceId: string;
+  companies: CompanyResponse[];
+}) {
   const board = useSuspenseQuery({ ...boardQueryOptions(orgId, workspaceId), select: toBoardViewModel }).data;
   const locale = useLocaleStore((state) => state.locale);
   const t = useT();
   const localize = useLocalize();
   const [sort, setSort] = useState<SortState>({ key: "createdAt", direction: "desc" });
+  const companyNameById = useMemo(() => new Map(companies.map((c) => [c.id, c.name])), [companies]);
 
   const rows = useMemo(() => {
     const flat: TableRowModel[] = board.columns.flatMap((column) =>
@@ -114,6 +124,8 @@ export function TableView({ orgId, workspaceId }: { orgId: string; workspaceId: 
               {t("board.table.column.amount")}
             </SortableTableHead>
             <TableHead>{t("board.table.column.tasks")}</TableHead>
+            <TableHead>{t("board.table.column.company")}</TableHead>
+            <TableHead>{t("board.table.column.contacts")}</TableHead>
             <TableHead>{t("board.table.column.assignees")}</TableHead>
             <SortableTableHead active={sort.key === "createdAt"} direction={sort.direction} onClick={() => toggleSort("createdAt")}>
               {t("board.table.column.createdAt")}
@@ -141,6 +153,23 @@ export function TableView({ orgId, workspaceId }: { orgId: string; workspaceId: 
               </TableCell>
               <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">
                 {project.totalTasksCount > 0 ? `${project.doneTasksCount}/${project.totalTasksCount}` : "—"}
+              </TableCell>
+              <TableCell className="text-muted-foreground">
+                {project.companyId ? (
+                  <span className="inline-flex items-center gap-1">
+                    <Building2 className="h-3.5 w-3.5" />
+                    {companyNameById.get(project.companyId) ?? "—"}
+                  </span>
+                ) : (
+                  "—"
+                )}
+              </TableCell>
+              <TableCell>
+                {project.contacts.length > 0 ? (
+                  <ContactsAvatarPopover contacts={project.contacts} />
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
               </TableCell>
               <TableCell>
                 {project.assignees.length > 0 ? (

@@ -6,17 +6,16 @@ import { ThemeToggle } from "../../shared/theme";
 import { SidebarNavItem } from "./nav-item";
 import { OrgSwitcher } from "./org-switcher";
 import { UserMenu } from "./user-menu";
-import { WorkspaceSwitcher } from "./workspace-switcher";
+import { WorkspacesSection } from "./workspaces-section";
 
-// Постоянная навигация (веха редизайна, этап 1) — заменяет header-only AppShell. Board —
-// единственный workspace-scoped раздел в сайдбаре: управление фазами переехало на саму доску
-// (trailing "+ колонка", rename/delete через меню колонки) — отдельная страница /settings/phases
-// удалена, дублировать один и тот же функционал в двух местах незачем.
+// Постоянная навигация (веха редизайна). Board — единственный workspace-scoped раздел в сайдбаре:
+// управление фазами переехало на саму доску (trailing "+ колонка", rename/delete через меню
+// колонки) — отдельная страница /settings/phases удалена, дублировать функционал незачем.
 //
-// Контакты/Компании — ПЕРВЫЙ org-scoped (не workspace-scoped) раздел в сайдбаре (архитектура
-// Contacts/Companies pages, п.1): Contact/Company живут на уровне орги, не воркспейса (docs/
-// decisions.md — "org-scoped SHARED resource"), поэтому не гейтятся на workspaceId и рендерятся
-// отдельным блоком, а не внутри "if (workspaceId)".
+// Контакты/Компании — org-scoped (не workspace-scoped): Contact/Company живут на уровне орги, не
+// воркспейса (docs/decisions.md — "org-scoped SHARED resource"), поэтому не гейтятся на
+// workspaceId и рендерятся рядом с "Доской" в ОДНОМ постоянном списке, а не внутри аккордеона —
+// этап 3 редизайна: permanent-links отделены от collapsible workspaces-секции ниже.
 export function Sidebar({ orgId }: { orgId: string }) {
   const t = useT();
   // useParams({strict:false}) реактивен на текущий матч роута — если на нём есть :workspaceId
@@ -25,40 +24,33 @@ export function Sidebar({ orgId }: { orgId: string }) {
   const workspaceId = params.workspaceId ?? getLastWorkspaceId() ?? undefined;
 
   return (
-    <aside className="flex h-dvh w-64 shrink-0 flex-col border-r border-border bg-card">
-      <div className="flex h-14 items-center border-b border-border px-3">
-        <span className="px-1.5 text-base font-semibold">Helix</span>
-      </div>
-
-      <div className="border-b border-border p-2">
+    <aside className="flex h-dvh w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground">
+      <div className="border-b border-sidebar-border p-2">
         <OrgSwitcher activeOrgId={orgId} />
       </div>
 
-      <div className="border-b border-border p-2">
-        <WorkspaceSwitcher orgId={orgId} currentWorkspaceId={workspaceId} />
-      </div>
-
-      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2">
-        {workspaceId && (
-          <>
+      <nav className="scroll-slim flex flex-1 flex-col gap-3 overflow-y-auto p-2">
+        <div className="flex flex-col gap-0.5">
+          {workspaceId && (
             <SidebarNavItem
               to="/workspaces/$workspaceId/board"
               params={{ workspaceId }}
               icon={KanbanSquare}
               label={t("sidebar.nav.board")}
             />
-            <div className="my-2 border-t border-border" />
-          </>
-        )}
-        <SidebarNavItem to="/contacts" icon={Users} label={t("sidebar.nav.contacts")} />
-        <SidebarNavItem to="/companies" icon={Building2} label={t("sidebar.nav.companies")} />
+          )}
+          <SidebarNavItem to="/contacts" icon={Users} label={t("sidebar.nav.contacts")} />
+          <SidebarNavItem to="/companies" icon={Building2} label={t("sidebar.nav.companies")} />
+        </div>
+
+        <WorkspacesSection orgId={orgId} currentWorkspaceId={workspaceId} />
       </nav>
 
-      <div className="flex flex-col gap-1 border-t border-border p-2">
+      <div className="flex flex-col gap-1 border-t border-sidebar-border p-2">
         <UserMenu />
         <div className="flex items-center gap-1">
-          <ThemeToggle />
-          <LocaleSwitcher />
+          <ThemeToggle className="text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground" />
+          <LocaleSwitcher className="text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground" />
         </div>
       </div>
     </aside>

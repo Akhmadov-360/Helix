@@ -141,10 +141,13 @@ export class ContactsRepository {
 
   // Keyset по id (§2). Смёрженные (тумбстоны) скрыты. q — по name/email (insensitive),
   // companyId — фильтр по компании.
+  //
+  // projects — джойн под глобальную адресную книгу (список показывает, к каким сделкам привязан
+  // контакт): один batched-запрос Prisma на всю страницу, не N+1 по строкам.
   listByOrg(
     orgId: string,
     opts: { q?: string; companyId?: string; cursorId?: string; limit: number },
-  ): Promise<ContactRow[]> {
+  ): Promise<Array<ContactRow & { projects: Array<{ project: { id: string; title: string } }> }>> {
     return this.prisma.client.contact.findMany({
       where: {
         orgId,
@@ -159,7 +162,7 @@ export class ContactsRepository {
             }
           : {}),
       },
-      select: CONTACT_SELECT,
+      select: { ...CONTACT_SELECT, projects: { select: { project: { select: { id: true, title: true } } } } },
       orderBy: { id: "asc" },
       take: opts.limit + 1,
       ...(opts.cursorId ? { cursor: { id: opts.cursorId }, skip: 1 } : {}),

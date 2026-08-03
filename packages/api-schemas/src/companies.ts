@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { contactLinkSchema, dealLinkSchema } from "./common";
 import { contactResponseSchema } from "./contacts";
 
 const companyNameSchema = z.string().trim().min(1).max(200);
@@ -40,6 +41,13 @@ export const companyResponseSchema = z.object({
   industry: z.string().nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
+  // Взаимоисключающе опционально (как ContactResponse.projects) — только list() джойнит:
+  // Project.companyId → RESTRICT (миграция init), список должен показывать, какие сделки
+  // блокируют удаление, ДО того как юзер получит 409.
+  projects: z.array(dealLinkSchema).optional(),
+  // Тоже только list() — превью контактов компании (avatar-стек + popover), полный список с
+  // управлением живёт на companyDetailResponseSchema.contacts (полный Contact, ниже).
+  contacts: z.array(contactLinkSchema).optional(),
 });
 export type CompanyResponse = z.infer<typeof companyResponseSchema>;
 
