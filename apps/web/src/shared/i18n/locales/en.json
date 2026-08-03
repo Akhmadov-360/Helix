@@ -189,6 +189,7 @@
   "projectDetail.overview.value": "Value",
   "projectDetail.overview.source": "Source",
   "projectDetail.overview.owner": "Owner",
+  "projectDetail.owner.reassigned": "Lead owner updated",
   "projectDetail.overview.company": "Company",
   "projectDetail.overview.created": "Created",
   "projectDetail.overview.updated": "Updated",

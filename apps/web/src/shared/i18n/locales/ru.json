@@ -189,6 +189,7 @@
   "projectDetail.overview.value": "Сумма",
   "projectDetail.overview.source": "Источник",
   "projectDetail.overview.owner": "Владелец",
+  "projectDetail.owner.reassigned": "Владелец лида изменён",
   "projectDetail.overview.company": "Компания",
   "projectDetail.overview.created": "Создан",
   "projectDetail.overview.updated": "Обновлён",
