@@ -2,6 +2,7 @@ import { Check, Globe } from "lucide-react";
 import { LOCALES, type Locale } from "@helix/api-schemas";
 import {
   Button,
+  cn,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -14,7 +15,7 @@ import { useT } from "./use-t";
 // "Русский" видно и когда текущий язык английский).
 const LABELS: Record<Locale, string> = { ru: "Русский", en: "English", uz: "Oʻzbekcha" };
 
-export function LocaleSwitcher() {
+export function LocaleSwitcher({ className }: { className?: string }) {
   const t = useT();
   const locale = useLocaleStore((state) => state.locale);
   const setLocale = useLocaleStore((state) => state.setLocale);
@@ -27,7 +28,7 @@ export function LocaleSwitcher() {
           variant="ghost"
           size="icon"
           aria-label={t("locale.switcher.label")}
-          className="text-muted-foreground hover:text-foreground"
+          className={cn("text-muted-foreground hover:text-foreground", className)}
         >
           <Globe className="h-4 w-4" />
         </Button>

@@ -48,18 +48,32 @@ describe("Company CRUD (§2, unit 4)", () => {
     request(app.getHttpServer()).delete(`/v1/companies/${id}`).set("Authorization", `Bearer ${token}`);
 
   describe("POST", () => {
-    it("создаёт компанию, domainNormalized не в ответе", async () => {
+    it("создаёт компанию + пустой dedupHint, domainNormalized не в ответе", async () => {
       const res = await create({ name: "Acme", domain: "https://WWW.Acme.com/about", industry: "Tech" }).expect(201);
-      expect(res.body.data.name).toBe("Acme");
-      expect(res.body.data.domain).toBe("https://WWW.Acme.com/about"); // хранится как ввёл
-      expect("domainNormalized" in res.body.data).toBe(false); // internal
+      const company = res.body.data.company;
+      expect(company.name).toBe("Acme");
+      expect(company.domain).toBe("https://WWW.Acme.com/about"); // хранится как ввёл
+      expect("domainNormalized" in company).toBe(false); // internal
+      expect(res.body.data.dedupHint).toEqual({ candidates: [] });
       // канон вычислен: strip protocol/www/path, lower
-      const row = await prisma.company.findUnique({ where: { id: res.body.data.id } });
+      const row = await prisma.company.findUnique({ where: { id: company.id } });
       expect(row?.domainNormalized).toBe("acme.com");
     });
 
     it("name обязателен → 400", async () => {
       await create({ domain: "x.com" }).expect(400);
+    });
+
+    it("dedupHint: тот же домен (после канонизации) → кандидат, без него — пусто", async () => {
+      const first = (await create({ name: "Acme", domain: "acme.com" }).expect(201)).body.data.company;
+      const res = await create({ name: "Acme Inc", domain: "https://www.ACME.com/" }).expect(201);
+      expect(res.body.data.dedupHint.candidates).toEqual([{ id: first.id, name: "Acme", domain: "acme.com" }]);
+
+      const noHit = await create({ name: "Other", domain: "other.com" }).expect(201);
+      expect(noHit.body.data.dedupHint.candidates).toEqual([]);
+
+      const noDomain = await create({ name: "No Domain" }).expect(201);
+      expect(noDomain.body.data.dedupHint.candidates).toEqual([]);
     });
   });
 
@@ -82,7 +96,7 @@ describe("Company CRUD (§2, unit 4)", () => {
 
   describe("GET :id — карточка + контакты", () => {
     it("возвращает активные контакты компании, смёрженные скрыты", async () => {
-      const co = (await create({ name: "Acme" }).expect(201)).body.data;
+      const co = (await create({ name: "Acme" }).expect(201)).body.data.company;
       const active = await prisma.contact.create({ data: { orgId, name: "Active", companyId: co.id } });
       // тумбстон: смёрженный контакт той же компании — в детали не показываем
       const target = await prisma.contact.create({ data: { orgId, name: "Target" } });
@@ -96,7 +110,7 @@ describe("Company CRUD (§2, unit 4)", () => {
     });
 
     it("чужая компания → 404", async () => {
-      const co = (await create({ name: "Acme" }).expect(201)).body.data;
+      const co = (await create({ name: "Acme" }).expect(201)).body.data.company;
       const stranger = await signUp(app);
       await request(app.getHttpServer())
         .get(`/v1/companies/${co.id}`)
@@ -107,7 +121,7 @@ describe("Company CRUD (§2, unit 4)", () => {
 
   describe("PATCH", () => {
     it("правит поля; domain:null очищает и обнуляет канон", async () => {
-      const co = (await create({ name: "Acme", domain: "acme.com" }).expect(201)).body.data;
+      const co = (await create({ name: "Acme", domain: "acme.com" }).expect(201)).body.data.company;
       const res = await patch(co.id).send({ domain: null }).expect(200);
       expect(res.body.data.domain).toBeNull();
       const row = await prisma.company.findUnique({ where: { id: co.id } });
@@ -115,14 +129,14 @@ describe("Company CRUD (§2, unit 4)", () => {
     });
 
     it("пустое тело → 400", async () => {
-      const co = (await create({ name: "Acme" }).expect(201)).body.data;
+      const co = (await create({ name: "Acme" }).expect(201)).body.data.company;
       await patch(co.id).send({}).expect(400);
     });
   });
 
   describe("DELETE", () => {
     it("удаляет компанию, контакты выживают с companyId=NULL (§6)", async () => {
-      const co = (await create({ name: "Acme" }).expect(201)).body.data;
+      const co = (await create({ name: "Acme" }).expect(201)).body.data.company;
       const contact = await prisma.contact.create({ data: { orgId, name: "John", companyId: co.id } });
 
       await del(co.id).expect(200);
@@ -134,7 +148,7 @@ describe("Company CRUD (§2, unit 4)", () => {
     });
 
     it("чужая компания → 404", async () => {
-      const co = (await create({ name: "Acme" }).expect(201)).body.data;
+      const co = (await create({ name: "Acme" }).expect(201)).body.data.company;
       const stranger = await signUp(app);
       await request(app.getHttpServer())
         .delete(`/v1/companies/${co.id}`)
@@ -146,7 +160,7 @@ describe("Company CRUD (§2, unit 4)", () => {
   // Матрица (ADR blast-radius): create=Member+, read=Member+/Viewer, update/delete=Manager+.
   describe("authz", () => {
     it("MEMBER: create → 201, read → 200, update/delete → 403", async () => {
-      const co = (await create({ name: "Acme" }).expect(201)).body.data;
+      const co = (await create({ name: "Acme" }).expect(201)).body.data.company;
       await prisma.membership.updateMany({ data: { role: "MEMBER" } });
       await create({ name: "New" }).expect(201); // create — Member+
       await list().expect(200);
@@ -155,7 +169,7 @@ describe("Company CRUD (§2, unit 4)", () => {
     });
 
     it("MANAGER: create/update/delete → все разрешены", async () => {
-      const co = (await create({ name: "Acme" }).expect(201)).body.data;
+      const co = (await create({ name: "Acme" }).expect(201)).body.data.company;
       await prisma.membership.updateMany({ data: { role: "MANAGER" } });
       await patch(co.id).send({ name: "Renamed" }).expect(200);
       await del(co.id).expect(200); // delete — Manager+ (было O/A)

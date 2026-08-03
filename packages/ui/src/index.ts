@@ -43,3 +43,14 @@ export { Badge, badgeVariants, type BadgeProps } from "./components/badge";
 export { Checkbox } from "./components/checkbox";
 export { Popover, PopoverTrigger, PopoverContent, PopoverAnchor } from "./components/popover";
 export { Calendar } from "./components/calendar";
+export {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+  SortableTableHead,
+  TableToolbar,
+} from "./components/table";
+export { Collapsible, CollapsibleTrigger, CollapsibleContent } from "./components/collapsible";

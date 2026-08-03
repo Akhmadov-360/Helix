@@ -6,9 +6,11 @@ export interface ProjectCardViewModel {
   title: string;
   source: string | null;
   amount: { value: number; currency: string } | null;
+  companyId: string | null;
   doneTasksCount: number;
   totalTasksCount: number;
   assignees: Array<{ userId: string; name: string }>;
+  contacts: Array<{ id: string; name: string }>;
   createdAt: string;
 }
 
@@ -58,9 +60,11 @@ export function toBoardViewModel(data: BoardResponse): BoardViewModel {
           project.value === null || project.currency === null
             ? null
             : { value: project.value, currency: project.currency },
+        companyId: project.companyId,
         doneTasksCount: project.doneTasksCount,
         totalTasksCount: project.totalTasksCount,
         assignees: project.assignees,
+        contacts: project.contacts,
         createdAt: project.createdAt,
       })),
     })),

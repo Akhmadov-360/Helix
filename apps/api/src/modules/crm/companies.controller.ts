@@ -19,6 +19,7 @@ import {
   type CompanyQuery,
   type CompanyResponse,
   type CreateCompanyInput,
+  type CreateCompanyResponse,
   type UpdateCompanyInput,
 } from "@helix/api-schemas";
 import { CurrentAuth, type AuthContext } from "../../core/auth-context";
@@ -41,7 +42,7 @@ export class CompaniesController {
   create(
     @CurrentAuth() auth: AuthContext,
     @Body(new ZodValidationPipe(createCompanySchema)) dto: CreateCompanyInput,
-  ): Promise<CompanyResponse> {
+  ): Promise<CreateCompanyResponse> {
     return this.companies.create(auth.activeOrgId, dto);
   }
 

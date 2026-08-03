@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { LayoutGrid, Plus, Table2 } from "lucide-react";
+import type { CompanyResponse } from "@helix/api-schemas";
 import { Button, cn } from "@helix/ui";
 import { useCan } from "../../shared/auth/ability";
 import { useT } from "../../shared/i18n";
@@ -12,6 +13,7 @@ export type BoardDisplayMode = "board" | "table";
 interface Props {
   orgId: string;
   workspaceId: string;
+  companies: CompanyResponse[];
   view: BoardDisplayMode;
   onViewChange: (view: BoardDisplayMode) => void;
 }
@@ -19,7 +21,7 @@ interface Props {
 // Хедер (кнопка создания + переключатель Доска/Таблица) живёт на уровне страницы, а не внутри
 // BoardView — оба вида делят одну строку, а Table view не владеет DnD-состоянием доски и не должен
 // его тянуть только ради общей кнопки.
-export function BoardShell({ orgId, workspaceId, view, onViewChange }: Props) {
+export function BoardShell({ orgId, workspaceId, companies, view, onViewChange }: Props) {
   const t = useT();
   const canCreate = useCan("Project.create");
   const [createOpen, setCreateOpen] = useState(false);
@@ -42,12 +44,12 @@ export function BoardShell({ orgId, workspaceId, view, onViewChange }: Props) {
       </div>
       <div className="min-h-0 flex-1">
         {view === "board" ? (
-          <BoardView orgId={orgId} workspaceId={workspaceId} />
+          <BoardView orgId={orgId} workspaceId={workspaceId} companies={companies} />
         ) : (
-          <TableView orgId={orgId} workspaceId={workspaceId} />
+          <TableView orgId={orgId} workspaceId={workspaceId} companies={companies} />
         )}
       </div>
-      <CreateDealDialog orgId={orgId} workspaceId={workspaceId} open={createOpen} onOpenChange={setCreateOpen} />
+      <CreateDealDialog orgId={orgId} workspaceId={workspaceId} companies={companies} open={createOpen} onOpenChange={setCreateOpen} />
     </div>
   );
 }

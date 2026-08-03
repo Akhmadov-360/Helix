@@ -71,18 +71,42 @@ export class CompaniesRepository {
     });
   }
 
+  // Дедуп по домену (FR-CC-4) — тот же приём, что Contact.findDedupCandidates (contacts.repository.ts).
+  findDedupCandidates(
+    orgId: string,
+    domainNormalized: string,
+  ): Promise<Array<{ id: string; name: string; domain: string | null }>> {
+    return this.prisma.client.company.findMany({
+      where: { orgId, domainNormalized },
+      select: { id: true, name: true, domain: true },
+      orderBy: { id: "asc" },
+      take: 20,
+    });
+  }
+
   // Keyset по id (§2): стабилен, детерминирован при равных именах. take limit+1 → hasMore.
   // q — подстрочный поиск по name (case-insensitive).
+  //
+  // projects/contacts — джойны под список: projects — какие сделки блокируют удаление
+  // (Project.companyId ON DELETE RESTRICT), contacts — превью для avatar-стека/popover (§7.5:
+  // смёрженные скрыты, тот же фильтр, что findDetailInOrg). Оба — batched-запросы на всю
+  // страницу, не N+1 по строкам.
   listByOrg(
     orgId: string,
     opts: { q?: string; cursorId?: string; limit: number },
-  ): Promise<CompanyRow[]> {
+  ): Promise<
+    Array<CompanyRow & { projects: Array<{ id: string; title: string }>; contacts: Array<{ id: string; name: string }> }>
+  > {
     return this.prisma.client.company.findMany({
       where: {
         orgId,
         ...(opts.q ? { name: { contains: opts.q, mode: "insensitive" } } : {}),
       },
-      select: COMPANY_SELECT,
+      select: {
+        ...COMPANY_SELECT,
+        projects: { select: { id: true, title: true } },
+        contacts: { where: { mergedIntoId: null }, select: { id: true, name: true }, orderBy: { id: "asc" } },
+      },
       orderBy: { id: "asc" },
       take: opts.limit + 1,
       ...(opts.cursorId ? { cursor: { id: opts.cursorId }, skip: 1 } : {}),

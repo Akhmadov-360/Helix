@@ -1,10 +1,12 @@
 import { Injectable } from "@nestjs/common";
 import type {
+  CompanyDedupHint,
   CompanyDetailResponse,
   CompanyListResponse,
   CompanyQuery,
   CompanyResponse,
   CreateCompanyInput,
+  CreateCompanyResponse,
   UpdateCompanyInput,
 } from "@helix/api-schemas";
 import { ResourceNotFoundError } from "../../core/errors/domain-error";
@@ -16,15 +18,26 @@ import { normalizeDomain } from "./normalize";
 export class CompaniesService {
   constructor(private readonly companies: CompaniesRepository) {}
 
-  async create(orgId: string, input: CreateCompanyInput): Promise<CompanyResponse> {
+  // POST → компания + dedupHint (§4.2, тот же приём, что ContactsService.create) — кандидаты
+  // ищутся ДО создания, поэтому новая компания не попадает в собственный хинт. Не блокирует.
+  async create(orgId: string, input: CreateCompanyInput): Promise<CreateCompanyResponse> {
+    const domainNormalized = normalizeDomain(input.domain);
+    const dedupHint = await this.dedupByNormalized(orgId, domainNormalized);
     const row = await this.companies.create({
       orgId,
       name: input.name,
       domain: input.domain,
-      domainNormalized: normalizeDomain(input.domain),
+      domainNormalized,
       industry: input.industry,
     });
-    return toCompanyResponse(row);
+    return { company: toCompanyResponse(row), dedupHint };
+  }
+
+  // domain пуст → канон null → в дедупе не участвует (§4.2), пустой хинт без запроса.
+  private async dedupByNormalized(orgId: string, domainNormalized: string | null): Promise<CompanyDedupHint> {
+    if (domainNormalized === null) return { candidates: [] };
+    const rows = await this.companies.findDedupCandidates(orgId, domainNormalized);
+    return { candidates: rows };
   }
 
   async list(orgId: string, query: CompanyQuery): Promise<CompanyListResponse> {
@@ -34,7 +47,10 @@ export class CompaniesService {
       limit: query.limit,
     });
     const hasMore = rows.length > query.limit;
-    return { companies: rows.slice(0, query.limit).map(toCompanyResponse), hasMore };
+    return {
+      companies: rows.slice(0, query.limit).map((row) => toCompanyResponse(row, row.projects, row.contacts)),
+      hasMore,
+    };
   }
 
   async getById(orgId: string, id: string): Promise<CompanyDetailResponse> {

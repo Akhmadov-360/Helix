@@ -1,11 +1,24 @@
 import { useMemo, useState } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowDown, ArrowUp, ArrowUpDown, Inbox } from "lucide-react";
-import type { PhaseType } from "@helix/api-schemas";
-import { Avatar, avatarVariants, Badge, cn } from "@helix/ui";
+import { Building2, Inbox } from "lucide-react";
+import type { CompanyResponse, PhaseType } from "@helix/api-schemas";
+import {
+  Avatar,
+  avatarVariants,
+  Badge,
+  cn,
+  SortableTableHead,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@helix/ui";
 import { useLocaleStore, useT } from "../../shared/i18n";
 import { useLocalize } from "../../shared/lib/localize";
+import { ContactsAvatarPopover } from "./contacts-popover";
 import { formatAmount, phaseTypeBadgeVariant } from "./format";
 import { boardQueryOptions } from "./queries";
 import { toBoardViewModel, type ProjectCardViewModel } from "./select";
@@ -21,12 +34,12 @@ interface SortState {
   direction: SortDirection;
 }
 
-interface TableRow extends ProjectCardViewModel {
+interface TableRowModel extends ProjectCardViewModel {
   phaseName: string;
   phaseType: PhaseType;
 }
 
-function sortRows(rows: TableRow[], sort: SortState): TableRow[] {
+function sortRows(rows: TableRowModel[], sort: SortState): TableRowModel[] {
   const dir = sort.direction === "asc" ? 1 : -1;
   return [...rows].sort((a, b) => {
     switch (sort.key) {
@@ -47,15 +60,24 @@ function sortRows(rows: TableRow[], sort: SortState): TableRow[] {
 // Табличная альтернатива канбану (FR-PRJ-7): та же board-кэш-запись, что у BoardView (общий
 // query key — переключение Доска/Таблица без лишнего запроса и without loading-flash), но плоский
 // список всех фаз сразу — удобно сканировать/сортировать много лидов, не листая колонки.
-export function TableView({ orgId, workspaceId }: { orgId: string; workspaceId: string }) {
+export function TableView({
+  orgId,
+  workspaceId,
+  companies,
+}: {
+  orgId: string;
+  workspaceId: string;
+  companies: CompanyResponse[];
+}) {
   const board = useSuspenseQuery({ ...boardQueryOptions(orgId, workspaceId), select: toBoardViewModel }).data;
   const locale = useLocaleStore((state) => state.locale);
   const t = useT();
   const localize = useLocalize();
   const [sort, setSort] = useState<SortState>({ key: "createdAt", direction: "desc" });
+  const companyNameById = useMemo(() => new Map(companies.map((c) => [c.id, c.name])), [companies]);
 
   const rows = useMemo(() => {
-    const flat: TableRow[] = board.columns.flatMap((column) =>
+    const flat: TableRowModel[] = board.columns.flatMap((column) =>
       column.projects.map((project) => ({
         ...project,
         phaseName: localize(column.phaseName),
@@ -87,108 +109,94 @@ export function TableView({ orgId, workspaceId }: { orgId: string; workspaceId: 
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2">
-      {/* overflow-x-auto: узкие экраны не ломают layout (ux: Table Handling) — таблица скроллится
-          горизонтально внутри своего контейнера, а не выталкивает страницу. */}
-      <div className="scroll-slim min-h-0 flex-1 overflow-auto rounded-lg border border-border">
-        <table className="w-full min-w-[720px] border-collapse text-sm">
-          <thead className="sticky top-0 z-10 bg-muted/80 backdrop-blur">
-            <tr className="border-b border-border text-left text-xs text-muted-foreground">
-              <SortableHeader label={t("board.table.column.title")} sortKey="title" sort={sort} onSort={toggleSort} />
-              <SortableHeader label={t("board.table.column.phase")} sortKey="phase" sort={sort} onSort={toggleSort} />
-              <SortableHeader label={t("board.table.column.amount")} sortKey="amount" sort={sort} onSort={toggleSort} align="right" />
-              <th scope="col" className="px-3 py-2 font-medium">
-                {t("board.table.column.tasks")}
-              </th>
-              <th scope="col" className="px-3 py-2 font-medium">
-                {t("board.table.column.assignees")}
-              </th>
-              <SortableHeader label={t("board.table.column.createdAt")} sortKey="createdAt" sort={sort} onSort={toggleSort} />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((project) => (
-              <tr key={project.id} className="border-b border-border/60 last:border-0 hover:bg-muted/40">
-                <td className="max-w-[280px] px-3 py-2">
-                  <Link
-                    to="/projects/$projectId/contacts"
-                    params={{ projectId: project.id }}
-                    className="block truncate font-medium text-foreground hover:text-accent"
-                  >
-                    {project.title}
-                  </Link>
-                  {project.source && <span className="text-xs text-muted-foreground">{project.source}</span>}
-                </td>
-                <td className="px-3 py-2">
-                  <Badge variant={phaseTypeBadgeVariant(project.phaseType)}>{project.phaseName}</Badge>
-                </td>
-                <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
-                  {project.amount ? formatAmount(project.amount, locale) : "—"}
-                </td>
-                <td className="whitespace-nowrap px-3 py-2 tabular-nums text-muted-foreground">
-                  {project.totalTasksCount > 0 ? `${project.doneTasksCount}/${project.totalTasksCount}` : "—"}
-                </td>
-                <td className="px-3 py-2">
-                  {project.assignees.length > 0 ? (
-                    <div className="flex -space-x-2">
-                      {project.assignees.slice(0, MAX_VISIBLE_ASSIGNEES).map((assignee) => (
-                        <Avatar key={assignee.userId} name={assignee.name} size="sm" className="ring-2 ring-card" />
-                      ))}
-                      {project.assignees.length > MAX_VISIBLE_ASSIGNEES && (
-                        <span className={cn(avatarVariants({ size: "sm" }), "ring-2 ring-card")}>
-                          +{project.assignees.length - MAX_VISIBLE_ASSIGNEES}
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </td>
-                <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
-                  {dateFormatter.format(new Date(project.createdAt))}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {/* containerClassName: доска скроллится ВНУТРИ уже ограниченной по высоте панели (не со
+          страницей целиком, как Companies/Contacts) — sticky-шапка держится в этом же контейнере. */}
+      <Table containerClassName="min-h-0 flex-1" className="min-w-[720px]">
+        <TableHeader className="sticky top-0 z-10 bg-muted/80 backdrop-blur">
+          <TableRow header>
+            <SortableTableHead active={sort.key === "title"} direction={sort.direction} onClick={() => toggleSort("title")}>
+              {t("board.table.column.title")}
+            </SortableTableHead>
+            <SortableTableHead active={sort.key === "phase"} direction={sort.direction} onClick={() => toggleSort("phase")}>
+              {t("board.table.column.phase")}
+            </SortableTableHead>
+            <SortableTableHead active={sort.key === "amount"} direction={sort.direction} onClick={() => toggleSort("amount")} align="right">
+              {t("board.table.column.amount")}
+            </SortableTableHead>
+            <TableHead>{t("board.table.column.tasks")}</TableHead>
+            <TableHead>{t("board.table.column.company")}</TableHead>
+            <TableHead>{t("board.table.column.contacts")}</TableHead>
+            <TableHead>{t("board.table.column.assignees")}</TableHead>
+            <SortableTableHead active={sort.key === "createdAt"} direction={sort.direction} onClick={() => toggleSort("createdAt")}>
+              {t("board.table.column.createdAt")}
+            </SortableTableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((project) => (
+            <TableRow key={project.id}>
+              <TableCell className="max-w-[280px]">
+                <Link
+                  to="/projects/$projectId/contacts"
+                  params={{ projectId: project.id }}
+                  className="block truncate font-medium text-foreground hover:text-accent"
+                >
+                  {project.title}
+                </Link>
+                {project.source && <span className="text-xs text-muted-foreground">{project.source}</span>}
+              </TableCell>
+              <TableCell>
+                <Badge variant={phaseTypeBadgeVariant(project.phaseType)}>{project.phaseName}</Badge>
+              </TableCell>
+              <TableCell className="whitespace-nowrap text-right tabular-nums">
+                {project.amount ? formatAmount(project.amount, locale) : "—"}
+              </TableCell>
+              <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">
+                {project.totalTasksCount > 0 ? `${project.doneTasksCount}/${project.totalTasksCount}` : "—"}
+              </TableCell>
+              <TableCell className="text-muted-foreground">
+                {project.companyId ? (
+                  <span className="inline-flex items-center gap-1">
+                    <Building2 className="h-3.5 w-3.5" />
+                    {companyNameById.get(project.companyId) ?? "—"}
+                  </span>
+                ) : (
+                  "—"
+                )}
+              </TableCell>
+              <TableCell>
+                {project.contacts.length > 0 ? (
+                  <ContactsAvatarPopover contacts={project.contacts} />
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </TableCell>
+              <TableCell>
+                {project.assignees.length > 0 ? (
+                  <div className="flex -space-x-2">
+                    {project.assignees.slice(0, MAX_VISIBLE_ASSIGNEES).map((assignee) => (
+                      <Avatar key={assignee.userId} name={assignee.name} size="sm" className="ring-2 ring-card" />
+                    ))}
+                    {project.assignees.length > MAX_VISIBLE_ASSIGNEES && (
+                      <span className={cn(avatarVariants({ size: "sm" }), "ring-2 ring-card")}>
+                        +{project.assignees.length - MAX_VISIBLE_ASSIGNEES}
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </TableCell>
+              <TableCell className="whitespace-nowrap text-muted-foreground">
+                {dateFormatter.format(new Date(project.createdAt))}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
       {truncatedPhases.length > 0 && (
         <p className="shrink-0 text-xs text-muted-foreground">{t("board.table.truncated")}</p>
       )}
     </div>
-  );
-}
-
-function SortableHeader({
-  label,
-  sortKey,
-  sort,
-  onSort,
-  align,
-}: {
-  label: string;
-  sortKey: SortKey;
-  sort: SortState;
-  onSort: (key: SortKey) => void;
-  align?: "right";
-}) {
-  const active = sort.key === sortKey;
-  // aria-sort на <th> — стандартный способ озвучить текущую сортировку скринридеру (ux: sortable-table).
-  const ariaSort = active ? (sort.direction === "asc" ? "ascending" : "descending") : "none";
-  const Icon = active ? (sort.direction === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
-
-  return (
-    <th scope="col" aria-sort={ariaSort} className="px-3 py-2 font-medium">
-      <button
-        type="button"
-        onClick={() => onSort(sortKey)}
-        className={cn(
-          "inline-flex items-center gap-1 transition-colors hover:text-foreground",
-          align === "right" && "flex-row-reverse",
-        )}
-      >
-        {label}
-        <Icon className={cn("h-3 w-3", !active && "opacity-40")} />
-      </button>
-    </th>
   );
 }

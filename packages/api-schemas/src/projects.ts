@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { contactLinkSchema } from "./common";
 import { phaseResponseSchema } from "./phases";
 
 // ISO-4217: три заглавные буквы. Не enum (~180 валют), не свободная строка («LOL»).
@@ -23,9 +24,14 @@ export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 // ownerId НЕ принимается: reassign — отдельная операция с иными правами (Manager+, матрица
 // «Reassign leads»), не поле общего edit (Member+). Смена владельца меняет будущий scope
 // (visibility=ASSIGNED, M6) → capability строже. Отдельный эндпоинт POST /:id/reassign.
+// companyId — nullish (не просто .partial()'нутый .optional() из createProjectSchema): та же
+// nullable-семантика, что updateContactSchema/updateCompanySchema (§3) — null отвязывает
+// компанию от сделки, отсутствие ключа её не трогает. Без override .partial() дал бы только
+// "optional", без возможности явно очистить.
 export const updateProjectSchema = createProjectSchema
   .omit({ ownerId: true })
   .partial()
+  .extend({ companyId: z.string().min(1).nullish() })
   .refine((v) => Object.values(v).some((x) => x !== undefined), {
     message: "At least one field must be provided",
   });
@@ -83,6 +89,10 @@ export const boardProjectResponseSchema = projectResponseSchema.extend({
   doneTasksCount: z.number().int().nonnegative(),
   totalTasksCount: z.number().int().nonnegative(),
   assignees: z.array(z.object({ userId: z.string(), name: z.string() })),
+  // Контакты сделки (ProjectContact→Contact, design review) — НЕ assignees (co-workers/User),
+  // это внешние люди. contactLinkSchema переиспользован из common.ts (та же форма {id,name},
+  // что Company.contacts).
+  contacts: z.array(contactLinkSchema),
 });
 export type BoardProjectResponse = z.infer<typeof boardProjectResponseSchema>;
 

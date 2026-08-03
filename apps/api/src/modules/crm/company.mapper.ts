@@ -12,7 +12,11 @@ export interface CompanyRow {
   updatedAt: Date;
 }
 
-export function toCompanyResponse(c: CompanyRow): CompanyResponse {
+export function toCompanyResponse(
+  c: CompanyRow,
+  projects?: Array<{ id: string; title: string }>,
+  contacts?: Array<{ id: string; name: string }>,
+): CompanyResponse {
   return {
     id: c.id,
     orgId: c.orgId,
@@ -21,6 +25,8 @@ export function toCompanyResponse(c: CompanyRow): CompanyResponse {
     industry: c.industry,
     createdAt: c.createdAt.toISOString(),
     updatedAt: c.updatedAt.toISOString(),
+    ...(projects ? { projects } : {}),
+    ...(contacts ? { contacts } : {}),
   };
 }
 
@@ -29,6 +35,6 @@ export function toCompanyDetailResponse(
 ): CompanyDetailResponse {
   return {
     ...toCompanyResponse(c),
-    contacts: c.contacts.map(toContactResponse),
+    contacts: c.contacts.map((contact) => toContactResponse(contact)),
   };
 }

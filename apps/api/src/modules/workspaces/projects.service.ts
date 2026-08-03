@@ -168,16 +168,17 @@ export class ProjectsService {
 
     const rows = await this.projects.boardRows(workspaceId, limitPerPhase);
     const projectIds = rows.map((row) => row.id);
-    const [totals, taskCounts, assignees] = await Promise.all([
+    const [totals, taskCounts, assignees, contacts] = await Promise.all([
       this.projects.columnTotals(workspaceId),
       this.projects.taskCountsByProjectIds(projectIds),
       this.projects.assigneesByProjectIds(projectIds),
+      this.projects.contactsByProjectIds(projectIds),
     ]);
 
     const byPhase = new Map<string, BoardProjectResponse[]>();
     for (const row of rows) {
       const list = byPhase.get(row.phaseId) ?? [];
-      list.push(toBoardProjectResponse(row, taskCounts.get(row.id), assignees.get(row.id)));
+      list.push(toBoardProjectResponse(row, taskCounts.get(row.id), assignees.get(row.id), contacts.get(row.id)));
       byPhase.set(row.phaseId, list);
     }
 
@@ -376,13 +377,16 @@ export class ProjectsService {
 
     // Та же форма, что у доски (§13.4): страница дозаписывается в board-кэш на фронте.
     const projectIds = page.map((row) => row.id);
-    const [taskCounts, assignees] = await Promise.all([
+    const [taskCounts, assignees, contacts] = await Promise.all([
       this.projects.taskCountsByProjectIds(projectIds),
       this.projects.assigneesByProjectIds(projectIds),
+      this.projects.contactsByProjectIds(projectIds),
     ]);
 
     return {
-      projects: page.map((row) => toBoardProjectResponse(row, taskCounts.get(row.id), assignees.get(row.id))),
+      projects: page.map((row) =>
+        toBoardProjectResponse(row, taskCounts.get(row.id), assignees.get(row.id), contacts.get(row.id)),
+      ),
       hasMore,
     };
   }

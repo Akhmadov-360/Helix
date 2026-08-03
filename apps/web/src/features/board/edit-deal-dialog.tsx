@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { CompanyResponse } from "@helix/api-schemas";
 import {
   Button,
   Dialog,
@@ -18,24 +19,29 @@ import { useT } from "../../shared/i18n";
 import { useUpdateProject } from "../project-detail/mutations";
 import { CURRENCIES } from "./currencies";
 
+const NO_COMPANY = "__none__";
+
 export interface EditableDeal {
   id: string;
   title: string;
   value: number | null;
   currency: string | null;
   source: string | null;
+  companyId: string | null;
 }
 
 export function EditDealDialog({
   orgId,
   workspaceId,
   project,
+  companies,
   open,
   onOpenChange,
 }: {
   orgId: string;
   workspaceId: string;
   project: EditableDeal | null;
+  companies: CompanyResponse[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -54,6 +60,7 @@ export function EditDealDialog({
           <EditDealFields
             key={project.id}
             project={project}
+            companies={companies}
             update={update}
             onDone={() => onOpenChange(false)}
             onCancel={() => onOpenChange(false)}
@@ -66,11 +73,13 @@ export function EditDealDialog({
 
 function EditDealFields({
   project,
+  companies,
   update,
   onDone,
   onCancel,
 }: {
   project: EditableDeal;
+  companies: CompanyResponse[];
   update: ReturnType<typeof useUpdateProject>;
   onDone: () => void;
   onCancel: () => void;
@@ -80,6 +89,7 @@ function EditDealFields({
   const [value, setValue] = useState(project.value !== null ? String(project.value) : "");
   const [currency, setCurrency] = useState(project.currency ?? "USD");
   const [source, setSource] = useState(project.source ?? "");
+  const [companyId, setCompanyId] = useState(project.companyId ?? NO_COMPANY);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -91,6 +101,7 @@ function EditDealFields({
         value: parsedValue,
         currency: parsedValue !== undefined ? currency.trim().toUpperCase() : undefined,
         source: source.trim() || undefined,
+        companyId: companyId === NO_COMPANY ? null : companyId,
       },
       { onSuccess: onDone },
     );
@@ -147,6 +158,22 @@ function EditDealFields({
           disabled={update.isPending}
         />
         <p className="text-xs text-muted-foreground">{t("board.create.sourceHint")}</p>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="edit-deal-company">{t("board.create.company")}</Label>
+        <Select value={companyId} onValueChange={setCompanyId} disabled={update.isPending}>
+          <SelectTrigger id="edit-deal-company">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NO_COMPANY}>{t("contacts.form.companyNone")}</SelectItem>
+            {companies.map((company) => (
+              <SelectItem key={company.id} value={company.id}>
+                {company.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
       <DialogFooter>
         <Button type="button" variant="ghost" onClick={onCancel} disabled={update.isPending}>

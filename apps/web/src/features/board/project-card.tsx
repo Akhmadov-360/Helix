@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Link } from "@tanstack/react-router";
-import { Archive, Calendar, CheckSquare, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Archive, Building2, Calendar, CheckSquare, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import type { CompanyResponse } from "@helix/api-schemas";
 import {
   Avatar,
   avatarVariants,
@@ -31,12 +32,13 @@ interface Props {
   project: ProjectCardViewModel;
   orgId: string;
   workspaceId: string;
+  companies: CompanyResponse[];
   overlay?: boolean;
 }
 
 // `Card` (packages/ui) не forwardRef — dnd-kit нужен реальный DOM-узел, поэтому ref/drag-атрибуты
 // на обёртке, Card остаётся чистым визуальным примитивом (композиция, не форк).
-export function ProjectCard({ project, orgId, workspaceId, overlay = false }: Props) {
+export function ProjectCard({ project, orgId, workspaceId, companies, overlay = false }: Props) {
   const t = useT();
   const locale = useLocaleStore((state) => state.locale);
   // §8.2: FE-capability — косметика (сервер всё равно единственный энфорсер move), но без неё
@@ -55,6 +57,10 @@ export function ProjectCard({ project, orgId, workspaceId, overlay = false }: Pr
     : { transform: CSS.Translate.toString(sortable.transform), transition: sortable.transition };
 
   const dateFormatter = new Intl.DateTimeFormat(locale, { day: "2-digit", month: "short" });
+  const companyName = useMemo(
+    () => (project.companyId ? companies.find((c) => c.id === project.companyId)?.name : undefined),
+    [companies, project.companyId],
+  );
 
   return (
     <div
@@ -112,10 +118,20 @@ export function ProjectCard({ project, orgId, workspaceId, overlay = false }: Pr
             </DropdownMenuContent>
           </DropdownMenu>
         )}
-        {project.source && (
-          <Badge variant="outline" className="w-fit text-[11px]">
-            {project.source}
-          </Badge>
+        {(project.source || companyName) && (
+          <div className="flex flex-wrap items-center gap-1">
+            {project.source && (
+              <Badge variant="outline" className="w-fit text-[11px]">
+                {project.source}
+              </Badge>
+            )}
+            {companyName && (
+              <Badge variant="outline" className="w-fit gap-1 text-[11px]">
+                <Building2 className="h-3 w-3" />
+                {companyName}
+              </Badge>
+            )}
+          </div>
         )}
 
         {overlay ? (
@@ -146,18 +162,23 @@ export function ProjectCard({ project, orgId, workspaceId, overlay = false }: Pr
               </span>
             )}
           </div>
-          {project.assignees.length > 0 && (
-            <div className="flex -space-x-2">
-              {project.assignees.slice(0, MAX_VISIBLE_ASSIGNEES).map((assignee) => (
-                <Avatar key={assignee.userId} name={assignee.name} size="sm" className="ring-2 ring-card" />
-              ))}
-              {project.assignees.length > MAX_VISIBLE_ASSIGNEES && (
-                <span className={cn(avatarVariants({ size: "sm" }), "ring-2 ring-card")}>
-                  +{project.assignees.length - MAX_VISIBLE_ASSIGNEES}
-                </span>
-              )}
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {/* Контакты сделки (ProjectContact) сюда НЕ выводим (design review): лицевая часть
+                карточки узкая (w-72) и уже занята датой/задачами/участниками — их может быть
+                много, полный список доступен в Таблице (table-view.tsx) и на детали сделки. */}
+            {project.assignees.length > 0 && (
+              <div className="flex -space-x-2">
+                {project.assignees.slice(0, MAX_VISIBLE_ASSIGNEES).map((assignee) => (
+                  <Avatar key={assignee.userId} name={assignee.name} size="sm" className="ring-2 ring-card" />
+                ))}
+                {project.assignees.length > MAX_VISIBLE_ASSIGNEES && (
+                  <span className={cn(avatarVariants({ size: "sm" }), "ring-2 ring-card")}>
+                    +{project.assignees.length - MAX_VISIBLE_ASSIGNEES}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </Card>
 
@@ -173,6 +194,7 @@ export function ProjectCard({ project, orgId, workspaceId, overlay = false }: Pr
           <EditDealDialog
             orgId={orgId}
             workspaceId={workspaceId}
+            companies={companies}
             project={
               editOpen
                 ? {
@@ -181,6 +203,7 @@ export function ProjectCard({ project, orgId, workspaceId, overlay = false }: Pr
                     value: project.amount?.value ?? null,
                     currency: project.amount?.currency ?? null,
                     source: project.source,
+                    companyId: project.companyId,
                   }
                 : null
             }

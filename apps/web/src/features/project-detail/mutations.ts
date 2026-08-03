@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { BoardResponse, ProjectResponse, UpdateProjectInput } from "@helix/api-schemas";
+import type { BoardResponse, ProjectResponse, ReassignProjectInput, UpdateProjectInput } from "@helix/api-schemas";
 import { projectResponseSchema } from "@helix/api-schemas";
 import { queryKeys, request } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
@@ -52,6 +52,49 @@ export function useUpdateProject(orgId: string, workspaceId: string, projectId: 
           },
       );
       toast.show(t("board.card.edited", { title: project.title }));
+    },
+  });
+}
+
+// Переназначение владельца — отдельный эндпоинт (Manager+, can('reassign','Project')), НЕ поле
+// PATCH (decisions.md ADR "reassign — первоклассная операция"): ownerId определит scope в M6
+// (visibility=ASSIGNED), поэтому это не косметика, а такая же по весу authz-операция, как move.
+// Тот же двойной патч кэша, что useUpdateProject (project-detail обязателен, board best-effort).
+export function useReassignProject(orgId: string, workspaceId: string, projectId: string) {
+  const queryClient = useQueryClient();
+  const { queryKey: projectKey } = projectQueryOptions(orgId, projectId);
+  const { queryKey: boardKey } = boardQueryOptions(orgId, workspaceId);
+  const t = useT();
+  const toast = useToast();
+
+  return useMutation({
+    mutationFn: (input: ReassignProjectInput) =>
+      request({
+        method: "POST",
+        path: `/v1/projects/${projectId}/reassign`,
+        body: input,
+        schema: projectResponseSchema,
+      }),
+    onError: (error) => {
+      const kind = toBoardError(error);
+      if (kind === "permissionDenied") void queryClient.invalidateQueries({ queryKey: queryKeys.me() });
+      toast.error(t(errorKey(kind)));
+    },
+    onSuccess: (project: ProjectResponse) => {
+      queryClient.setQueryData<ProjectResponse>(projectKey, project);
+      queryClient.setQueryData<BoardResponse>(
+        boardKey,
+        (current) =>
+          current && {
+            ...current,
+            phases: current.phases.map((phase) =>
+              phase.id === project.phaseId
+                ? { ...phase, projects: phase.projects.map((p) => (p.id === project.id ? { ...p, ...project } : p)) }
+                : phase,
+            ),
+          },
+      );
+      toast.show(t("projectDetail.owner.reassigned"));
     },
   });
 }

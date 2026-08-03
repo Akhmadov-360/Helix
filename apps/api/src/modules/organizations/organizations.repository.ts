@@ -76,6 +76,17 @@ export class OrganizationsRepository {
     return memberships.map((m) => ({ userId: m.user.id, name: m.user.name, email: m.user.email, role: m.role }));
   }
 
+  // FR-ORG-2: список орг пользователя под org-switcher — та же таблица (Membership), другой срез
+  // (по userId, не orgId), поэтому здесь же, не отдельным репозиторием (см. комментарий класса).
+  async listOrgsForUser(userId: string): Promise<{ orgId: string; name: string; role: Role }[]> {
+    const memberships = await this.prisma.client.membership.findMany({
+      where: { userId },
+      select: { role: true, org: { select: { id: true, name: true } } },
+      orderBy: { org: { name: "asc" } },
+    });
+    return memberships.map((m) => ({ orgId: m.org.id, name: m.org.name, role: m.role }));
+  }
+
   async findDefaultOrgIdForUser(
     userId: string,
     tx?: Prisma.TransactionClient,

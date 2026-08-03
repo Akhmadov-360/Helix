@@ -16,6 +16,7 @@ import {
 } from "@dnd-kit/core";
 import { arrayMove, horizontalListSortingStrategy, SortableContext, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { Plus } from "lucide-react";
+import type { CompanyResponse } from "@helix/api-schemas";
 import { Button } from "@helix/ui";
 import { useCan } from "../../shared/auth/ability";
 import { useT } from "../../shared/i18n";
@@ -65,7 +66,15 @@ type DragState =
 
 // Интерактивная доска (веха E, ADR-FE-2): DOM даёт намерение (курсор над картой X), move
 // считается по id-соседям в финальном порядке — rank целиком server-owned (§7).
-export function BoardView({ orgId, workspaceId }: { orgId: string; workspaceId: string }) {
+export function BoardView({
+  orgId,
+  workspaceId,
+  companies,
+}: {
+  orgId: string;
+  workspaceId: string;
+  companies: CompanyResponse[];
+}) {
   const board = useSuspenseQuery({ ...boardQueryOptions(orgId, workspaceId), select: toBoardViewModel }).data;
   const move = useMoveProject(orgId, workspaceId);
   const reorderColumns = useReorderPhases(orgId, workspaceId);
@@ -261,6 +270,7 @@ export function BoardView({ orgId, workspaceId }: { orgId: string; workspaceId: 
                   projectsById={projectsById}
                   orgId={orgId}
                   workspaceId={workspaceId}
+                  companies={companies}
                   onLoadMore={() => loadMore.mutate({ phaseId: id })}
                   loadingMore={loadMore.isPending && loadMore.variables?.phaseId === id}
                 />
@@ -281,7 +291,7 @@ export function BoardView({ orgId, workspaceId }: { orgId: string; workspaceId: 
         </SortableContext>
         <DragOverlay>
           {activeProject ? (
-            <ProjectCard project={activeProject} orgId={orgId} workspaceId={workspaceId} overlay />
+            <ProjectCard project={activeProject} orgId={orgId} workspaceId={workspaceId} companies={companies} overlay />
           ) : activeColumn ? (
             <div className="flex h-12 w-72 shrink-0 items-center rounded-lg border-r border-border bg-muted/40 px-3 shadow-lg">
               <h2 className="text-sm font-semibold">{localize(activeColumn.phaseName)}</h2>

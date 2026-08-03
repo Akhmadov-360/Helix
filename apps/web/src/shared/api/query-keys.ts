@@ -6,6 +6,8 @@
 // orgId (identity), поэтому в его ключе orgId нет.
 export const queryKeys = {
   me: () => ["me"] as const,
+  // Как me() — источник личности (список орг ЮЗЕРА, не одной орги), orgId в ключе нет.
+  myOrgs: () => ["myOrgs"] as const,
   workspaces: (orgId: string) => ["org", orgId, "workspaces"] as const,
   board: (orgId: string, workspaceId: string, limitPerPhase: number) =>
     ["org", orgId, "workspace", workspaceId, "board", { limitPerPhase }] as const,
@@ -22,4 +24,12 @@ export const queryKeys = {
   contactSearch: (orgId: string, q: string) => ["org", orgId, "contacts", "search", { q }] as const,
   projectTasks: (orgId: string, projectId: string) =>
     ["org", orgId, "project", projectId, "tasks"] as const,
+  // Глобальная адресная книга (org-scoped, не workspace-scoped) — отдельная "list"-ветка от
+  // contactSearch ("search"), чтобы инвалидация одного не путалась с другим, но оба под общим
+  // ["org", orgId, "contacts"] — мутация контакта инвалидирует и то, и другое разом.
+  contactsList: (orgId: string, query: { q?: string; companyId?: string }) =>
+    ["org", orgId, "contacts", "list", query] as const,
+  contact: (orgId: string, contactId: string) => ["org", orgId, "contact", contactId] as const,
+  companiesList: (orgId: string, query: { q?: string }) => ["org", orgId, "companies", "list", query] as const,
+  company: (orgId: string, companyId: string) => ["org", orgId, "company", companyId] as const,
 };

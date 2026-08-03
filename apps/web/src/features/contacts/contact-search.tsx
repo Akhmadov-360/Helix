@@ -1,22 +1,28 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Search } from "lucide-react";
+import { Building2, Search } from "lucide-react";
 import type { ContactResponse, DedupHint } from "@helix/api-schemas";
 import { Button, Card, Input } from "@helix/ui";
 import { useT } from "../../shared/i18n";
-import { contactSearchQueryOptions } from "./queries";
+import { companyContactsQueryOptions, contactSearchQueryOptions } from "./queries";
 import { CreateContactForm } from "./create-contact-form";
 
+// company — деал этой карточки привязан к компании (design review): пока поле поиска пустое,
+// показываем контактов ИЗ ЭТОЙ компании как подсказку рядом со строкой поиска, не только по
+// явному запросу — самый частый следующий шаг ("привязать ещё людей из той же компании") не
+// должен требовать печатать её название. Как только юзер начал печатать — обычный typeahead.
 export function ContactSearch({
   orgId,
   excludeIds,
   onLinkExisting,
   onCreated,
+  company,
 }: {
   orgId: string;
   excludeIds: Set<string>;
   onLinkExisting: (contact: ContactResponse) => void;
   onCreated: (contact: ContactResponse, dedupHint: DedupHint) => void;
+  company?: { id: string; name: string };
 }) {
   const t = useT();
   const [query, setQuery] = useState("");
@@ -28,12 +34,20 @@ export function ContactSearch({
     return () => clearTimeout(timer);
   }, [query]);
 
-  const search = useQuery(contactSearchQueryOptions(orgId, debounced));
-  const results = (search.data?.contacts ?? []).filter((c) => !excludeIds.has(c.id));
+  const showingCompanySuggestions = Boolean(company) && debounced.trim().length === 0;
+  const search = useQuery({ ...contactSearchQueryOptions(orgId, debounced), enabled: !showingCompanySuggestions });
+  const companyContacts = useQuery({
+    ...companyContactsQueryOptions(orgId, company?.id ?? ""),
+    enabled: showingCompanySuggestions,
+  });
+
+  const activeQuery = showingCompanySuggestions ? companyContacts : search;
+  const results = (activeQuery.data?.contacts ?? []).filter((c) => !excludeIds.has(c.id));
 
   if (creating) {
     return (
       <CreateContactForm
+        orgId={orgId}
         initialName={query}
         onDone={(contact, dedupHint) => {
           setCreating(false);
@@ -56,8 +70,14 @@ export function ContactSearch({
           className="pl-9"
         />
       </div>
-      {debounced.trim().length > 0 && (
-        <Card className="flex flex-col divide-y divide-border p-1">
+      {showingCompanySuggestions && results.length > 0 && (
+        <p className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Building2 className="h-3 w-3" />
+          {t("contacts.search.fromCompany", { name: company?.name ?? "" })}
+        </p>
+      )}
+      {(debounced.trim().length > 0 || (showingCompanySuggestions && results.length > 0)) && (
+        <Card className="scroll-slim flex max-h-64 flex-col divide-y divide-border overflow-y-auto p-1">
           {results.map((contact) => (
             <button
               key={contact.id}
@@ -66,15 +86,20 @@ export function ContactSearch({
               className="flex flex-col items-start px-2 py-1.5 text-left text-sm hover:bg-muted"
             >
               <span className="font-medium">{contact.name}</span>
-              {contact.email && <span className="text-xs text-muted-foreground">{contact.email}</span>}
+              {/* Приоритет: телефон, иначе email (design review) — контакту звонят чаще, чем пишут. */}
+              {(contact.phone ?? contact.email) && (
+                <span className="text-xs text-muted-foreground">{contact.phone ?? contact.email}</span>
+              )}
             </button>
           ))}
-          {!search.isFetching && results.length === 0 && (
+          {!showingCompanySuggestions && !search.isFetching && results.length === 0 && (
             <p className="px-2 py-1.5 text-sm text-muted-foreground">{t("contacts.search.noResults")}</p>
           )}
-          <Button variant="ghost" size="sm" className="justify-start" onClick={() => setCreating(true)}>
-            {t("contacts.search.createNew", { query })}
-          </Button>
+          {!showingCompanySuggestions && (
+            <Button variant="ghost" size="sm" className="justify-start" onClick={() => setCreating(true)}>
+              {t("contacts.search.createNew", { query })}
+            </Button>
+          )}
         </Card>
       )}
     </div>

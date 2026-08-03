@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Users } from "lucide-react";
-import type { Audience, ContactResponse, DedupHint as DedupHintData } from "@helix/api-schemas";
+import type { Audience, CompanyResponse, ContactResponse, DedupHint as DedupHintData } from "@helix/api-schemas";
 import { Button, Card, cn } from "@helix/ui";
 import { useCan } from "../../shared/auth/ability";
 import { useT } from "../../shared/i18n";
@@ -11,17 +11,19 @@ import { DedupHint } from "./dedup-hint";
 import { useLinkContact, useMergeContact, useUnlinkContact, useUpdateContactRoles } from "./mutations";
 import { projectContactsQueryOptions } from "./queries";
 
-// audience приходит пропом, не собственным запросом воркспейса: features/* не импортируют друг
-// друга напрямую (композиция на уровне routes/, скелет apps/web §2) — маршрут contacts.tsx уже
-// грузит workspace ради этого и передаёт audience сюда.
+// audience/company приходят пропом, не собственным запросом воркспейса/компании: features/* не
+// импортируют друг друга напрямую (композиция на уровне routes/, скелет apps/web §2) — маршрут
+// contacts.tsx уже грузит workspace/companies ради этого и передаёт их сюда.
 export function ContactsView({
   orgId,
   projectId,
   audience,
+  company,
 }: {
   orgId: string;
   projectId: string;
   audience: Audience;
+  company?: CompanyResponse;
 }) {
   const t = useT();
   const contacts = useSuspenseQuery(projectContactsQueryOptions(orgId, projectId)).data;
@@ -65,7 +67,13 @@ export function ContactsView({
   return (
     <div className="flex flex-col gap-4">
       {canLink && (
-        <ContactSearch orgId={orgId} excludeIds={excludeIds} onLinkExisting={linkExisting} onCreated={handleCreated} />
+        <ContactSearch
+          orgId={orgId}
+          excludeIds={excludeIds}
+          onLinkExisting={linkExisting}
+          onCreated={handleCreated}
+          company={company}
+        />
       )}
 
       {dedup && (
