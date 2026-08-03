@@ -1,20 +1,23 @@
 import { Injectable } from "@nestjs/common";
 import type { PhaseType } from "@helix/db";
 import type { Prisma } from "@helix/db";
-import type {
-  ActivityEventResponse,
-  BoardProjectResponse,
-  BoardResponse,
-  ColumnQuery,
-  ColumnResponse,
-  CreateProjectInput,
-  LocalizedName,
-  MoveProjectInput,
-  ProjectResponse,
-  ProjectStatus,
-  UpdateProjectInput,
+import {
+  buildProjectFieldsSchema,
+  missingRequiredFieldKeys,
+  type ActivityEventResponse,
+  type BoardProjectResponse,
+  type BoardResponse,
+  type ColumnQuery,
+  type ColumnResponse,
+  type CreateProjectInput,
+  type LocalizedName,
+  type MoveProjectInput,
+  type ProjectResponse,
+  type ProjectStatus,
+  type UpdateProjectInput,
 } from "@helix/api-schemas";
 import {
+  MissingRequiredFieldsError,
   ResourceNotFoundError,
   StaleNeighborsError,
   WorkspaceHasNoPhasesError,
@@ -22,6 +25,8 @@ import {
 import { PrismaService } from "../../core/prisma/prisma.service";
 import { ActivityRecorder } from "../activity/activity-recorder";
 import { ActivityRepository } from "../activity/activity.repository";
+import { FieldsRepository } from "../fields/fields.repository";
+import { toFieldDefinitionResponse } from "../fields/field.mapper";
 import { toPhaseResponse } from "../phases/phase.mapper";
 import { PhasesRepository } from "../phases/phases.repository";
 import { toBoardProjectResponse, toProjectResponse } from "../projects/project.mapper";
@@ -46,6 +51,7 @@ export class ProjectsService {
     private readonly prisma: PrismaService,
     private readonly workspaces: WorkspacesRepository,
     private readonly phases: PhasesRepository,
+    private readonly fields: FieldsRepository,
     private readonly projects: ProjectsRepository,
     private readonly users: UsersRepository,
     private readonly activity: ActivityRecorder,
@@ -71,7 +77,24 @@ export class ProjectsService {
       const before = await this.projects.findByIdInOrg(projectId, orgId, tx);
       if (!before) throw new ResourceNotFoundError("Project not found");
 
-      const updated = await this.projects.updateFields(projectId, input, tx);
+      // §7: required enforcement — только если запрос трогает fields (иначе title-only патч
+      // на лид с незаполненным required не должен ломаться). Смёрженный набор (существующие
+      // значения + патч) обязан по-прежнему satisфy required.
+      const fields =
+        input.fields !== undefined
+          ? await this.resolveProjectFields(
+              before.workspaceId,
+              tx,
+              input.fields,
+              (before.fields as Record<string, unknown>) ?? {},
+            )
+          : undefined;
+
+      const updated = await this.projects.updateFields(
+        projectId,
+        { ...input, fields: fields as Prisma.InputJsonValue | undefined },
+        tx,
+      );
 
       if (input.value !== undefined && Number(before.value ?? NaN) !== input.value) {
         const actor = await this.users.findProfileById(userId);
@@ -409,6 +432,10 @@ export class ProjectsService {
     const actor = await this.users.findProfileById(userId);
 
     const created = await this.prisma.client.$transaction(async (tx) => {
+      // §7: required enforcement — итоговый набор здесь ВСЕГДА равен input.fields (лид новый,
+      // сливать не с чем).
+      const fields = await this.resolveProjectFields(workspaceId, tx, input.fields, {});
+
       const project = await this.projects.create(
         {
           orgId,
@@ -422,6 +449,7 @@ export class ProjectsService {
           source: input.source,
           companyId: input.companyId,
           ownerId: input.ownerId,
+          fields: fields as Prisma.InputJsonValue,
         },
         tx,
       );
@@ -439,5 +467,26 @@ export class ProjectsService {
     });
 
     return toProjectResponse(created);
+  }
+
+  // custom-fields.md §10 шаг 5/6: типизирует incoming по актуальному FieldDefinition[]
+  // воркспейса, сливает с existing (PATCH — партиальный набор, create — existing = {}) и
+  // проверяет required (§7) на ИТОГОВОМ наборе. Бросает MISSING_REQUIRED_FIELDS при пробеле.
+  private async resolveProjectFields(
+    workspaceId: string,
+    tx: Prisma.TransactionClient,
+    incoming: Record<string, unknown> | undefined,
+    existing: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const definitions = (await this.fields.listByWorkspaceOrdered(workspaceId, tx)).map(
+      toFieldDefinitionResponse,
+    );
+    const parsedIncoming = buildProjectFieldsSchema(definitions).parse(incoming ?? {});
+    const merged = { ...existing, ...parsedIncoming };
+
+    const missing = missingRequiredFieldKeys(definitions, merged);
+    if (missing.length > 0) throw new MissingRequiredFieldsError({ keys: missing });
+
+    return merged;
   }
 }

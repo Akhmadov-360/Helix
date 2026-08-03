@@ -5,6 +5,7 @@ export * from "./enums";
 export * from "./auth";
 export * from "./workspaces";
 export * from "./phases";
+export * from "./fields";
 export * from "./projects";
 export * from "./activity";
 export * from "./contacts";

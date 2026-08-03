@@ -20,6 +20,7 @@ export const PROJECT_SELECT = {
   companyId: true,
   ownerId: true,
   rank: true,
+  fields: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -36,6 +37,7 @@ export interface CreateProjectData {
   source?: string;
   companyId?: string;
   ownerId?: string;
+  fields?: Prisma.InputJsonValue;
 }
 
 @Injectable()
@@ -95,6 +97,7 @@ export class ProjectsRepository {
       currency?: string;
       source?: string;
       companyId?: string | null;
+      fields?: Prisma.InputJsonValue;
     },
     tx?: Prisma.TransactionClient,
   ): Promise<ProjectRow> {

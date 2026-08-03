@@ -26,6 +26,7 @@ import { APP_SUBJECTS, defineAbilityForRole, type AppAction } from "./app-abilit
 const SUBJECT_OPERATIONS = {
   Workspace: ["create", "read", "update", "delete"],
   Phase: ["create", "update", "delete"],
+  FieldDefinition: ["create", "read", "update", "delete"],
   Project: ["create", "read", "update", "delete", "reassign"],
   Company: ["create", "read", "update", "delete"],
   Contact: ["create", "read", "update", "delete", "merge"],

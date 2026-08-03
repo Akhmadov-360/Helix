@@ -166,6 +166,27 @@ export class AssigneeAlreadyExistsError extends ConflictError {
   }
 }
 
+/**
+ * Итоговый набор `Project.fields` не покрывает все `FieldDefinition{required: true}` воркспейса
+ * (custom-fields.md §7, вариант B — жёсткий backend). В details — ключи, которых не хватает.
+ */
+export class MissingRequiredFieldsError extends BadRequestError {
+  readonly code = "MISSING_REQUIRED_FIELDS";
+
+  constructor(override readonly details: { keys: string[] }) {
+    super("Required custom fields are missing");
+  }
+}
+
+/** Запрошенная смена FieldDefinition.type не входит в allow-list (custom-fields.md §5). */
+export class IncompatibleFieldTypeChangeError extends BadRequestError {
+  readonly code = "INCOMPATIBLE_FIELD_TYPE_CHANGE";
+
+  constructor() {
+    super("This field type change is not supported; create a new field instead");
+  }
+}
+
 /** Нельзя создать лид в доске без фаз (§10): Project.phaseId NOT NULL, класть некуда. */
 export class WorkspaceHasNoPhasesError extends ConflictError {
   readonly code = "WORKSPACE_HAS_NO_PHASES";

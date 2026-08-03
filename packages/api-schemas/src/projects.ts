@@ -8,7 +8,9 @@ export const currencySchema = z.string().regex(/^[A-Z]{3}$/, "ISO-4217 3-letter 
 export const projectStatusSchema = z.enum(["OPEN", "WON", "LOST", "ARCHIVED"]);
 export type ProjectStatus = z.infer<typeof projectStatusSchema>;
 
-// fields ОТСУТСТВУЕТ намеренно (§11): FieldDefinition CRUD ещё нет → валидировать нечем.
+// fields — грубая форма (custom-fields.md §10 шаг 1): точная per-workspace валидация
+// (типы значений, required) собирается ДИНАМИЧЕСКИ из FieldDefinition[] в сервисе
+// (buildProjectFieldsSchema), пайп этого не может — набор полей неизвестен статически.
 export const createProjectSchema = z.object({
   title: z.string().trim().min(1).max(500),
   value: z.number().nonnegative().optional(),
@@ -16,6 +18,7 @@ export const createProjectSchema = z.object({
   source: z.string().trim().max(200).optional(),
   companyId: z.string().min(1).optional(),
   ownerId: z.string().min(1).optional(),
+  fields: z.record(z.string(), z.unknown()).optional(),
 });
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 
@@ -78,6 +81,7 @@ export const projectResponseSchema = z.object({
   companyId: z.string().nullable(),
   ownerId: z.string().nullable(),
   rank: z.string(), // отдаётся для курсора, но НЕ принимается ни одним эндпоинтом (§4)
+  fields: z.record(z.string(), z.unknown()),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });

@@ -14,6 +14,7 @@ export type AppAction = (typeof APP_ACTIONS)[number];
 export const APP_SUBJECTS = [
   "Workspace",
   "Phase",
+  "FieldDefinition",
   "Project",
   "Company",
   "Contact",
@@ -51,6 +52,7 @@ export function defineAbilityForRole(role: Role): AppAbility {
       can("create", "Workspace");
       can("update", "Workspace");
       can("manage", "Phase");
+      can("manage", "FieldDefinition"); // custom-fields.md §1: те же роли, что «Create/configure workspaces & phases»
       // Лиды: create/read/update (move/archive/restore — update) + reassign, но НЕ delete (O/A).
       can("read", "Project");
       can("create", "Project");
@@ -72,6 +74,7 @@ export function defineAbilityForRole(role: Role): AppAbility {
     case "MEMBER":
       can("read", "Workspace");
       can("read", "Phase");
+      can("read", "FieldDefinition"); // custom-fields.md §1: список полей — «все» роли
       // Лиды: create/edit/move — Member△ (PRD «Create/edit leads», «Move phases»). Scope=ORG в M1.
       // NB: reassign (смена ownerId) по матрице = Manager+, но это field-level различие внутри
       // update — не выражается action-level CASL. Отложено (field-level policy, M6-adjacent).
@@ -92,6 +95,7 @@ export function defineAbilityForRole(role: Role): AppAbility {
       // Глобальный read-only: видит всё, не меняет ничего.
       can("read", "Workspace");
       can("read", "Phase");
+      can("read", "FieldDefinition");
       can("read", "Project");
       can("read", "Company");
       can("read", "Contact");

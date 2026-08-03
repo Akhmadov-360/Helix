@@ -8,6 +8,7 @@ import { z } from "zod";
 export const capabilitySubjectSchema = z.enum([
   "Workspace",
   "Phase",
+  "FieldDefinition",
   "Project",
   "Company",
   "Contact",
