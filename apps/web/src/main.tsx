@@ -24,6 +24,15 @@ onSessionExpired(() => {
   void invalidateSecurityContext(queryClient).then(() => router.navigate({ to: "/login" }));
 });
 
+// bfcache (жест "назад" в браузере) может разморозить СТАРУЮ вкладку прямо из памяти — со старым
+// access-token в JS-heap и старым React Query кэшем чужой орги, минуя повторный запуск main.tsx.
+// useSwitchOrg уже делает hard-reload на "/" именно из-за похожей гонки (см. её комментарий) —
+// bfcache открывает тот же класс бага с другой стороны (назад, не вперёд). pageshow{persisted:true}
+// (MDN) — единственный надёжный сигнал "эта страница восстановлена из bfcache, не свежая загрузка".
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) window.location.reload();
+});
+
 const rootEl = document.getElementById("root");
 if (!rootEl) throw new Error("Root element #root not found");
 
