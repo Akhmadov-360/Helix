@@ -18,7 +18,12 @@ export const EMAIL_QUEUE = "email";
   imports: [
     BullModule.forRootAsync({
       inject: [ENV],
-      useFactory: (env: Env) => ({ connection: { url: env.REDIS_URL } }),
+      useFactory: (env: Env) => ({
+        // BullMQ blocking commands (BRPOPLPUSH и т.п.) требуют этого явно — иначе ioredis
+        // обрывает долгоживущее blocking-соединение по retry-лимиту, и Worker падает/зависает.
+        // Задокументированное требование BullMQ, не наша прихоть.
+        connection: { url: env.REDIS_URL, maxRetriesPerRequest: null },
+      }),
     }),
     BullModule.registerQueue({ name: EMAIL_QUEUE }),
   ],
