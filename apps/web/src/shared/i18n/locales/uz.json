@@ -38,7 +38,6 @@
   "resetPassword.error.missingToken": "Havolada tiklash tokeni yo‘q. Tiklash sahifasidan yangisini so‘rang",
   "resetPassword.error.network": "Server bilan aloqa yo‘q. Ulanishni tekshiring",
   "resetPassword.error.generic": "Parolni saqlab bo‘lmadi. Qaytadan urinib ko‘ring",
-  "toast.dismiss": "Bildirishnomani yopish",
   "shell.logout": "Chiqish",
   "sidebar.nav.board": "Doska",
   "sidebar.nav.contacts": "Kontaktlar",

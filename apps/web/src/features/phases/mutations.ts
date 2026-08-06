@@ -10,7 +10,7 @@ import { phaseResponseSchema, workspaceResponseSchema } from "@helix/api-schemas
 import { z } from "zod";
 import { request, queryKeys } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
-import { useToast } from "../../shared/toast/use-toast";
+import { toast } from "sonner";
 import { boardQueryOptions } from "../board/queries";
 import { workspaceQueryOptions } from "./queries";
 import { toPhaseError } from "./phase-error";
@@ -76,7 +76,6 @@ export function useReorderPhases(orgId: string, workspaceId: string) {
   const { queryKey } = workspaceQueryOptions(orgId, workspaceId);
   const { queryKey: boardKey } = boardQueryOptions(orgId, workspaceId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: ReorderPhasesVariables) =>
@@ -130,7 +129,6 @@ export function useCreatePhase(orgId: string, workspaceId: string) {
   const queryClient = useQueryClient();
   const { queryKey } = workspaceQueryOptions(orgId, workspaceId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (input: CreatePhaseInput) =>
@@ -151,7 +149,7 @@ export function useCreatePhase(orgId: string, workspaceId: string) {
         (current) => current && { ...current, phases: sortByOrder([...(current.phases ?? []), phase]) },
       );
       invalidateBoard(queryClient, orgId, workspaceId);
-      toast.show(t("phases.create.success", { name: phase.name.ru ?? phase.name.en ?? phase.name.uz ?? "" }));
+      toast.success(t("phases.create.success", { name: phase.name.ru ?? phase.name.en ?? phase.name.uz ?? "" }));
     },
   });
 }
@@ -160,7 +158,6 @@ export function useUpdatePhase(orgId: string, workspaceId: string) {
   const queryClient = useQueryClient();
   const { queryKey } = workspaceQueryOptions(orgId, workspaceId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { phaseId: string; input: UpdatePhaseInput }) =>
@@ -185,7 +182,7 @@ export function useUpdatePhase(orgId: string, workspaceId: string) {
           },
       );
       invalidateBoard(queryClient, orgId, workspaceId);
-      toast.show(t("phases.edit.success"));
+      toast.success(t("phases.edit.success"));
     },
   });
 }
@@ -194,7 +191,6 @@ export function useDeletePhase(orgId: string, workspaceId: string) {
   const queryClient = useQueryClient();
   const { queryKey } = workspaceQueryOptions(orgId, workspaceId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { phaseId: string; reassignTo?: string }) =>
@@ -218,7 +214,7 @@ export function useDeletePhase(orgId: string, workspaceId: string) {
         (current) => current && { ...current, phases: (current.phases ?? []).filter((p) => p.id !== vars.phaseId) },
       );
       invalidateBoard(queryClient, orgId, workspaceId);
-      toast.show(t("phases.delete.success"));
+      toast.success(t("phases.delete.success"));
     },
   });
 }

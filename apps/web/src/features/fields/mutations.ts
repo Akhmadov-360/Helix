@@ -4,7 +4,7 @@ import type { CreateFieldDefinitionInput, FieldDefinitionResponse, UpdateFieldDe
 import { fieldDefinitionResponseSchema } from "@helix/api-schemas";
 import { queryKeys, request } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
-import { useToast } from "../../shared/toast/use-toast";
+import { toast } from "sonner";
 import { fieldsQueryOptions } from "./queries";
 import { toFieldError } from "./field-error";
 
@@ -25,7 +25,6 @@ export function useCreateField(orgId: string, workspaceId: string) {
   const queryClient = useQueryClient();
   const { queryKey } = fieldsQueryOptions(orgId, workspaceId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (input: CreateFieldDefinitionInput) =>
@@ -42,7 +41,7 @@ export function useCreateField(orgId: string, workspaceId: string) {
     },
     onSuccess: (field) => {
       queryClient.setQueryData<FieldDefinitionResponse[]>(queryKey, (current) => [...(current ?? []), field]);
-      toast.show(t("fields.create.success"));
+      toast.success(t("fields.create.success"));
     },
   });
 }
@@ -51,7 +50,6 @@ export function useUpdateField(orgId: string, workspaceId: string) {
   const queryClient = useQueryClient();
   const { queryKey } = fieldsQueryOptions(orgId, workspaceId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { fieldId: string; input: UpdateFieldDefinitionInput }) =>
@@ -73,7 +71,7 @@ export function useUpdateField(orgId: string, workspaceId: string) {
         queryKey,
         (current) => current?.map((f) => (f.id === field.id ? field : f)),
       );
-      toast.show(t("fields.edit.success"));
+      toast.success(t("fields.edit.success"));
     },
   });
 }
@@ -82,7 +80,6 @@ export function useDeleteField(orgId: string, workspaceId: string) {
   const queryClient = useQueryClient();
   const { queryKey } = fieldsQueryOptions(orgId, workspaceId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { fieldId: string }) =>
@@ -97,7 +94,7 @@ export function useDeleteField(orgId: string, workspaceId: string) {
         queryKey,
         (current) => current?.filter((f) => f.id !== vars.fieldId),
       );
-      toast.show(t("fields.delete.success"));
+      toast.success(t("fields.delete.success"));
     },
   });
 }

@@ -3,7 +3,7 @@ import type { BoardResponse, ProjectResponse, ReassignProjectInput, UpdateProjec
 import { projectResponseSchema } from "@helix/api-schemas";
 import { queryKeys, request } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
-import { useToast } from "../../shared/toast/use-toast";
+import { toast } from "sonner";
 import { toBoardError } from "../board/board-error";
 import { boardQueryOptions } from "../board/queries";
 import { projectQueryOptions } from "./queries";
@@ -29,7 +29,6 @@ export function useUpdateProject(orgId: string, workspaceId: string, projectId: 
   const { queryKey: projectKey } = projectQueryOptions(orgId, projectId);
   const { queryKey: boardKey } = boardQueryOptions(orgId, workspaceId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (input: UpdateProjectInput) =>
@@ -55,7 +54,7 @@ export function useUpdateProject(orgId: string, workspaceId: string, projectId: 
             ),
           },
       );
-      toast.show(t("board.card.edited", { title: project.title }));
+      toast.success(t("board.card.edited", { title: project.title }));
     },
   });
 }
@@ -69,7 +68,6 @@ export function useReassignProject(orgId: string, workspaceId: string, projectId
   const { queryKey: projectKey } = projectQueryOptions(orgId, projectId);
   const { queryKey: boardKey } = boardQueryOptions(orgId, workspaceId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (input: ReassignProjectInput) =>
@@ -98,7 +96,7 @@ export function useReassignProject(orgId: string, workspaceId: string, projectId
             ),
           },
       );
-      toast.show(t("projectDetail.owner.reassigned"));
+      toast.success(t("projectDetail.owner.reassigned"));
     },
   });
 }

@@ -4,7 +4,7 @@ import type { ContactListResponse, CreateContactInput, DealRole, ProjectContactR
 import { contactListResponseSchema, contactResponseSchema, createContactResponseSchema, projectContactResponseSchema } from "@helix/api-schemas";
 import { queryKeys, request } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
-import { useToast } from "../../shared/toast/use-toast";
+import { toast } from "sonner";
 import { contactQueryOptions, projectContactsQueryOptions, type ContactsListQuery } from "./queries";
 import { toContactError, toLinkContactError } from "./contact-error";
 
@@ -55,7 +55,6 @@ export function useLinkContact(orgId: string, projectId: string) {
   const queryClient = useQueryClient();
   const { queryKey } = projectContactsQueryOptions(orgId, projectId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: LinkContactVariables) =>
@@ -93,7 +92,6 @@ export function useUpdateContactRoles(orgId: string, projectId: string) {
   const queryClient = useQueryClient();
   const { queryKey } = projectContactsQueryOptions(orgId, projectId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { contactId: string; roles: DealRole[] }) =>
@@ -132,7 +130,6 @@ export function useUnlinkContact(orgId: string, projectId: string) {
   const queryClient = useQueryClient();
   const { queryKey } = projectContactsQueryOptions(orgId, projectId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { contactId: string }) =>
@@ -166,7 +163,6 @@ export function useUnlinkContact(orgId: string, projectId: string) {
 export function useCreateContact(orgId: string) {
   const queryClient = useQueryClient();
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (input: CreateContactInput) =>
@@ -187,7 +183,6 @@ export function useCreateContact(orgId: string) {
 export function useUpdateContact(orgId: string) {
   const queryClient = useQueryClient();
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { contactId: string; input: UpdateContactInput }) =>
@@ -205,7 +200,7 @@ export function useUpdateContact(orgId: string) {
     onSuccess: (contact) => {
       queryClient.setQueryData(contactQueryOptions(orgId, contact.id).queryKey, contact);
       invalidateContactsList(queryClient, orgId);
-      toast.show(t("contacts.edit.success"));
+      toast.success(t("contacts.edit.success"));
     },
   });
 }
@@ -213,7 +208,6 @@ export function useUpdateContact(orgId: string) {
 export function useDeleteContact(orgId: string) {
   const queryClient = useQueryClient();
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { contactId: string }) =>
@@ -229,7 +223,7 @@ export function useDeleteContact(orgId: string) {
         (current) => current && { ...current, contacts: current.contacts.filter((c) => c.id !== vars.contactId) },
       );
       invalidateContactsList(queryClient, orgId);
-      toast.show(t("contacts.delete.success"));
+      toast.success(t("contacts.delete.success"));
     },
   });
 }
@@ -240,7 +234,6 @@ export function useDeleteContact(orgId: string) {
 export function useMergeContactGlobal(orgId: string) {
   const queryClient = useQueryClient();
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { targetId: string; sourceId: string }) =>
@@ -264,7 +257,6 @@ export function useMergeContactGlobal(orgId: string) {
 export function useMergeContact(orgId: string, projectId: string) {
   const queryClient = useQueryClient();
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { targetId: string; sourceId: string }) =>

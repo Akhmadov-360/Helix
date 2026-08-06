@@ -5,7 +5,7 @@ import { projectAssigneeResponseSchema } from "@helix/api-schemas";
 import { TransportError } from "../../shared/api";
 import { queryKeys, request } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
-import { useToast } from "../../shared/toast/use-toast";
+import { toast } from "sonner";
 import { projectAssigneesQueryOptions } from "./queries";
 
 type AssigneeError = "alreadyAssigned" | "permissionDenied" | "notFound" | "unexpected";
@@ -40,7 +40,6 @@ export function useAssignMember(orgId: string, projectId: string) {
   const queryClient = useQueryClient();
   const { queryKey } = projectAssigneesQueryOptions(orgId, projectId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: AssignMemberVariables) =>
@@ -72,7 +71,6 @@ export function useUnassignMember(orgId: string, projectId: string) {
   const queryClient = useQueryClient();
   const { queryKey } = projectAssigneesQueryOptions(orgId, projectId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { userId: string }) =>

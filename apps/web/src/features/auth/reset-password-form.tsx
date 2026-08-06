@@ -6,12 +6,11 @@ import { resetPasswordSchema, type ResetPasswordInput } from "@helix/api-schemas
 import { z } from "zod";
 import { Button, Input, Label } from "@helix/ui";
 import { request, TransportError } from "../../shared/api";
-import { useToast } from "../../shared/toast/use-toast";
+import { toast } from "sonner";
 import { useT, type MessageKey } from "../../shared/i18n";
 
 export function ResetPasswordForm({ token }: { token: string }) {
   const t = useT();
-  const toast = useToast();
   const navigate = useNavigate();
   const form = useForm<ResetPasswordInput>({
     resolver: zodResolver(resetPasswordSchema),
@@ -22,7 +21,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
     mutationFn: (input: ResetPasswordInput) =>
       request({ method: "POST", path: "/v1/auth/reset-password", body: input, schema: z.null() }),
     onSuccess: () => {
-      toast.show(t("resetPassword.success"));
+      toast.success(t("resetPassword.success"));
       void navigate({ to: "/login" });
     },
     onError: (error) => toast.error(t(resetPasswordErrorKey(error))),

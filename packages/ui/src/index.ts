@@ -11,7 +11,6 @@ export {
   CardContent,
   CardFooter,
 } from "./components/card";
-export { Toast, toastVariants, type ToastProps } from "./components/toast";
 export { Toaster } from "./components/sonner";
 export { Avatar, avatarVariants, type AvatarProps } from "./components/avatar";
 export {

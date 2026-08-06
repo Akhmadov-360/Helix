@@ -4,7 +4,7 @@ import type { BlueprintResponse, CreateBlueprintFromWorkspaceInput } from "@heli
 import { blueprintResponseSchema } from "@helix/api-schemas";
 import { request } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
-import { useToast } from "../../shared/toast/use-toast";
+import { toast } from "sonner";
 import { toBlueprintError } from "./blueprint-error";
 
 function blueprintErrorKey(kind: ReturnType<typeof toBlueprintError>): MessageKey {
@@ -24,7 +24,6 @@ function blueprintErrorKey(kind: ReturnType<typeof toBlueprintError>): MessageKe
 export function useCreateBlueprintFromWorkspace(orgId: string) {
   const queryClient = useQueryClient();
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (input: CreateBlueprintFromWorkspaceInput) =>
@@ -35,7 +34,7 @@ export function useCreateBlueprintFromWorkspace(orgId: string) {
     },
     onSuccess: (blueprint) => {
       void queryClient.invalidateQueries({ queryKey: ["org", orgId, "blueprints"] });
-      toast.show(t("blueprints.save.success", { name: blueprint.name }));
+      toast.success(t("blueprints.save.success", { name: blueprint.name }));
     },
   });
 }
@@ -43,7 +42,6 @@ export function useCreateBlueprintFromWorkspace(orgId: string) {
 export function useDeleteBlueprint(orgId: string) {
   const queryClient = useQueryClient();
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { id: string }) =>
@@ -57,7 +55,7 @@ export function useDeleteBlueprint(orgId: string) {
         { queryKey: ["org", orgId, "blueprints"] },
         (current) => current?.filter((b) => b.id !== vars.id),
       );
-      toast.show(t("blueprints.delete.success"));
+      toast.success(t("blueprints.delete.success"));
     },
   });
 }

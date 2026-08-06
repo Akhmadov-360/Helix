@@ -10,7 +10,7 @@ import {
 } from "@helix/api-schemas";
 import { queryKeys, request } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
-import { useToast } from "../../shared/toast/use-toast";
+import { toast } from "sonner";
 import { companiesListQueryOptions, companyQueryOptions, type CompaniesListQuery } from "./queries";
 import { toCompanyError } from "./company-error";
 
@@ -38,7 +38,6 @@ export function invalidateCompaniesList(queryClient: ReturnType<typeof useQueryC
 export function useCreateCompany(orgId: string) {
   const queryClient = useQueryClient();
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (input: CreateCompanyInput) =>
@@ -50,7 +49,7 @@ export function useCreateCompany(orgId: string) {
     },
     onSuccess: ({ company }) => {
       invalidateCompaniesList(queryClient, orgId);
-      toast.show(t("companies.create.success", { name: company.name }));
+      toast.success(t("companies.create.success", { name: company.name }));
     },
   });
 }
@@ -58,7 +57,6 @@ export function useCreateCompany(orgId: string) {
 export function useUpdateCompany(orgId: string) {
   const queryClient = useQueryClient();
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { companyId: string; input: UpdateCompanyInput }) =>
@@ -83,7 +81,7 @@ export function useUpdateCompany(orgId: string) {
         (current) => current && { ...current, ...company, contacts: current.contacts },
       );
       invalidateCompaniesList(queryClient, orgId);
-      toast.show(t("companies.edit.success"));
+      toast.success(t("companies.edit.success"));
     },
   });
 }
@@ -91,7 +89,6 @@ export function useUpdateCompany(orgId: string) {
 export function useDeleteCompany(orgId: string) {
   const queryClient = useQueryClient();
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { companyId: string }) =>
@@ -107,7 +104,7 @@ export function useDeleteCompany(orgId: string) {
         (current) => current && { ...current, companies: current.companies.filter((c) => c.id !== vars.companyId) },
       );
       void queryClient.invalidateQueries({ queryKey: companiesListQueryOptions(orgId).queryKey });
-      toast.show(t("companies.delete.success"));
+      toast.success(t("companies.delete.success"));
     },
   });
 }
@@ -120,7 +117,6 @@ export function useDeleteCompany(orgId: string) {
 export function useUnlinkCompanyFromProject(orgId: string) {
   const queryClient = useQueryClient();
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { projectId: string }) =>
@@ -147,7 +143,6 @@ export function useUnlinkCompanyFromProject(orgId: string) {
 export function useSetContactCompany(orgId: string, companyId: string) {
   const queryClient = useQueryClient();
   const t = useT();
-  const toast = useToast();
   const queryKey = companyQueryOptions(orgId, companyId).queryKey;
 
   return useMutation({

@@ -9,7 +9,7 @@ import type {
 import { columnResponseSchema, projectResponseSchema } from "@helix/api-schemas";
 import { request, queryKeys } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
-import { useToast } from "../../shared/toast/use-toast";
+import { toast } from "sonner";
 import { boardQueryOptions } from "./queries";
 import { toBoardError } from "./board-error";
 
@@ -124,7 +124,6 @@ export function useMoveProject(orgId: string, workspaceId: string) {
   const queryClient = useQueryClient();
   const { queryKey } = boardQueryOptions(orgId, workspaceId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: MoveVariables) =>
@@ -161,7 +160,6 @@ export function useCreateProject(orgId: string, workspaceId: string) {
   const queryClient = useQueryClient();
   const { queryKey } = boardQueryOptions(orgId, workspaceId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (input: CreateProjectInput) =>
@@ -181,7 +179,7 @@ export function useCreateProject(orgId: string, workspaceId: string) {
     },
     onSuccess: (project) => {
       queryClient.setQueryData<BoardResponse>(queryKey, (current) => current && prependProject(current, project));
-      toast.show(t("board.create.success", { title: project.title }));
+      toast.success(t("board.create.success", { title: project.title }));
     },
   });
 }
@@ -205,7 +203,6 @@ export function useArchiveProject(orgId: string, workspaceId: string) {
   const queryClient = useQueryClient();
   const { queryKey } = boardQueryOptions(orgId, workspaceId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { id: string; title: string }) =>
@@ -217,7 +214,7 @@ export function useArchiveProject(orgId: string, workspaceId: string) {
     },
     onSuccess: (_project, vars) => {
       queryClient.setQueryData<BoardResponse>(queryKey, (current) => current && removeProject(current, vars.id));
-      toast.show(t("board.card.archived", { title: vars.title }));
+      toast.success(t("board.card.archived", { title: vars.title }));
     },
   });
 }
@@ -226,7 +223,6 @@ export function useDeleteProject(orgId: string, workspaceId: string) {
   const queryClient = useQueryClient();
   const { queryKey } = boardQueryOptions(orgId, workspaceId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { id: string; title: string }) =>
@@ -238,7 +234,7 @@ export function useDeleteProject(orgId: string, workspaceId: string) {
     },
     onSuccess: (_response, vars) => {
       queryClient.setQueryData<BoardResponse>(queryKey, (current) => current && removeProject(current, vars.id));
-      toast.show(t("board.card.deleted", { title: vars.title }));
+      toast.success(t("board.card.deleted", { title: vars.title }));
     },
   });
 }
@@ -249,7 +245,6 @@ export function useLoadMoreColumn(orgId: string, workspaceId: string) {
   const queryClient = useQueryClient();
   const { queryKey } = boardQueryOptions(orgId, workspaceId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { phaseId: string }) => {

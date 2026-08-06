@@ -4,7 +4,7 @@ import type { CreateTaskInput, TaskResponse, UpdateTaskInput } from "@helix/api-
 import { taskResponseSchema } from "@helix/api-schemas";
 import { queryKeys, request } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
-import { useToast } from "../../shared/toast/use-toast";
+import { toast } from "sonner";
 import { projectTasksQueryOptions } from "./queries";
 import { toTaskError } from "./task-error";
 
@@ -33,7 +33,6 @@ export function useCreateTask(orgId: string, projectId: string) {
   const queryClient = useQueryClient();
   const { queryKey } = projectTasksQueryOptions(orgId, projectId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (input: CreateTaskInput) =>
@@ -59,7 +58,6 @@ export function useUpdateTask(orgId: string, projectId: string) {
   const queryClient = useQueryClient();
   const { queryKey } = projectTasksQueryOptions(orgId, projectId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { taskId: string; input: UpdateTaskInput }) =>
@@ -111,7 +109,6 @@ export function useCompleteTask(orgId: string, projectId: string) {
   const queryClient = useQueryClient();
   const { queryKey } = projectTasksQueryOptions(orgId, projectId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { taskId: string }) =>
@@ -148,7 +145,6 @@ export function useReopenTask(orgId: string, projectId: string) {
   const queryClient = useQueryClient();
   const { queryKey } = projectTasksQueryOptions(orgId, projectId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { taskId: string }) =>
@@ -187,7 +183,6 @@ export function useDeleteTask(orgId: string, projectId: string) {
   const queryClient = useQueryClient();
   const { queryKey } = projectTasksQueryOptions(orgId, projectId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { taskId: string }) =>

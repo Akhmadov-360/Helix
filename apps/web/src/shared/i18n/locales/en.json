@@ -38,7 +38,6 @@
   "resetPassword.error.missingToken": "This link is missing a reset token. Request a new one",
   "resetPassword.error.network": "No connection to the server. Check your network",
   "resetPassword.error.generic": "Could not save the password. Please try again",
-  "toast.dismiss": "Dismiss notification",
   "shell.logout": "Sign out",
   "sidebar.nav.board": "Board",
   "sidebar.nav.contacts": "Contacts",
