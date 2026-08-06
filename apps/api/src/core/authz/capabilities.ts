@@ -35,6 +35,11 @@ const SUBJECT_OPERATIONS = {
   Task: ["create", "read", "update", "delete"],
   // blueprints.md §0: без update (PRD не требует редактируемости — создал неправильно, удали).
   Blueprint: ["create", "read", "delete"],
+  // Appendix B «Manage members & roles» = O/A only. update = смена роли участника,
+  // delete = удаление из орги. read/create нет: ростер читают все (без @CheckPolicy,
+  // см. organizations.controller.ts), создание — это POST /v1/organizations (новая
+  // орга целиком, не Membership конкретного юзера) — отдельный сценарий без CASL-гейта.
+  Membership: ["update", "delete"],
 } as const satisfies Record<(typeof APP_SUBJECTS)[number], readonly AppAction[]>;
 
 /**

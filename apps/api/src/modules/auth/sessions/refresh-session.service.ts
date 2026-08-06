@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
-import type { Prisma } from "@helix/db";
+import type { Prisma, RefreshRevocationReason } from "@helix/db";
 import type { Env } from "@helix/config";
 import type { Request } from "express";
 import { ENV } from "../../../core/config/config.module";
@@ -99,12 +99,18 @@ export class RefreshSessionService {
   }
 
   /**
-   * Отзыв всех сессий пользователя (logout-all, §7) — на всех устройствах и во
-   * всех цепочках. Идентификация идёт по userId из access-токена, а не по cookie:
-   * это действие уровня аккаунта, а не текущей сессии.
+   * Отзыв всех сессий пользователя — на всех устройствах и во всех цепочках.
+   * Идентификация идёт по userId, а не по cookie: это действие уровня аккаунта,
+   * а не текущей сессии. Причина по умолчанию LOGOUT (logout-all, §7); сброс пароля
+   * передаёт PASSWORD_CHANGED — держим украденный пароль от продления доступа
+   * через уже выданные refresh-токены.
    */
-  async revokeAllForUser(userId: string, tx?: Prisma.TransactionClient): Promise<number> {
-    return this.sessions.revokeAllForUser(userId, "LOGOUT", tx);
+  async revokeAllForUser(
+    userId: string,
+    tx?: Prisma.TransactionClient,
+    reason: RefreshRevocationReason = "LOGOUT",
+  ): Promise<number> {
+    return this.sessions.revokeAllForUser(userId, reason, tx);
   }
 
   /**

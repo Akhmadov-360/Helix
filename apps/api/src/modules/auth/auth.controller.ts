@@ -11,11 +11,15 @@ import {
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import {
+  forgotPasswordSchema,
   loginSchema,
+  resetPasswordSchema,
   switchOrgSchema,
   type AuthResult,
   type CurrentUser,
+  type ForgotPasswordInput,
   type LoginInput,
+  type ResetPasswordInput,
   type SwitchOrgInput,
 } from "@helix/api-schemas";
 import type { Request, Response } from "express";
@@ -26,6 +30,7 @@ import { UsersRepository } from "../users/users.repository";
 import { CurrentAuth, type AuthContext } from "../../core/auth-context";
 import { AuthService } from "./auth.service";
 import { JwtAuthGuard } from "./jwt-auth.guard";
+import { PasswordResetService } from "./password-reset/password-reset.service";
 import { REFRESH_COOKIE_NAME, RefreshCookieService } from "./sessions/refresh-cookie.service";
 import { sessionMetadataFrom } from "./sessions/refresh-session.service";
 
@@ -36,6 +41,7 @@ export class AuthController {
     private readonly auth: AuthService,
     private readonly users: UsersRepository,
     private readonly refreshCookie: RefreshCookieService,
+    private readonly passwordReset: PasswordResetService,
   ) {}
 
   /**
@@ -206,5 +212,32 @@ export class AuthController {
       dto.orgId,
       typeof rawToken === "string" && rawToken.length > 0 ? rawToken : undefined,
     );
+  }
+
+  /**
+   * Guard'ом НЕ закрыт — запрашивает сброс тот, кто как раз не может залогиниться.
+   *
+   * Всегда 200, независимо от того, существует ли email (§ PasswordResetService):
+   * иначе ответ стал бы оракулом существования аккаунта, как и на /login.
+   */
+  @Post("forgot-password")
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ description: "Если email существует — письмо отправлено (идемпотентно по форме ответа)" })
+  async forgotPassword(
+    @Body(new ZodValidationPipe(forgotPasswordSchema)) dto: ForgotPasswordInput,
+  ): Promise<null> {
+    await this.passwordReset.requestReset(dto.email);
+    return null;
+  }
+
+  /** Guard'ом НЕ закрыт — личность подтверждается токеном из письма, не access-токеном. */
+  @Post("reset-password")
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ description: "Пароль изменён; все refresh-сессии пользователя отозваны" })
+  async resetPassword(
+    @Body(new ZodValidationPipe(resetPasswordSchema)) dto: ResetPasswordInput,
+  ): Promise<null> {
+    await this.passwordReset.resetPassword(dto.token, dto.newPassword);
+    return null;
   }
 }

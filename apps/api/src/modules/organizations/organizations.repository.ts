@@ -99,4 +99,43 @@ export class OrganizationsRepository {
 
     return membership?.orgId ?? null;
   }
+
+  async findMembership(
+    orgId: string,
+    userId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<{ role: Role } | null> {
+    return (tx ?? this.prisma.client).membership.findUnique({
+      where: { orgId_userId: { orgId, userId } },
+      select: { role: true },
+    });
+  }
+
+  /** Сколько OWNER в орге — guard против «понизили/удалили последнего». */
+  async countOwners(orgId: string, tx?: Prisma.TransactionClient): Promise<number> {
+    return (tx ?? this.prisma.client).membership.count({ where: { orgId, role: "OWNER" } });
+  }
+
+  /** В скольких оргах состоит юзер — guard против «удалили единственное членство». */
+  async countOrgsForUser(userId: string, tx?: Prisma.TransactionClient): Promise<number> {
+    return (tx ?? this.prisma.client).membership.count({ where: { userId } });
+  }
+
+  async updateMemberRole(
+    orgId: string,
+    userId: string,
+    role: Role,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
+    await (tx ?? this.prisma.client).membership.update({
+      where: { orgId_userId: { orgId, userId } },
+      data: { role },
+    });
+  }
+
+  async removeMember(orgId: string, userId: string, tx?: Prisma.TransactionClient): Promise<void> {
+    await (tx ?? this.prisma.client).membership.delete({
+      where: { orgId_userId: { orgId, userId } },
+    });
+  }
 }

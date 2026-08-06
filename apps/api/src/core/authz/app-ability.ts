@@ -22,6 +22,7 @@ export const APP_SUBJECTS = [
   "ProjectAssignee",
   "Task",
   "Blueprint",
+  "Membership",
 ] as const;
 export type AppSubject = (typeof APP_SUBJECTS)[number] | "all";
 export type AppAbility = MongoAbility<[AppAction, AppSubject]>;

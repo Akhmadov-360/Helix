@@ -25,3 +25,16 @@ export type MyOrgResponse = z.infer<typeof myOrgResponseSchema>;
 
 export const myOrgListResponseSchema = z.array(myOrgResponseSchema);
 export type MyOrgListResponse = z.infer<typeof myOrgListResponseSchema>;
+
+// ────────────────────── создание доп. организации (FR-ORG-2) ────────────────────
+// Organization.name — простая строка (см. registration.service.ts), не LocalizedName.
+export const createOrganizationSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+});
+export type CreateOrganizationInput = z.infer<typeof createOrganizationSchema>;
+
+// ─────────────────── смена роли участника (Appendix B, O/A only) ────────────────
+export const changeMemberRoleSchema = z.object({
+  role: roleSchema,
+});
+export type ChangeMemberRoleInput = z.infer<typeof changeMemberRoleSchema>;

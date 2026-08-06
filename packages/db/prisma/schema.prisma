@@ -120,6 +120,7 @@ model User {
   auditLogs        AuditLog[] // back-relation; actorId живёт на AuditLog
   tasks            Task[] // back-relation для assignee (Task.assigneeId → User, SetNull)
   refreshSessions  RefreshSession[]
+  passwordResetTokens PasswordResetToken[]
 }
 
 model Membership {
@@ -450,6 +451,23 @@ model RefreshSession {
   @@index([familyId])
   // Кандидат на составной @@index([familyId, revokedAt]) под горячий kill-family/выборку живых —
   // НЕ добавляю без профиля запросов (преждевременная оптимизация). Держу в голове.
+}
+
+// auth.md §0: сброс пароля был отложен до появления очереди+почты — теперь (M2 notifications)
+// есть оба. tokenHash — тот же приём, что RefreshSession.tokenHash: токен высокоэнтропийный
+// (crypto.randomBytes), поэтому SHA-256 корректен (argon2 добавил бы только латентность зря).
+// Разовый (usedAt) и короткоживущий (expiresAt ~1ч, короче RefreshSession — окно атаки уже).
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 // ============================================================================

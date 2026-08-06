@@ -8,11 +8,20 @@ import { MAILER, type MailerService } from "./mailer/mailer.interface";
 import { NotificationsRepository } from "./notifications.repository";
 import { resolveLeadCreatedRecipients } from "./recipients";
 import { renderLeadCreatedEmail } from "./templates/lead-created-email";
+import { renderPasswordResetEmail } from "./templates/password-reset-email";
 import type { LeadCreatedJobData } from "./lead-created-job";
+import { PASSWORD_RESET_JOB, type PasswordResetJobData } from "./password-reset-job";
+
+type EmailJobData = LeadCreatedJobData | PasswordResetJobData;
 
 /**
  * Консьюмер очереди `email` (§1). Живёт в том же Nest-приложении, не отдельным процессом —
  * на масштабе Helix выделенный worker добавил бы деплой-сложность без выгоды (§1).
+ *
+ * Одна очередь, несколько job-имён (§1 «webhooks/embeddings получат имена здесь же») —
+ * process() диспетчерит по job.name, а не заводит Processor на каждое имя: они делят
+ * одну и ту же Redis-очередь/конкурентность, отдельный класс на письмо плодил бы
+ * DI-boilerplate без выгоды.
  */
 @Processor(EMAIL_QUEUE)
 export class EmailWorker extends WorkerHost {
@@ -26,8 +35,15 @@ export class EmailWorker extends WorkerHost {
     super();
   }
 
-  async process(job: Job<LeadCreatedJobData>): Promise<void> {
-    const { orgId, projectId } = job.data;
+  async process(job: Job<EmailJobData>): Promise<void> {
+    if (job.name === PASSWORD_RESET_JOB) {
+      return this.processPasswordReset(job.data as PasswordResetJobData);
+    }
+    return this.processLeadCreated(job.data as LeadCreatedJobData);
+  }
+
+  private async processLeadCreated(data: LeadCreatedJobData): Promise<void> {
+    const { orgId, projectId } = data;
 
     // §3 defensive re-check: чужой orgId по ошибке → не отправляем, логируем как ошибку
     // (это баг вызывающего кода, не штатное состояние), не ретраим бесконечно молча.
@@ -47,5 +63,10 @@ export class EmailWorker extends WorkerHost {
 
     const email = renderLeadCreatedEmail({ projectId, projectTitle: context.title, appUrl: this.env.APP_URL });
     await this.mailer.send({ to: recipients, ...email });
+  }
+
+  private async processPasswordReset(data: PasswordResetJobData): Promise<void> {
+    const email = renderPasswordResetEmail({ name: data.name, token: data.token, appUrl: this.env.APP_URL });
+    await this.mailer.send({ to: [data.email], ...email });
   }
 }

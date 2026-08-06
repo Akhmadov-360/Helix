@@ -5,16 +5,18 @@ import { notifySessionExpired, SessionExpiredError } from "./session-expired";
 
 export const REFRESH_PATH = "/v1/auth/refresh";
 export const LOGIN_PATH = "/v1/auth/login";
+export const RESET_PASSWORD_PATH = "/v1/auth/reset-password";
 
 // AUTH-1 / §8.1: одна refresh-cookie → ровно один одновременно выполняющийся refresh. Модульный
 // промис — единственный choke-point для ВСЕХ конкурентных запросов (не per-request retry): refresh
 // ротируется на бэке, второй параллельный /refresh с тем же токеном триггерит reuse-detection.
 let inFlight: Promise<void> | null = null;
 
-// Два обязательных исключения из auth-flow (§8.1): /refresh не оборачиваем в себя же (иначе цикл);
-// /login 401 — доменные неверные креды, не протухший access, рефрешить нечего.
+// Обязательные исключения из auth-flow (§8.1): /refresh не оборачиваем в себя же (иначе цикл);
+// /login и /reset-password 401 — доменные отказы (неверные креды / битый токен письма), не
+// протухший access, рефрешить нечего — а на анонимном экране refresh и не может ничего вернуть.
 export function skipsAuthFlow(path: string): boolean {
-  return path === REFRESH_PATH || path === LOGIN_PATH;
+  return path === REFRESH_PATH || path === LOGIN_PATH || path === RESET_PASSWORD_PATH;
 }
 
 // Проактивный lock: любой исходящий запрос сначала ждёт уже идущий refresh, потом читает access

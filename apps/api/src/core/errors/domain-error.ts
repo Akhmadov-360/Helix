@@ -276,3 +276,42 @@ export class InvalidRefreshTokenError extends UnauthorizedError {
     super("Refresh session is missing, invalid or expired");
   }
 }
+
+/**
+ * Последний OWNER орги — понизить роль или удалить нельзя: орга осталась бы без
+ * единственной роли, которой доступно «Manage members & roles» (Appendix B), то есть
+ * без возможности когда-либо восстановить управление участниками.
+ */
+export class LastOwnerError extends ConflictError {
+  readonly code = "LAST_OWNER";
+
+  constructor() {
+    super("Organization must have at least one OWNER");
+  }
+}
+
+/**
+ * Удаляемое членство — единственное у пользователя (auth.md §9.1: каждый User
+ * состоит хотя бы в одной Org всегда). Удалить его значило бы сломать инвариант,
+ * от которого зависит резолюция activeOrgId на логине/refresh.
+ */
+export class SoleOrganizationMembershipError extends ConflictError {
+  readonly code = "SOLE_ORGANIZATION_MEMBERSHIP";
+
+  constructor() {
+    super("Cannot remove a member's only organization membership");
+  }
+}
+
+/**
+ * Токен сброса пароля (reset-password): не найден, истёк или уже использован.
+ * Отдельный код от INVALID_TOKEN/INVALID_REFRESH_TOKEN — фронту нужно вести на форму
+ * «ссылка недействительна, запросите новую», а не на логин/refresh.
+ */
+export class InvalidPasswordResetTokenError extends UnauthorizedError {
+  readonly code = "INVALID_PASSWORD_RESET_TOKEN";
+
+  constructor() {
+    super("Password reset link is invalid or expired");
+  }
+}
