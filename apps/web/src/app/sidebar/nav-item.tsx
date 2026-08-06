@@ -2,7 +2,12 @@ import { Link } from "@tanstack/react-router";
 import type { ComponentType } from "react";
 import { cn } from "@helix/ui";
 
-type SidebarRoute = "/workspaces/$workspaceId/board" | "/contacts" | "/companies";
+type SidebarRoute =
+  | "/workspaces/$workspaceId/board"
+  | "/contacts"
+  | "/companies"
+  | "/settings/members"
+  | "/settings/audit-log";
 
 export function SidebarNavItem({
   to,

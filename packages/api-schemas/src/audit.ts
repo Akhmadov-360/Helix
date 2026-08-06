@@ -1,9 +1,15 @@
 import { z } from "zod";
+import { roleSchema } from "./auth";
 
-// Org-уровневый административный аудит (AuditLog, contacts.md §7.3) — ОТДЕЛЬНО от ActivityEvent
-// (тот про ленту лида, projectId NOT NULL). Замкнутый словарь действий, строкой (schemaVersion —
-// форма факта историческая, P2), общий с будущей webhook-вокабулой.
-export const auditActionSchema = z.enum(["contact.merged"]);
+// Org-уровневый административный аудит (AuditLog, contacts.md §7.3, decisions.md D5) — ОТДЕЛЬНО
+// от ActivityEvent (тот про ленту лида, projectId NOT NULL). Замкнутый словарь действий, строкой
+// (schemaVersion — форма факта историческая, P2), общий с будущей webhook-вокабулой.
+export const auditActionSchema = z.enum([
+  "contact.merged",
+  "membership.role_changed",
+  "membership.removed",
+  "organization.created",
+]);
 export type AuditAction = z.infer<typeof auditActionSchema>;
 
 // Снапшот merge (P2/P3): что уехало из source в target — след для ручного un-merge (§7.7).
@@ -18,13 +24,74 @@ const contactMergedPayloadSchema = z.object({
   fieldsFilledFromSource: z.array(z.string()),
 });
 
-// Писательский контракт AuditRecorder (валидируется перед записью). Один action сейчас;
-// discriminatedUnion — задел под рост словаря без ломки существующих поколений.
+// Снапшот целевого юзера (P2): membership.role_changed/removed переживают уход юзера из орги —
+// имя/email на МОМЕНТ действия, не живая ссылка (userId остаётся для клика в текущий профиль,
+// тот же приём, что actorId в AuditLog).
+const membershipRoleChangedPayloadSchema = z.object({
+  userId: z.string(),
+  userName: z.string(),
+  userEmail: z.string(),
+  fromRole: roleSchema,
+  toRole: roleSchema,
+});
+
+const membershipRemovedPayloadSchema = z.object({
+  userId: z.string(),
+  userName: z.string(),
+  userEmail: z.string(),
+  role: roleSchema,
+});
+
+const organizationCreatedPayloadSchema = z.object({
+  name: z.string(),
+});
+
+// Писательский контракт AuditRecorder (валидируется перед записью). discriminatedUnion — задел
+// под рост словаря без ломки существующих поколений.
 export const auditEventSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("contact.merged"),
     schemaVersion: z.literal(1),
     payload: contactMergedPayloadSchema,
   }),
+  z.object({
+    action: z.literal("membership.role_changed"),
+    schemaVersion: z.literal(1),
+    payload: membershipRoleChangedPayloadSchema,
+  }),
+  z.object({
+    action: z.literal("membership.removed"),
+    schemaVersion: z.literal(1),
+    payload: membershipRemovedPayloadSchema,
+  }),
+  z.object({
+    action: z.literal("organization.created"),
+    schemaVersion: z.literal(1),
+    payload: organizationCreatedPayloadSchema,
+  }),
 ]);
 export type AuditEvent = z.infer<typeof auditEventSchema>;
+
+// ─────────────────────────── чтение (GET /organizations/audit-log) ──────────────────────────
+// Читательский контракт НЕ дискриминирован по action: payload разных действий разной формы,
+// а список рендерится единой таблицей (action + JSON payload как есть) — фронт форматирует по
+// словарю в i18n, не разбирая структуру. actorName/actorEmail null = актор удалён (SetNull).
+export const auditLogEntryResponseSchema = z.object({
+  id: z.string(),
+  actorId: z.string().nullable(),
+  actorName: z.string().nullable(),
+  actorEmail: z.string().nullable(),
+  action: auditActionSchema,
+  payload: z.record(z.string(), z.unknown()),
+  createdAt: z.iso.datetime(),
+});
+export type AuditLogEntryResponse = z.infer<typeof auditLogEntryResponseSchema>;
+
+export const auditLogListResponseSchema = z.array(auditLogEntryResponseSchema);
+export type AuditLogListResponse = z.infer<typeof auditLogListResponseSchema>;
+
+export const auditLogQuerySchema = z.object({
+  cursor: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(50),
+});
+export type AuditLogQuery = z.infer<typeof auditLogQuerySchema>;

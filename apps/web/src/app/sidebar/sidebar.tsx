@@ -1,5 +1,6 @@
 import { useParams } from "@tanstack/react-router";
-import { Building2, KanbanSquare, Users } from "lucide-react";
+import { Building2, KanbanSquare, ScrollText, Users, UsersRound } from "lucide-react";
+import { useCan } from "../../shared/auth/ability";
 import { LocaleSwitcher, useT } from "../../shared/i18n";
 import { getLastWorkspaceId } from "../../shared/lib/last-workspace";
 import { ThemeToggle } from "../../shared/theme";
@@ -23,6 +24,14 @@ export function Sidebar({ orgId }: { orgId: string }) {
   const params = useParams({ strict: false }) as { workspaceId?: string };
   const workspaceId = params.workspaceId ?? getLastWorkspaceId() ?? undefined;
 
+  // Appendix B «Manage members & roles» / D5 «org-security-аудит» — оба O/A only. Пункты скрыты
+  // для остальных ролей (косметика, сервер — единственный энфорсер), а не просто задизейблены:
+  // страница пустая для них ценности не несёт.
+  const canUpdateMembers = useCan("Membership.update");
+  const canDeleteMembers = useCan("Membership.delete");
+  const canManageMembers = canUpdateMembers || canDeleteMembers;
+  const canReadAuditLog = useCan("AuditLog.read");
+
   return (
     <aside className="flex h-dvh w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground">
       <div className="border-b border-sidebar-border p-2">
@@ -44,6 +53,17 @@ export function Sidebar({ orgId }: { orgId: string }) {
         </div>
 
         <WorkspacesSection orgId={orgId} currentWorkspaceId={workspaceId} />
+
+        {(canManageMembers || canReadAuditLog) && (
+          <div className="flex flex-col gap-0.5 border-t border-sidebar-border pt-3">
+            {canManageMembers && (
+              <SidebarNavItem to="/settings/members" icon={UsersRound} label={t("sidebar.nav.members")} />
+            )}
+            {canReadAuditLog && (
+              <SidebarNavItem to="/settings/audit-log" icon={ScrollText} label={t("sidebar.nav.auditLog")} />
+            )}
+          </div>
+        )}
       </nav>
 
       <div className="flex flex-col gap-1 border-t border-sidebar-border p-2">

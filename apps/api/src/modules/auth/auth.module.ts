@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { JwtModule, type JwtSignOptions } from "@nestjs/jwt";
 import type { Env } from "@helix/config";
 import { ENV } from "../../core/config/config.module";
+import { AuditModule } from "../audit/audit.module";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { UsersModule } from "../users/users.module";
@@ -24,6 +25,7 @@ import { OrganizationsService } from "../organizations/organizations.service";
     OrganizationsModule,
     PasswordModule,
     NotificationsModule,
+    AuditModule,
     // Секрет и TTL берём из валидированного env, а не из process.env напрямую:
     // приложение уже не поднимется с невалидным JWT_SECRET (проверка на старте).
     JwtModule.registerAsync({

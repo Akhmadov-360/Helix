@@ -100,15 +100,18 @@ export class OrganizationsRepository {
     return membership?.orgId ?? null;
   }
 
+  /** name/email включены для AuditLog-снапшота (P2) — не только role. */
   async findMembership(
     orgId: string,
     userId: string,
     tx?: Prisma.TransactionClient,
-  ): Promise<{ role: Role } | null> {
-    return (tx ?? this.prisma.client).membership.findUnique({
+  ): Promise<{ role: Role; userName: string; userEmail: string } | null> {
+    const membership = await (tx ?? this.prisma.client).membership.findUnique({
       where: { orgId_userId: { orgId, userId } },
-      select: { role: true },
+      select: { role: true, user: { select: { name: true, email: true } } },
     });
+    if (!membership) return null;
+    return { role: membership.role, userName: membership.user.name, userEmail: membership.user.email };
   }
 
   /** Сколько OWNER в орге — guard против «понизили/удалили последнего». */

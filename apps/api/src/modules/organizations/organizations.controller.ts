@@ -1,8 +1,11 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import {
+  auditLogQuerySchema,
   changeMemberRoleSchema,
   createOrganizationSchema,
+  type AuditLogListResponse,
+  type AuditLogQuery,
   type ChangeMemberRoleInput,
   type CreateOrganizationInput,
   type MyOrgListResponse,
@@ -57,14 +60,24 @@ export class OrganizationsController {
     @Param("userId") userId: string,
     @Body(new ZodValidationPipe(changeMemberRoleSchema)) dto: ChangeMemberRoleInput,
   ): Promise<null> {
-    await this.organizations.changeMemberRole(auth.activeOrgId, userId, dto.role);
+    await this.organizations.changeMemberRole(auth.activeOrgId, auth.userId, userId, dto.role);
     return null;
   }
 
   @Delete("members/:userId")
   @CheckPolicy("delete", "Membership")
   async removeMember(@CurrentAuth() auth: AuthContext, @Param("userId") userId: string): Promise<null> {
-    await this.organizations.removeMember(auth.activeOrgId, userId);
+    await this.organizations.removeMember(auth.activeOrgId, auth.userId, userId);
     return null;
+  }
+
+  // decisions.md D5: org-security-аудит, admin-only.
+  @Get("audit-log")
+  @CheckPolicy("read", "AuditLog")
+  listAuditLog(
+    @CurrentAuth() auth: AuthContext,
+    @Query(new ZodValidationPipe(auditLogQuerySchema)) query: AuditLogQuery,
+  ): Promise<AuditLogListResponse> {
+    return this.organizations.listAuditLog(auth.activeOrgId, query);
   }
 }
