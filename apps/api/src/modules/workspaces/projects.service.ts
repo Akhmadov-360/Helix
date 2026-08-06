@@ -33,6 +33,7 @@ import { toBoardProjectResponse, toProjectResponse } from "../projects/project.m
 import { ProjectsRepository } from "../projects/projects.repository";
 import { denseRanks, rankBetween } from "../projects/rank";
 import { OrganizationsRepository } from "../organizations/organizations.repository";
+import { NotificationsService } from "../notifications/notifications.service";
 import { UsersRepository } from "../users/users.repository";
 import { assertOrgMember } from "./assert-org-member";
 import { WorkspacesRepository } from "./workspaces.repository";
@@ -57,6 +58,7 @@ export class ProjectsService {
     private readonly activity: ActivityRecorder,
     private readonly activityLog: ActivityRepository,
     private readonly orgs: OrganizationsRepository,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async getById(orgId: string, projectId: string): Promise<ProjectResponse> {
@@ -475,6 +477,12 @@ export class ProjectsService {
       });
       return project;
     });
+
+    // §2 notifications.md: enqueue ПОСЛЕ $transaction() — код здесь гарантированно выполняется
+    // после коммита (Prisma коммитит внутри await, до возврата управления вызывающему).
+    // enqueueLeadCreated сама глотает и логирует свою ошибку (см. её комментарий) — await здесь
+    // не рискует откатить или провалить создание лида, только ждёт дешёвый Redis round-trip.
+    await this.notifications.enqueueLeadCreated({ orgId, projectId: created.id });
 
     return toProjectResponse(created);
   }

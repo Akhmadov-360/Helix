@@ -3,6 +3,7 @@ import { AuthzModule } from "../../core/authz/authz.module";
 import { ActivityModule } from "../activity/activity.module";
 import { AuthModule } from "../auth/auth.module";
 import { FieldsModule } from "../fields/fields.module";
+import { NotificationsModule } from "../notifications/notifications.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { PhasesModule } from "../phases/phases.module";
 import { ProjectsModule } from "../projects/projects.module";
@@ -31,6 +32,7 @@ import { WorkspacesService } from "./workspaces.service";
     UsersModule,
     ActivityModule,
     AuthzModule,
+    NotificationsModule,
   ],
   controllers: [WorkspacesController, PhasesController, FieldsController, ProjectsController],
   providers: [WorkspacesService, WorkspacesRepository, PhasesService, FieldsService, ProjectsService],
