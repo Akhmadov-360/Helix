@@ -234,6 +234,30 @@ export function useDeleteContact(orgId: string) {
   });
 }
 
+// Тот же POST /contacts/:targetId/merge, что useMergeContact ниже — но без привязки к сделке:
+// вызывается со страницы /contacts (глобальная адресная книга), а не из карточки лида, поэтому
+// инвалидирует contactsList, а не кэш конкретного проекта.
+export function useMergeContactGlobal(orgId: string) {
+  const queryClient = useQueryClient();
+  const t = useT();
+  const toast = useToast();
+
+  return useMutation({
+    mutationFn: (vars: { targetId: string; sourceId: string }) =>
+      request({
+        method: "POST",
+        path: `/v1/contacts/${vars.targetId}/merge`,
+        body: { sourceId: vars.sourceId },
+        schema: contactResponseSchema,
+      }),
+    onError: (error) => {
+      const kind = toContactError(error);
+      toast.error(t(contactErrorKey(kind)));
+    },
+    onSuccess: () => invalidateContactsList(queryClient, orgId),
+  });
+}
+
 // §13.3: сливает новый контакт (source) В кандидата (target) — POST /contacts/:targetId/merge.
 // Редирект связей (ProjectContact.contactId source→target) делает бэк (contacts.md §7.3);
 // фронту достаточно инвалидировать projectContacts, чтобы подхватить актуальный contactId/имя.

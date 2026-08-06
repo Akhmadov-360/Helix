@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { CompanyResponse, ContactResponse } from "@helix/api-schemas";
+import type { CompanyResponse, ContactResponse, DedupHint } from "@helix/api-schemas";
 import {
   Button,
   Dialog,
@@ -28,12 +28,15 @@ export function ContactFormDialog({
   companies,
   open,
   onOpenChange,
+  onCreated,
 }: {
   orgId: string;
   contact: ContactResponse | null;
   companies: CompanyResponse[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  // Только create возвращает dedupHint (§4.1) — update не проверяет дубли повторно.
+  onCreated?: (newContactId: string, hint: DedupHint) => void;
 }) {
   const t = useT();
 
@@ -50,6 +53,7 @@ export function ContactFormDialog({
             contact={contact}
             companies={companies}
             onDone={() => onOpenChange(false)}
+            onCreated={onCreated}
             onCancel={() => onOpenChange(false)}
           />
         )}
@@ -63,12 +67,14 @@ function ContactFormFields({
   contact,
   companies,
   onDone,
+  onCreated,
   onCancel,
 }: {
   orgId: string;
   contact: ContactResponse | null;
   companies: CompanyResponse[];
   onDone: () => void;
+  onCreated?: (newContactId: string, hint: DedupHint) => void;
   onCancel: () => void;
 }) {
   const t = useT();
@@ -107,7 +113,12 @@ function ContactFormFields({
           phone: phone.trim() || undefined,
           companyId: resolvedCompanyId ?? undefined,
         },
-        { onSuccess: onDone },
+        {
+          onSuccess: (res) => {
+            onDone();
+            if (res.dedupHint.candidates.length > 0) onCreated?.(res.contact.id, res.dedupHint);
+          },
+        },
       );
     }
   }

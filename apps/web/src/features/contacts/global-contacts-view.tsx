@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Briefcase, Link2Off, MoreHorizontal, Pencil, Plus, Trash2, Users } from "lucide-react";
-import type { CompanyResponse, ContactResponse, DealLink } from "@helix/api-schemas";
+import type { CompanyResponse, ContactResponse, DealLink, DedupHint as DedupHintData } from "@helix/api-schemas";
 import {
   Button,
   DropdownMenu,
@@ -24,8 +24,9 @@ import {
 import { useCan } from "../../shared/auth/ability";
 import { useT } from "../../shared/i18n";
 import { ContactFormDialog } from "./contact-form-dialog";
+import { DedupHint } from "./dedup-hint";
 import { DeleteContactDialog } from "./delete-contact-dialog";
-import { invalidateContactsList, useLoadMoreContacts, useUnlinkContact } from "./mutations";
+import { invalidateContactsList, useLoadMoreContacts, useMergeContactGlobal, useUnlinkContact } from "./mutations";
 import { contactsListQueryOptions } from "./queries";
 
 type SortKey = "name" | "email" | "phone" | "company";
@@ -143,6 +144,9 @@ export function GlobalContactsView({ orgId, companies }: { orgId: string; compan
   const canUpdate = useCan("Contact.update");
   const canDelete = useCan("Contact.delete");
   const canUnlink = useCan("ProjectContact.delete");
+  const canMerge = useCan("Contact.merge");
+  const merge = useMergeContactGlobal(orgId);
+  const [dedup, setDedup] = useState<{ hint: DedupHintData; newContactId: string } | null>(null);
 
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
@@ -196,6 +200,17 @@ export function GlobalContactsView({ orgId, companies }: { orgId: string; compan
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
+      {dedup && (
+        <DedupHint
+          hint={dedup.hint}
+          canMerge={canMerge}
+          onMerge={(candidateId) => {
+            merge.mutate({ targetId: candidateId, sourceId: dedup.newContactId });
+            setDedup(null);
+          }}
+          onDismiss={() => setDedup(null)}
+        />
+      )}
       <Table toolbar={toolbar} containerClassName="min-h-0 flex-1" className="min-w-[820px]">
         <TableHeader className="sticky top-0 z-10 bg-muted/80 backdrop-blur">
           <TableRow header>
@@ -293,7 +308,14 @@ export function GlobalContactsView({ orgId, companies }: { orgId: string; compan
         </div>
       )}
 
-      <ContactFormDialog orgId={orgId} contact={null} companies={companies} open={createOpen} onOpenChange={setCreateOpen} />
+      <ContactFormDialog
+        orgId={orgId}
+        contact={null}
+        companies={companies}
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreated={(newContactId, hint) => setDedup({ hint, newContactId })}
+      />
       <ContactFormDialog
         orgId={orgId}
         contact={editTarget}
