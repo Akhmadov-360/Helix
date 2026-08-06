@@ -4,8 +4,8 @@ import { z } from "zod";
  * Env-контракт Helix.
  *
  * M0-скоуп: обязательны DATABASE_URL (API + Prisma-CLI) и JWT (auth входит в M0, см. ниже).
- * Redis/S3 в M0 не подключены (нет BullMQ/S3) → OPTIONAL, иначе приложение не поднялось бы без
- * фиктивных секретов. Ужесточаем per-веха: Redis → M2 (BullMQ), S3 → M3 (files).
+ * S3 ещё не подключён (нет модуля файлов) → OPTIONAL. Redis был OPTIONAL до M2 (BullMQ ещё не
+ * существовал) — теперь обязателен, см. REDIS_URL ниже. Ужесточаем per-веха: S3 → M3 (files).
  */
 export const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -14,7 +14,7 @@ export const envSchema = z.object({
   DATABASE_URL: z.url(),
 
   // ── Async / Redis (M2 — BullMQ) ─────────────────────────────────────────────
-  REDIS_URL: z.url().optional(),
+  REDIS_URL: z.url(), // было optional() — M0-заглушка; с M2 BullMQ реально подключён, обязателен
 
   // ── Files / S3 · MinIO (M3) ──────────────────────────────────────────────────
   S3_ENDPOINT: z.url().optional(),

@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { APP_FILTER, APP_INTERCEPTOR } from "@nestjs/core";
 import { ConfigModule } from "./core/config/config.module";
 import { PrismaModule } from "./core/prisma/prisma.module";
+import { QueueModule } from "./core/queue/queue.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { RegistrationModule } from "./modules/registration/registration.module";
 import { WorkspacesModule } from "./modules/workspaces/workspaces.module";
@@ -16,6 +17,7 @@ import { ResponseTransformInterceptor } from "./core/interceptors/response-trans
   imports: [
     ConfigModule,
     PrismaModule,
+    QueueModule,
     AuthModule,
     RegistrationModule,
     WorkspacesModule,
