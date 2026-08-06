@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Audience, CreateWorkspaceInput, UpdateWorkspaceInput, WorkspaceResponse } from "@helix/api-schemas";
+import type { CreateWorkspaceInput, UpdateWorkspaceInput, WorkspaceResponse } from "@helix/api-schemas";
 import { workspaceResponseSchema } from "@helix/api-schemas";
 import { queryKeys, request } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
@@ -24,11 +24,13 @@ export function useCreateWorkspace(orgId: string) {
   const toast = useToast();
 
   return useMutation({
-    mutationFn: (input: { name: string; audience: Audience }) =>
+    // audience опционален (blueprints.md §3: если не передан, побеждает audience блюпринта) —
+    // отдельная перегрузка на "с блюпринтом"/"без" не нужна, форма запроса общая.
+    mutationFn: (input: CreateWorkspaceInput) =>
       request({
         method: "POST",
         path: "/v1/workspaces",
-        body: input satisfies CreateWorkspaceInput,
+        body: input,
         schema: workspaceResponseSchema,
       }),
     onError: (error) => {

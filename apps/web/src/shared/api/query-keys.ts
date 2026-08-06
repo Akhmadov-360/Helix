@@ -33,4 +33,5 @@ export const queryKeys = {
   contact: (orgId: string, contactId: string) => ["org", orgId, "contact", contactId] as const,
   companiesList: (orgId: string, query: { q?: string }) => ["org", orgId, "companies", "list", query] as const,
   company: (orgId: string, companyId: string) => ["org", orgId, "company", companyId] as const,
+  blueprints: (orgId: string, query: { audience?: string }) => ["org", orgId, "blueprints", query] as const,
 };

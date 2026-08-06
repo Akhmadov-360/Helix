@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { ArrowRight, Calendar, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowRight, Calendar, MoreHorizontal, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
 import type { WorkspaceResponse } from "@helix/api-schemas";
 import {
   Badge,
@@ -15,6 +15,7 @@ import { workspacesQueryOptions } from "../../../features/workspaces/queries";
 import { CreateWorkspaceDialog } from "../../../features/workspaces/create-workspace-dialog";
 import { EditWorkspaceDialog } from "../../../features/workspaces/edit-workspace-dialog";
 import { DeleteWorkspaceDialog } from "../../../features/workspaces/delete-workspace-dialog";
+import { SaveAsBlueprintDialog } from "../../../features/workspaces/save-as-blueprint-dialog";
 import { useCan } from "../../../shared/auth/ability";
 import { useLocaleStore, useT } from "../../../shared/i18n";
 import { meQueryOptions, useMe } from "../../../shared/auth/session";
@@ -39,9 +40,11 @@ function WorkspacesPage() {
   const canCreate = useCan("Workspace.create");
   const canUpdate = useCan("Workspace.update");
   const canDelete = useCan("Workspace.delete");
+  const canSaveBlueprint = useCan("Blueprint.create"); // blueprints.md §6: Manage blueprints = O/A only
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<WorkspaceResponse | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [saveBlueprintTarget, setSaveBlueprintTarget] = useState<WorkspaceResponse | null>(null);
 
   const dateFormatter = new Intl.DateTimeFormat(locale, { day: "2-digit", month: "short", year: "numeric" });
 
@@ -93,7 +96,7 @@ function WorkspacesPage() {
                   {workspaceInitial(workspace.name)}
                 </span>
                 <div className="flex items-center gap-0.5">
-                  {(canUpdate || canDelete) && (
+                  {(canUpdate || canDelete || canSaveBlueprint) && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
@@ -111,6 +114,12 @@ function WorkspacesPage() {
                           <DropdownMenuItem onSelect={() => setEditTarget(workspace)}>
                             <Pencil className="h-3.5 w-3.5" />
                             {t("workspaces.card.edit")}
+                          </DropdownMenuItem>
+                        )}
+                        {canSaveBlueprint && (
+                          <DropdownMenuItem onSelect={() => setSaveBlueprintTarget(workspace)}>
+                            <Sparkles className="h-3.5 w-3.5" />
+                            {t("workspaces.card.saveAsBlueprint")}
                           </DropdownMenuItem>
                         )}
                         {canDelete && (
@@ -170,6 +179,13 @@ function WorkspacesPage() {
         workspace={deleteTarget}
         open={deleteTarget !== null}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
+      />
+      <SaveAsBlueprintDialog
+        key={saveBlueprintTarget?.id ?? "none"}
+        orgId={me.activeOrgId}
+        workspace={saveBlueprintTarget}
+        open={saveBlueprintTarget !== null}
+        onOpenChange={(open) => !open && setSaveBlueprintTarget(null)}
       />
     </div>
   );
