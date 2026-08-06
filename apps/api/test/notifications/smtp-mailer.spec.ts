@@ -7,8 +7,10 @@ import { SmtpMailerService } from "../../src/modules/notifications/mailer/smtp-m
 // не мок транспорта, а тот же MailHog, что разработчик открывает на localhost:8025.
 const MAILHOG_API = "http://localhost:8025/api/v2/messages";
 
+// Delete-all живёт в API v1, а не v2 (MailHog не унифицировал это между версиями) — v2 здесь
+// только для чтения.
 async function clearMailhog(): Promise<void> {
-  await fetch(MAILHOG_API, { method: "DELETE" });
+  await fetch("http://localhost:8025/api/v1/messages", { method: "DELETE" });
 }
 
 describe("SmtpMailerService — доставка через MailHog", () => {
