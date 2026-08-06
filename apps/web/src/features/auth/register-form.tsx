@@ -6,6 +6,7 @@ import { authResultSchema, registerSchema, type RegisterInput } from "@helix/api
 import { Button, Input, Label } from "@helix/ui";
 import { request, setAccessToken, TransportError } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
+import { clearLastWorkspaceId } from "../../shared/lib/last-workspace";
 
 export function RegisterForm() {
   const t = useT();
@@ -19,6 +20,8 @@ export function RegisterForm() {
     mutationFn: (input: RegisterInput) =>
       request({ method: "POST", path: "/v1/auth/register", body: input, schema: authResultSchema }),
     onSuccess: (result) => {
+      // См. login-form.tsx: та же личность-смена, тот же риск чужого хинта.
+      clearLastWorkspaceId();
       setAccessToken(result.accessToken);
       void navigate({ to: "/" });
     },

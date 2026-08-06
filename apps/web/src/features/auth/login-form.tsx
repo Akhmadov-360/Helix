@@ -6,6 +6,7 @@ import { authResultSchema, loginSchema, type LoginInput } from "@helix/api-schem
 import { Button, Input, Label } from "@helix/ui";
 import { request, setAccessToken, TransportError } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
+import { clearLastWorkspaceId } from "../../shared/lib/last-workspace";
 
 export function LoginForm() {
   const t = useT();
@@ -19,6 +20,9 @@ export function LoginForm() {
     mutationFn: (input: LoginInput) =>
       request({ method: "POST", path: "/v1/auth/login", body: input, schema: authResultSchema }),
     onSuccess: (result) => {
+      // Хинт мог остаться от ДРУГОЙ личности, если её сессия закончилась не через /logout
+      // (закрыли вкладку) — иначе "/" слепо редиректнул бы на чужой воркспейс → 404 (last-workspace.ts).
+      clearLastWorkspaceId();
       setAccessToken(result.accessToken);
       void navigate({ to: "/" });
     },
