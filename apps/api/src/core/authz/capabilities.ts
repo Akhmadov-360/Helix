@@ -33,6 +33,8 @@ const SUBJECT_OPERATIONS = {
   ProjectContact: ["create", "read", "update", "delete"],
   ProjectAssignee: ["create", "read", "delete"],
   Task: ["create", "read", "update", "delete"],
+  // blueprints.md §0: без update (PRD не требует редактируемости — создал неправильно, удали).
+  Blueprint: ["create", "read", "delete"],
 } as const satisfies Record<(typeof APP_SUBJECTS)[number], readonly AppAction[]>;
 
 /**

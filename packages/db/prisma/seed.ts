@@ -224,6 +224,69 @@ async function seedSecondOrgProjects(
   });
 }
 
+// blueprints.md §5: сидинг, не миграция (данные, не схема) — минимум по одному системному
+// блюпринту на B2B/B2C, из PRD §7.5 «Sample system blueprints» как отправная точка, не выдумка.
+// Детерминированный id (не cuid()) — идемпотентность сида без дублей между запусками.
+const SYSTEM_BLUEPRINTS: ReadonlyArray<{
+  id: string;
+  audience: Audience;
+  name: string;
+  definition: Record<string, unknown>;
+}> = [
+  {
+    id: "bp-b2b-software-agency",
+    audience: Audience.B2B,
+    name: "Software Agency Client Pipeline",
+    definition: {
+      phases: [
+        { key: "call_request", name: { en: "Call Request" }, type: "OPEN", order: 1 },
+        { key: "discovery", name: { en: "Discovery" }, type: "OPEN", order: 2 },
+        { key: "planning", name: { en: "Planning" }, type: "OPEN", order: 3 },
+        { key: "contract", name: { en: "Contract" }, type: "OPEN", order: 4 },
+        { key: "won", name: { en: "Won" }, type: "WON", order: 5 },
+        { key: "lost", name: { en: "Lost" }, type: "LOST", order: 6 },
+      ],
+      projectFields: [
+        { key: "budget", label: { en: "Budget" }, type: "currency" },
+        { key: "tech_stack", label: { en: "Preferred Stack" }, type: "multiselect", options: ["TS", "Python", "Go"] },
+        { key: "target_start", label: { en: "Target Start" }, type: "date" },
+      ],
+      notificationDefaults: { newLead: { email: true, recipients: ["owner", "assignees"] } },
+    },
+  },
+  {
+    id: "bp-b2c-real-estate",
+    audience: Audience.B2C,
+    name: "Real Estate Buyer",
+    definition: {
+      phases: [
+        { key: "inquiry", name: { en: "Inquiry" }, type: "OPEN", order: 1 },
+        { key: "pre_qualified", name: { en: "Pre-qualified" }, type: "OPEN", order: 2 },
+        { key: "viewing", name: { en: "Viewing" }, type: "OPEN", order: 3 },
+        { key: "offer", name: { en: "Offer" }, type: "OPEN", order: 4 },
+        { key: "closing", name: { en: "Closing" }, type: "WON", order: 5 },
+        { key: "lost", name: { en: "Lost" }, type: "LOST", order: 6 },
+      ],
+      projectFields: [
+        { key: "property_type", label: { en: "Property Type" }, type: "select", options: ["Apartment", "House", "Commercial"] },
+        { key: "budget_max", label: { en: "Max Budget" }, type: "currency" },
+        { key: "preferred_district", label: { en: "Preferred District" }, type: "text" },
+      ],
+      notificationDefaults: { newLead: { email: true, recipients: ["owner"] } },
+    },
+  },
+];
+
+async function upsertSystemBlueprints(): Promise<void> {
+  for (const bp of SYSTEM_BLUEPRINTS) {
+    await prisma.blueprint.upsert({
+      where: { id: bp.id },
+      update: { audience: bp.audience, name: bp.name, definition: bp.definition },
+      create: { id: bp.id, orgId: null, audience: bp.audience, name: bp.name, definition: bp.definition },
+    });
+  }
+}
+
 async function main(): Promise<void> {
   const { orgId, userIdByRole } = await upsertOrgAndUsers();
   const { id: workspaceId, phaseIdByKey } = await upsertWorkspace(orgId);
@@ -232,6 +295,9 @@ async function main(): Promise<void> {
   const { orgId: secondOrgId, crossMemberId } = await upsertSecondOrg();
   const { id: secondWorkspaceId, phaseIdByKey: secondPhaseIdByKey } = await upsertWorkspace(secondOrgId);
   await seedSecondOrgProjects(secondOrgId, secondWorkspaceId, secondPhaseIdByKey, crossMemberId);
+
+  await upsertSystemBlueprints();
+  console.log(`Системные блюпринты: ${SYSTEM_BLUEPRINTS.map((b) => b.id).join(", ")}`);
 
   console.log(`Seed OK — org ${orgId}, workspace ${workspaceId}. Пароль для всех демо-юзеров: ${DEMO_PASSWORD}`);
   for (const u of DEMO_USERS) console.log(`  ${u.role.padEnd(7)} ${u.email}`);

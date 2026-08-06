@@ -24,6 +24,12 @@ export class FieldsRepository {
     return (tx ?? this.prisma.client).fieldDefinition.create({ data, select: FIELD_SELECT });
   }
 
+  // blueprints.md §3: инстанцирование projectFields[] — коллизия key внутри одного блюпринта
+  // (@@unique([workspaceId, key])) бросает и откатывает всю транзакцию воркспейса (атомарность).
+  createMany(data: Prisma.FieldDefinitionCreateManyInput[], tx?: Prisma.TransactionClient): Promise<unknown> {
+    return (tx ?? this.prisma.client).fieldDefinition.createMany({ data });
+  }
+
   // Tenant-scope через связь: field → workspace.orgId. Чужой/несуществующий id → null → 404.
   findByIdInOrg(
     id: string,

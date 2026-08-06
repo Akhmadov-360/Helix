@@ -16,3 +16,4 @@ export * from "./project-links";
 export * from "./tasks";
 export * from "./organizations";
 export * from "./capabilities";
+export * from "./blueprints";

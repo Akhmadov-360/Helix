@@ -10,6 +10,8 @@ export const createWorkspaceSchema = z.object({
   name: z.string().trim().min(1).max(200),
   audience: audienceSchema.optional(),
   settings: settingsSchema.optional(),
+  // blueprints.md §3: опционально — без него поведение не меняется (DEFAULT_PHASES, как раньше).
+  blueprintId: z.string().min(1).optional(),
 });
 export type CreateWorkspaceInput = z.infer<typeof createWorkspaceSchema>;
 

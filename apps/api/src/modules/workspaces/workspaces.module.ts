@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { AuthzModule } from "../../core/authz/authz.module";
 import { ActivityModule } from "../activity/activity.module";
 import { AuthModule } from "../auth/auth.module";
+import { BlueprintsModule } from "../blueprints/blueprints.module";
 import { FieldsModule } from "../fields/fields.module";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
@@ -25,6 +26,7 @@ import { WorkspacesService } from "./workspaces.service";
 @Module({
   imports: [
     AuthModule,
+    BlueprintsModule,
     OrganizationsModule,
     PhasesModule,
     FieldsModule,

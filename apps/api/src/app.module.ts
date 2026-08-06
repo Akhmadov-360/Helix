@@ -4,6 +4,7 @@ import { ConfigModule } from "./core/config/config.module";
 import { PrismaModule } from "./core/prisma/prisma.module";
 import { QueueModule } from "./core/queue/queue.module";
 import { AuthModule } from "./modules/auth/auth.module";
+import { BlueprintsModule } from "./modules/blueprints/blueprints.module";
 import { RegistrationModule } from "./modules/registration/registration.module";
 import { WorkspacesModule } from "./modules/workspaces/workspaces.module";
 import { CrmModule } from "./modules/crm/crm.module";
@@ -19,6 +20,7 @@ import { ResponseTransformInterceptor } from "./core/interceptors/response-trans
     PrismaModule,
     QueueModule,
     AuthModule,
+    BlueprintsModule,
     RegistrationModule,
     WorkspacesModule,
     CrmModule,
