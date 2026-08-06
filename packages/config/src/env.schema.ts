@@ -16,6 +16,16 @@ export const envSchema = z.object({
   // ── Async / Redis (M2 — BullMQ) ─────────────────────────────────────────────
   REDIS_URL: z.url(), // было optional() — M0-заглушка; с M2 BullMQ реально подключён, обязателен
 
+  // ── Notifications / Email (M2, notifications.md §8) ──────────────────────────
+  MAIL_PROVIDER: z.enum(["ses", "smtp"]),
+  MAIL_FROM: z.email(), // адрес отправителя, "Helix <noreply@...>"
+  APP_URL: z.url(), // база для deep link в письме (§5)
+  // SES (prod): без кастомных кред-переменных — default credential provider chain (IAM role), §7.
+  SES_REGION: z.string().optional(),
+  // SMTP (dev/MailHog): без auth, MailHog не проверяет креды.
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().optional(),
+
   // ── Files / S3 · MinIO (M3) ──────────────────────────────────────────────────
   S3_ENDPOINT: z.url().optional(),
   S3_REGION: z.string().optional(),
