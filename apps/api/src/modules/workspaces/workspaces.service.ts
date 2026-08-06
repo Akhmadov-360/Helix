@@ -25,10 +25,10 @@ import { WorkspacesRepository } from "./workspaces.repository";
 // лид и есть WON/LOST-фаза, без которой status не станет WON. Блюпринты (M2) заменят.
 // key статичен и уникален по построению — генератор слагов не нужен (он придёт с POST /phases).
 const DEFAULT_PHASES: ReadonlyArray<{ key: string; name: LocalizedName; type: "OPEN" | "WON" | "LOST" }> = [
-  { key: "lead", name: { en: "Lead" }, type: "OPEN" },
-  { key: "in-progress", name: { en: "In Progress" }, type: "OPEN" },
-  { key: "won", name: { en: "Won" }, type: "WON" },
-  { key: "lost", name: { en: "Lost" }, type: "LOST" },
+  { key: "lead", name: { en: "Lead", ru: "Лид", uz: "Lid" }, type: "OPEN" },
+  { key: "in-progress", name: { en: "In Progress", ru: "В работе", uz: "Jarayonda" }, type: "OPEN" },
+  { key: "won", name: { en: "Won", ru: "Выиграно", uz: "Yutildi" }, type: "WON" },
+  { key: "lost", name: { en: "Lost", ru: "Проиграно", uz: "Yutqazildi" }, type: "LOST" },
 ];
 
 interface WorkspaceRow {

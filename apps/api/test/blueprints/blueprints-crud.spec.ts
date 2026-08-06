@@ -131,7 +131,7 @@ describe("Blueprints CRUD (blueprints.md §1/§4/§6)", () => {
         .set("Authorization", `Bearer ${token}`)
         .expect(200);
       const stillSnapshotted = reread.body.data.find((b: { id: string }) => b.id === created.body.data.id);
-      expect(stillSnapshotted.definition.phases[0].name).toEqual({ en: "Lead" });
+      expect(stillSnapshotted.definition.phases[0].name).toEqual({ en: "Lead", ru: "Лид", uz: "Lid" });
     });
 
     it("чужой workspaceId → 404", async () => {

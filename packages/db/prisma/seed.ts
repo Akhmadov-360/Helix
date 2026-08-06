@@ -21,11 +21,11 @@ const DEMO_USERS: ReadonlyArray<{ email: string; name: string; role: Role }> = [
 
 // Тот же набор, что workspaces.service.ts создаёт для реальной регистрации (§10 варианта B) —
 // держим демо-доску неотличимой от того, что получает настоящий пользователь.
-const DEFAULT_PHASES: ReadonlyArray<{ key: string; name: { en: string }; type: PhaseType }> = [
-  { key: "lead", name: { en: "Lead" }, type: PhaseType.OPEN },
-  { key: "in-progress", name: { en: "In Progress" }, type: PhaseType.OPEN },
-  { key: "won", name: { en: "Won" }, type: PhaseType.WON },
-  { key: "lost", name: { en: "Lost" }, type: PhaseType.LOST },
+const DEFAULT_PHASES: ReadonlyArray<{ key: string; name: { en: string; ru: string; uz: string }; type: PhaseType }> = [
+  { key: "lead", name: { en: "Lead", ru: "Лид", uz: "Lid" }, type: PhaseType.OPEN },
+  { key: "in-progress", name: { en: "In Progress", ru: "В работе", uz: "Jarayonda" }, type: PhaseType.OPEN },
+  { key: "won", name: { en: "Won", ru: "Выиграно", uz: "Yutildi" }, type: PhaseType.WON },
+  { key: "lost", name: { en: "Lost", ru: "Проиграно", uz: "Yutqazildi" }, type: PhaseType.LOST },
 ];
 
 async function upsertOrgAndUsers(): Promise<{ orgId: string; userIdByRole: Record<Role, string> }> {
@@ -239,17 +239,22 @@ const SYSTEM_BLUEPRINTS: ReadonlyArray<{
     name: "Software Agency Client Pipeline",
     definition: {
       phases: [
-        { key: "call_request", name: { en: "Call Request" }, type: "OPEN", order: 1 },
-        { key: "discovery", name: { en: "Discovery" }, type: "OPEN", order: 2 },
-        { key: "planning", name: { en: "Planning" }, type: "OPEN", order: 3 },
-        { key: "contract", name: { en: "Contract" }, type: "OPEN", order: 4 },
-        { key: "won", name: { en: "Won" }, type: "WON", order: 5 },
-        { key: "lost", name: { en: "Lost" }, type: "LOST", order: 6 },
+        { key: "call_request", name: { en: "Call Request", ru: "Запрос звонка", uz: "Qo'ng'iroq so'rovi" }, type: "OPEN", order: 1 },
+        { key: "discovery", name: { en: "Discovery", ru: "Знакомство", uz: "Tanishuv" }, type: "OPEN", order: 2 },
+        { key: "planning", name: { en: "Planning", ru: "Планирование", uz: "Rejalashtirish" }, type: "OPEN", order: 3 },
+        { key: "contract", name: { en: "Contract", ru: "Договор", uz: "Shartnoma" }, type: "OPEN", order: 4 },
+        { key: "won", name: { en: "Won", ru: "Выиграно", uz: "Yutildi" }, type: "WON", order: 5 },
+        { key: "lost", name: { en: "Lost", ru: "Проиграно", uz: "Yutqazildi" }, type: "LOST", order: 6 },
       ],
       projectFields: [
-        { key: "budget", label: { en: "Budget" }, type: "currency" },
-        { key: "tech_stack", label: { en: "Preferred Stack" }, type: "multiselect", options: ["TS", "Python", "Go"] },
-        { key: "target_start", label: { en: "Target Start" }, type: "date" },
+        { key: "budget", label: { en: "Budget", ru: "Бюджет", uz: "Byudjet" }, type: "currency" },
+        {
+          key: "tech_stack",
+          label: { en: "Preferred Stack", ru: "Предпочитаемый стек", uz: "Afzal ko'rilgan texnologiyalar" },
+          type: "multiselect",
+          options: ["TS", "Python", "Go"],
+        },
+        { key: "target_start", label: { en: "Target Start", ru: "Плановая дата начала", uz: "Boshlanish sanasi" }, type: "date" },
       ],
       notificationDefaults: { newLead: { email: true, recipients: ["owner", "assignees"] } },
     },
@@ -260,17 +265,22 @@ const SYSTEM_BLUEPRINTS: ReadonlyArray<{
     name: "Real Estate Buyer",
     definition: {
       phases: [
-        { key: "inquiry", name: { en: "Inquiry" }, type: "OPEN", order: 1 },
-        { key: "pre_qualified", name: { en: "Pre-qualified" }, type: "OPEN", order: 2 },
-        { key: "viewing", name: { en: "Viewing" }, type: "OPEN", order: 3 },
-        { key: "offer", name: { en: "Offer" }, type: "OPEN", order: 4 },
-        { key: "closing", name: { en: "Closing" }, type: "WON", order: 5 },
-        { key: "lost", name: { en: "Lost" }, type: "LOST", order: 6 },
+        { key: "inquiry", name: { en: "Inquiry", ru: "Заявка", uz: "So'rov" }, type: "OPEN", order: 1 },
+        { key: "pre_qualified", name: { en: "Pre-qualified", ru: "Предквалификация", uz: "Dastlabki tekshiruv" }, type: "OPEN", order: 2 },
+        { key: "viewing", name: { en: "Viewing", ru: "Просмотр", uz: "Ko'rish" }, type: "OPEN", order: 3 },
+        { key: "offer", name: { en: "Offer", ru: "Предложение", uz: "Taklif" }, type: "OPEN", order: 4 },
+        { key: "closing", name: { en: "Closing", ru: "Закрытие сделки", uz: "Bitim yopilishi" }, type: "WON", order: 5 },
+        { key: "lost", name: { en: "Lost", ru: "Проиграно", uz: "Yutqazildi" }, type: "LOST", order: 6 },
       ],
       projectFields: [
-        { key: "property_type", label: { en: "Property Type" }, type: "select", options: ["Apartment", "House", "Commercial"] },
-        { key: "budget_max", label: { en: "Max Budget" }, type: "currency" },
-        { key: "preferred_district", label: { en: "Preferred District" }, type: "text" },
+        {
+          key: "property_type",
+          label: { en: "Property Type", ru: "Тип недвижимости", uz: "Ko'chmas mulk turi" },
+          type: "select",
+          options: ["Apartment", "House", "Commercial"],
+        },
+        { key: "budget_max", label: { en: "Max Budget", ru: "Макс. бюджет", uz: "Maks. byudjet" }, type: "currency" },
+        { key: "preferred_district", label: { en: "Preferred District", ru: "Желаемый район", uz: "Afzal ko'rilgan tuman" }, type: "text" },
       ],
       notificationDefaults: { newLead: { email: true, recipients: ["owner"] } },
     },
