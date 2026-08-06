@@ -148,13 +148,96 @@ async function seedProjects(
   }
 }
 
+// Демо смены орги (M1 защита): владелец Helix Demo одновременно состоит во ВТОРОЙ орге с ДРУГОЙ
+// ролью — тот же живой юзер/токен, разные capabilities в зависимости от activeOrgId. Показывает
+// switch-org (§decisions.md "activeOrgId в токене") и что роль пересчитывается per-org, не глобальна.
+const SECOND_ORG_NAME = "Nomad Ventures";
+const SECOND_ORG_OWNER = { email: "rustam@helix.dev", name: "Rustam Founder" };
+const CROSS_MEMBER_EMAIL = DEMO_USERS[0]!.email; // owner@helix.dev — OWNER в Helix Demo, MEMBER здесь
+
+async function upsertSecondOrg(): Promise<{ orgId: string; crossMemberId: string }> {
+  const passwordHash = await hash(DEMO_PASSWORD, ARGON2_POLICY);
+
+  const existingSecondOwner = await prisma.user.findUnique({
+    where: { email: SECOND_ORG_OWNER.email },
+    include: { memberships: true },
+  });
+  const orgId =
+    existingSecondOwner?.memberships[0]?.orgId ??
+    (await prisma.organization.create({ data: { name: SECOND_ORG_NAME } })).id;
+
+  const secondOwner = await prisma.user.upsert({
+    where: { email: SECOND_ORG_OWNER.email },
+    update: { name: SECOND_ORG_OWNER.name },
+    create: { email: SECOND_ORG_OWNER.email, name: SECOND_ORG_OWNER.name, passwordHash },
+  });
+  await prisma.membership.upsert({
+    where: { orgId_userId: { orgId, userId: secondOwner.id } },
+    update: { role: Role.OWNER },
+    create: { orgId, userId: secondOwner.id, role: Role.OWNER },
+  });
+
+  const crossMember = await prisma.user.findUniqueOrThrow({ where: { email: CROSS_MEMBER_EMAIL } });
+  await prisma.membership.upsert({
+    where: { orgId_userId: { orgId, userId: crossMember.id } },
+    update: { role: Role.MEMBER },
+    create: { orgId, userId: crossMember.id, role: Role.MEMBER },
+  });
+
+  return { orgId, crossMemberId: crossMember.id };
+}
+
+async function seedSecondOrgProjects(
+  orgId: string,
+  workspaceId: string,
+  phaseIdByKey: Record<string, string>,
+  crossMemberId: string,
+): Promise<void> {
+  const alreadySeeded = (await prisma.project.count({ where: { workspaceId } })) > 0;
+  if (alreadySeeded) return;
+
+  // Один лид принадлежит cross-member (Olga) — в этой орге она MEMBER, владеет своим лидом,
+  // но не может управлять воркспейсом/фазами (capability-проверка видна прямо на UI).
+  const ranks = generateNKeysBetween(null, null, 2);
+  await prisma.project.createMany({
+    data: [
+      {
+        orgId,
+        workspaceId,
+        phaseId: phaseIdByKey.lead!,
+        title: "Silk Road Traders — поставки",
+        status: ProjectStatus.OPEN,
+        value: "24000",
+        currency: "USD",
+        ownerId: crossMemberId,
+        rank: ranks[0]!,
+      },
+      {
+        orgId,
+        workspaceId,
+        phaseId: phaseIdByKey["in-progress"]!,
+        title: "Tashkent Retail — POS-интеграция",
+        status: ProjectStatus.OPEN,
+        rank: ranks[1]!,
+      },
+    ],
+  });
+}
+
 async function main(): Promise<void> {
   const { orgId, userIdByRole } = await upsertOrgAndUsers();
   const { id: workspaceId, phaseIdByKey } = await upsertWorkspace(orgId);
   await seedProjects(orgId, workspaceId, phaseIdByKey, userIdByRole);
 
+  const { orgId: secondOrgId, crossMemberId } = await upsertSecondOrg();
+  const { id: secondWorkspaceId, phaseIdByKey: secondPhaseIdByKey } = await upsertWorkspace(secondOrgId);
+  await seedSecondOrgProjects(secondOrgId, secondWorkspaceId, secondPhaseIdByKey, crossMemberId);
+
   console.log(`Seed OK — org ${orgId}, workspace ${workspaceId}. Пароль для всех демо-юзеров: ${DEMO_PASSWORD}`);
   for (const u of DEMO_USERS) console.log(`  ${u.role.padEnd(7)} ${u.email}`);
+  console.log(`Второй орг «${SECOND_ORG_NAME}» — org ${secondOrgId}, workspace ${secondWorkspaceId}`);
+  console.log(`  OWNER   ${SECOND_ORG_OWNER.email}`);
+  console.log(`  MEMBER  ${CROSS_MEMBER_EMAIL}  (в Helix Demo — OWNER; смени оргу на "${SECOND_ORG_NAME}" тем же логином)`);
 }
 
 main()
