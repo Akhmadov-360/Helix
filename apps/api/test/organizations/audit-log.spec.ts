@@ -92,13 +92,13 @@ describe("GET /v1/organizations/audit-log (decisions.md D5)", () => {
     expect(entry?.payload).toMatchObject({ name: "Second Org" });
   });
 
-  it("MANAGER не видит аудит (403 — read = O/A only)", async () => {
+  it("MANAGER читает аудит (read = все роли — словарь не секретнее публичного ростера)", async () => {
     const manager = await signUpAs(app, "MANAGER");
 
     await request(app.getHttpServer())
       .get("/v1/organizations/audit-log")
       .set("Authorization", `Bearer ${manager.token}`)
-      .expect(403);
+      .expect(200);
   });
 
   it("аудит одной орги не виден в другой (tenant-изоляция)", async () => {

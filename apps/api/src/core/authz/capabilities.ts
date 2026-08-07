@@ -40,7 +40,7 @@ const SUBJECT_OPERATIONS = {
   // см. organizations.controller.ts), создание — это POST /v1/organizations (новая
   // орга целиком, не Membership конкретного юзера) — отдельный сценарий без CASL-гейта.
   Membership: ["update", "delete"],
-  // decisions.md D5: org-security-аудит, admin-only.
+  // Читают все роли (app-ability.ts) — сегодняшний словарь не секретнее уже публичного ростера.
   AuditLog: ["read"],
 } as const satisfies Record<(typeof APP_SUBJECTS)[number], readonly AppAction[]>;
 
