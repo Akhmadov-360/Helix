@@ -20,6 +20,7 @@ import { Route as AuthenticatedCompaniesIndexRouteImport } from './routes/_authe
 import { Route as AuthenticatedCompaniesCompanyIdRouteImport } from './routes/_authenticated/companies/$companyId'
 import { Route as AuthenticatedContactsIndexRouteImport } from './routes/_authenticated/contacts/index'
 import { Route as AuthenticatedContactsContactIdRouteImport } from './routes/_authenticated/contacts/$contactId'
+import { Route as AuthenticatedProjectsProjectIdRouteImport } from './routes/_authenticated/projects/$projectId'
 import { Route as AuthenticatedSettingsAuditLogRouteImport } from './routes/_authenticated/settings/audit-log'
 import { Route as AuthenticatedSettingsMembersRouteImport } from './routes/_authenticated/settings/members'
 import { Route as AuthenticatedWorkspacesIndexRouteImport } from './routes/_authenticated/workspaces/index'
@@ -88,6 +89,12 @@ const AuthenticatedContactsContactIdRoute =
     path: '/contacts/$contactId',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedProjectsProjectIdRoute =
+  AuthenticatedProjectsProjectIdRouteImport.update({
+    id: '/projects/$projectId',
+    path: '/projects/$projectId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedSettingsAuditLogRoute =
   AuthenticatedSettingsAuditLogRouteImport.update({
     id: '/settings/audit-log',
@@ -108,27 +115,27 @@ const AuthenticatedWorkspacesIndexRoute =
   } as any)
 const AuthenticatedProjectsProjectIdIndexRoute =
   AuthenticatedProjectsProjectIdIndexRouteImport.update({
-    id: '/projects/$projectId/',
-    path: '/projects/$projectId/',
-    getParentRoute: () => AuthenticatedRoute,
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedProjectsProjectIdRoute,
   } as any)
 const AuthenticatedProjectsProjectIdActivityRoute =
   AuthenticatedProjectsProjectIdActivityRouteImport.update({
-    id: '/projects/$projectId/activity',
-    path: '/projects/$projectId/activity',
-    getParentRoute: () => AuthenticatedRoute,
+    id: '/activity',
+    path: '/activity',
+    getParentRoute: () => AuthenticatedProjectsProjectIdRoute,
   } as any)
 const AuthenticatedProjectsProjectIdContactsRoute =
   AuthenticatedProjectsProjectIdContactsRouteImport.update({
-    id: '/projects/$projectId/contacts',
-    path: '/projects/$projectId/contacts',
-    getParentRoute: () => AuthenticatedRoute,
+    id: '/contacts',
+    path: '/contacts',
+    getParentRoute: () => AuthenticatedProjectsProjectIdRoute,
   } as any)
 const AuthenticatedProjectsProjectIdTasksRoute =
   AuthenticatedProjectsProjectIdTasksRouteImport.update({
-    id: '/projects/$projectId/tasks',
-    path: '/projects/$projectId/tasks',
-    getParentRoute: () => AuthenticatedRoute,
+    id: '/tasks',
+    path: '/tasks',
+    getParentRoute: () => AuthenticatedProjectsProjectIdRoute,
   } as any)
 const AuthenticatedWorkspacesWorkspaceIdIndexRoute =
   AuthenticatedWorkspacesWorkspaceIdIndexRouteImport.update({
@@ -157,6 +164,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof AuthResetPasswordRoute
   '/companies/$companyId': typeof AuthenticatedCompaniesCompanyIdRoute
   '/contacts/$contactId': typeof AuthenticatedContactsContactIdRoute
+  '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRouteWithChildren
   '/settings/audit-log': typeof AuthenticatedSettingsAuditLogRoute
   '/settings/members': typeof AuthenticatedSettingsMembersRoute
   '/companies/': typeof AuthenticatedCompaniesIndexRoute
@@ -202,6 +210,7 @@ export interface FileRoutesById {
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/companies/$companyId': typeof AuthenticatedCompaniesCompanyIdRoute
   '/_authenticated/contacts/$contactId': typeof AuthenticatedContactsContactIdRoute
+  '/_authenticated/projects/$projectId': typeof AuthenticatedProjectsProjectIdRouteWithChildren
   '/_authenticated/settings/audit-log': typeof AuthenticatedSettingsAuditLogRoute
   '/_authenticated/settings/members': typeof AuthenticatedSettingsMembersRoute
   '/_authenticated/companies/': typeof AuthenticatedCompaniesIndexRoute
@@ -225,6 +234,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/companies/$companyId'
     | '/contacts/$contactId'
+    | '/projects/$projectId'
     | '/settings/audit-log'
     | '/settings/members'
     | '/companies/'
@@ -269,6 +279,7 @@ export interface FileRouteTypes {
     | '/_authenticated/'
     | '/_authenticated/companies/$companyId'
     | '/_authenticated/contacts/$contactId'
+    | '/_authenticated/projects/$projectId'
     | '/_authenticated/settings/audit-log'
     | '/_authenticated/settings/members'
     | '/_authenticated/companies/'
@@ -367,6 +378,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedContactsContactIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/projects/$projectId': {
+      id: '/_authenticated/projects/$projectId'
+      path: '/projects/$projectId'
+      fullPath: '/projects/$projectId'
+      preLoaderRoute: typeof AuthenticatedProjectsProjectIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/settings/audit-log': {
       id: '/_authenticated/settings/audit-log'
       path: '/settings/audit-log'
@@ -390,31 +408,31 @@ declare module '@tanstack/react-router' {
     }
     '/_authenticated/projects/$projectId/': {
       id: '/_authenticated/projects/$projectId/'
-      path: '/projects/$projectId'
+      path: '/'
       fullPath: '/projects/$projectId/'
       preLoaderRoute: typeof AuthenticatedProjectsProjectIdIndexRouteImport
-      parentRoute: typeof AuthenticatedRoute
+      parentRoute: typeof AuthenticatedProjectsProjectIdRoute
     }
     '/_authenticated/projects/$projectId/activity': {
       id: '/_authenticated/projects/$projectId/activity'
-      path: '/projects/$projectId/activity'
+      path: '/activity'
       fullPath: '/projects/$projectId/activity'
       preLoaderRoute: typeof AuthenticatedProjectsProjectIdActivityRouteImport
-      parentRoute: typeof AuthenticatedRoute
+      parentRoute: typeof AuthenticatedProjectsProjectIdRoute
     }
     '/_authenticated/projects/$projectId/contacts': {
       id: '/_authenticated/projects/$projectId/contacts'
-      path: '/projects/$projectId/contacts'
+      path: '/contacts'
       fullPath: '/projects/$projectId/contacts'
       preLoaderRoute: typeof AuthenticatedProjectsProjectIdContactsRouteImport
-      parentRoute: typeof AuthenticatedRoute
+      parentRoute: typeof AuthenticatedProjectsProjectIdRoute
     }
     '/_authenticated/projects/$projectId/tasks': {
       id: '/_authenticated/projects/$projectId/tasks'
-      path: '/projects/$projectId/tasks'
+      path: '/tasks'
       fullPath: '/projects/$projectId/tasks'
       preLoaderRoute: typeof AuthenticatedProjectsProjectIdTasksRouteImport
-      parentRoute: typeof AuthenticatedRoute
+      parentRoute: typeof AuthenticatedProjectsProjectIdRoute
     }
     '/_authenticated/workspaces/$workspaceId/': {
       id: '/_authenticated/workspaces/$workspaceId/'
@@ -456,21 +474,42 @@ const AuthRouteChildren: AuthRouteChildren = {
 
 const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
 
+interface AuthenticatedProjectsProjectIdRouteChildren {
+  AuthenticatedProjectsProjectIdActivityRoute: typeof AuthenticatedProjectsProjectIdActivityRoute
+  AuthenticatedProjectsProjectIdContactsRoute: typeof AuthenticatedProjectsProjectIdContactsRoute
+  AuthenticatedProjectsProjectIdTasksRoute: typeof AuthenticatedProjectsProjectIdTasksRoute
+  AuthenticatedProjectsProjectIdIndexRoute: typeof AuthenticatedProjectsProjectIdIndexRoute
+}
+
+const AuthenticatedProjectsProjectIdRouteChildren: AuthenticatedProjectsProjectIdRouteChildren =
+  {
+    AuthenticatedProjectsProjectIdActivityRoute:
+      AuthenticatedProjectsProjectIdActivityRoute,
+    AuthenticatedProjectsProjectIdContactsRoute:
+      AuthenticatedProjectsProjectIdContactsRoute,
+    AuthenticatedProjectsProjectIdTasksRoute:
+      AuthenticatedProjectsProjectIdTasksRoute,
+    AuthenticatedProjectsProjectIdIndexRoute:
+      AuthenticatedProjectsProjectIdIndexRoute,
+  }
+
+const AuthenticatedProjectsProjectIdRouteWithChildren =
+  AuthenticatedProjectsProjectIdRoute._addFileChildren(
+    AuthenticatedProjectsProjectIdRouteChildren,
+  )
+
 interface AuthenticatedRouteChildren {
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedCompaniesCompanyIdRoute: typeof AuthenticatedCompaniesCompanyIdRoute
   AuthenticatedContactsContactIdRoute: typeof AuthenticatedContactsContactIdRoute
+  AuthenticatedProjectsProjectIdRoute: typeof AuthenticatedProjectsProjectIdRouteWithChildren
   AuthenticatedSettingsAuditLogRoute: typeof AuthenticatedSettingsAuditLogRoute
   AuthenticatedSettingsMembersRoute: typeof AuthenticatedSettingsMembersRoute
   AuthenticatedCompaniesIndexRoute: typeof AuthenticatedCompaniesIndexRoute
   AuthenticatedContactsIndexRoute: typeof AuthenticatedContactsIndexRoute
   AuthenticatedWorkspacesIndexRoute: typeof AuthenticatedWorkspacesIndexRoute
-  AuthenticatedProjectsProjectIdActivityRoute: typeof AuthenticatedProjectsProjectIdActivityRoute
-  AuthenticatedProjectsProjectIdContactsRoute: typeof AuthenticatedProjectsProjectIdContactsRoute
-  AuthenticatedProjectsProjectIdTasksRoute: typeof AuthenticatedProjectsProjectIdTasksRoute
   AuthenticatedWorkspacesWorkspaceIdBoardRoute: typeof AuthenticatedWorkspacesWorkspaceIdBoardRoute
   AuthenticatedWorkspacesWorkspaceIdFieldsRoute: typeof AuthenticatedWorkspacesWorkspaceIdFieldsRoute
-  AuthenticatedProjectsProjectIdIndexRoute: typeof AuthenticatedProjectsProjectIdIndexRoute
   AuthenticatedWorkspacesWorkspaceIdIndexRoute: typeof AuthenticatedWorkspacesWorkspaceIdIndexRoute
 }
 
@@ -478,23 +517,17 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedCompaniesCompanyIdRoute: AuthenticatedCompaniesCompanyIdRoute,
   AuthenticatedContactsContactIdRoute: AuthenticatedContactsContactIdRoute,
+  AuthenticatedProjectsProjectIdRoute:
+    AuthenticatedProjectsProjectIdRouteWithChildren,
   AuthenticatedSettingsAuditLogRoute: AuthenticatedSettingsAuditLogRoute,
   AuthenticatedSettingsMembersRoute: AuthenticatedSettingsMembersRoute,
   AuthenticatedCompaniesIndexRoute: AuthenticatedCompaniesIndexRoute,
   AuthenticatedContactsIndexRoute: AuthenticatedContactsIndexRoute,
   AuthenticatedWorkspacesIndexRoute: AuthenticatedWorkspacesIndexRoute,
-  AuthenticatedProjectsProjectIdActivityRoute:
-    AuthenticatedProjectsProjectIdActivityRoute,
-  AuthenticatedProjectsProjectIdContactsRoute:
-    AuthenticatedProjectsProjectIdContactsRoute,
-  AuthenticatedProjectsProjectIdTasksRoute:
-    AuthenticatedProjectsProjectIdTasksRoute,
   AuthenticatedWorkspacesWorkspaceIdBoardRoute:
     AuthenticatedWorkspacesWorkspaceIdBoardRoute,
   AuthenticatedWorkspacesWorkspaceIdFieldsRoute:
     AuthenticatedWorkspacesWorkspaceIdFieldsRoute,
-  AuthenticatedProjectsProjectIdIndexRoute:
-    AuthenticatedProjectsProjectIdIndexRoute,
   AuthenticatedWorkspacesWorkspaceIdIndexRoute:
     AuthenticatedWorkspacesWorkspaceIdIndexRoute,
 }

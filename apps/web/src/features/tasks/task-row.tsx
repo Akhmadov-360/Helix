@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import type { TaskResponse } from "@helix/api-schemas";
 import { Badge, Button, Checkbox, cn } from "@helix/ui";
 import { useT } from "../../shared/i18n";
@@ -39,7 +40,7 @@ export function TaskRow({
   }
 
   return (
-    <li className="group flex items-center gap-2.5 rounded-md px-1 py-1.5 hover:bg-muted/50">
+    <li className="group flex items-center gap-2.5 rounded-lg p-2 transition-colors hover:bg-muted/40">
       <Checkbox checked={task.done} disabled={!canUpdate} onCheckedChange={onToggle} className="shrink-0" />
 
       {editing ? (
@@ -62,12 +63,26 @@ export function TaskRow({
           type="button"
           disabled={!canUpdate}
           onClick={() => canUpdate && setEditing(true)}
-          className={cn(
-            "flex-1 truncate text-left text-sm disabled:cursor-default",
-            task.done && "text-muted-foreground line-through",
-          )}
+          className="relative flex-1 truncate text-left text-sm disabled:cursor-default"
         >
-          {task.title}
+          {/* Зачёркивание — не CSS line-through (снэп без анимации в большинстве браузеров), а
+              собственная линия, растущая слева направо/сжимающаяся обратно при снятии галочки. */}
+          <span className={cn("transition-colors duration-200", task.done && "text-muted-foreground")}>
+            {task.title}
+          </span>
+          <AnimatePresence>
+            {task.done && (
+              <motion.span
+                key="strike"
+                initial={{ scaleX: 0 }}
+                animate={{ scaleX: 1 }}
+                exit={{ scaleX: 0 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                style={{ originX: 0 }}
+                className="pointer-events-none absolute left-0 top-1/2 h-px w-full bg-muted-foreground"
+              />
+            )}
+          </AnimatePresence>
         </button>
       )}
 
