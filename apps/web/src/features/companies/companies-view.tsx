@@ -1,20 +1,27 @@
 import { useEffect, useMemo, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Briefcase, Building2, Link2Off, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowUpRight, Briefcase, Building2, Link2Off, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import type { CompanyDedupHint as CompanyDedupHintData, CompanyResponse, ContactLink, DealLink } from "@helix/api-schemas";
 import {
   Avatar,
   avatarVariants,
   Button,
   cn,
+  ColumnsMenu,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  Pagination,
   Popover,
   PopoverContent,
   PopoverTrigger,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   SortableTableHead,
   Table,
   TableBody,
@@ -26,10 +33,13 @@ import {
 } from "@helix/ui";
 import { useCan } from "../../shared/auth/ability";
 import { useT } from "../../shared/i18n";
+import { useColumnVisibility } from "../../shared/lib/use-column-visibility";
+import { useCursorPagination } from "../../shared/lib/use-cursor-pagination";
+import { useTableSort, type TableSort } from "../../shared/lib/use-table-sort";
 import { CompanyDedupHint } from "./company-dedup-hint";
 import { CompanyFormDialog } from "./company-form-dialog";
 import { DeleteCompanyDialog } from "./delete-company-dialog";
-import { useLoadMoreCompanies, useUnlinkCompanyFromProject } from "./mutations";
+import { useUnlinkCompanyFromProject } from "./mutations";
 import { companiesListQueryOptions } from "./queries";
 
 // Тот же порог, что project-card.tsx MAX_VISIBLE_ASSIGNEES — единая граница "стек vs +N" везде,
@@ -37,13 +47,8 @@ import { companiesListQueryOptions } from "./queries";
 const MAX_VISIBLE_CONTACTS = 3;
 
 type SortKey = "name" | "domain" | "industry";
-type SortDirection = "asc" | "desc";
-interface SortState {
-  key: SortKey;
-  direction: SortDirection;
-}
 
-function sortCompanies(companies: CompanyResponse[], sort: SortState): CompanyResponse[] {
+function sortCompanies(companies: CompanyResponse[], sort: TableSort<SortKey>): CompanyResponse[] {
   const dir = sort.direction === "asc" ? 1 : -1;
   return [...companies].sort((a, b) => {
     const av = a[sort.key] ?? "";
@@ -164,16 +169,30 @@ export function CompaniesView({ orgId }: { orgId: string }) {
     const timer = setTimeout(() => setDebounced(search.trim()), 300);
     return () => clearTimeout(timer);
   }, [search]);
-  const query = useMemo(() => ({ q: debounced || undefined }), [debounced]);
+  const [industryFilter, setIndustryFilter] = useState<string | undefined>(undefined);
+  const [pageSize, setPageSize] = useState(25);
+  const pagination = useCursorPagination(`${debounced}|${industryFilter}|${pageSize}`);
+  const query = useMemo(
+    () => ({ q: debounced || undefined, industry: industryFilter, cursorId: pagination.cursorId, limit: pageSize }),
+    [debounced, industryFilter, pagination.cursorId, pageSize],
+  );
 
   // useQuery + placeholderData (не useSuspenseQuery) — тот же приём, что contacts/global-contacts-
   // view.tsx: смена поиска меняет query-key, старая страница остаётся на экране, пока грузится новая.
   const { data, isFetching } = useQuery({ ...companiesListQueryOptions(orgId, query), placeholderData: keepPreviousData });
   const companies = useMemo(() => data?.companies ?? [], [data]);
   const hasMore = data?.hasMore ?? false;
-  const loadMore = useLoadMoreCompanies(orgId, query);
 
-  const [sort, setSort] = useState<SortState>({ key: "name", direction: "asc" });
+  // Список значений для дропдауна "Индустрия" — нет отдельного /distinct-эндпоинта, поэтому
+  // берём отдельным (не завязанным на текущий поиск/фильтр/страницу) запросом первых 100 компаний
+  // орги: список опций не должен схлопываться до одного значения, когда сам фильтр уже применён.
+  const { data: industryOptionsData } = useQuery(companiesListQueryOptions(orgId, { limit: 100 }));
+  const industryOptions = useMemo(
+    () => [...new Set((industryOptionsData?.companies ?? []).map((c) => c.industry).filter((v): v is string => !!v))].sort(),
+    [industryOptionsData],
+  );
+
+  const [sort, toggleSort] = useTableSort<SortKey>({ key: "name", direction: "asc" });
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<CompanyResponse | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CompanyResponse | null>(null);
@@ -186,24 +205,50 @@ export function CompaniesView({ orgId }: { orgId: string }) {
     ? new Set([dedup.newCompanyId, ...dedup.hint.candidates.map((c) => c.id)])
     : null;
 
-  function toggleSort(key: SortKey) {
-    setSort((prev) => (prev.key === key ? { key, direction: prev.direction === "asc" ? "desc" : "asc" } : { key, direction: "asc" }));
-  }
+  // Name и колонка действий — всегда видны (toggleable: false), остальное можно спрятать через
+  // "Columns" (design review): один источник правды и для меню, и для colSpan пустого состояния.
+  const columns = [
+    { key: "domain", label: t("companies.list.domain") },
+    { key: "industry", label: t("companies.list.industry") },
+    { key: "deals", label: t("companies.list.colDeals") },
+    { key: "contacts", label: t("companies.list.colContacts") },
+  ];
+  const { isVisible, toggle: toggleColumn } = useColumnVisibility("companies");
+  const columnCount = 2 + columns.filter((c) => isVisible(c.key)).length;
 
   const toolbar = (
     <TableToolbar
       search={{ value: search, onChange: setSearch, placeholder: t("companies.page.searchPlaceholder") }}
-      actions={
-        canCreate && (
-          <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
-            <Plus className="h-3.5 w-3.5" />
-            {t("companies.create.trigger")}
-          </Button>
+      filters={
+        industryOptions.length > 0 && (
+          <Select value={industryFilter ?? "all"} onValueChange={(value) => setIndustryFilter(value === "all" ? undefined : value)}>
+            <SelectTrigger className="h-9 w-[160px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("companies.filter.allIndustries")}</SelectItem>
+              {industryOptions.map((industry) => (
+                <SelectItem key={industry} value={industry}>
+                  {industry}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         )
+      }
+      actions={
+        <>
+          <ColumnsMenu columns={columns} isVisible={isVisible} onToggle={toggleColumn} triggerLabel={t("table.columns.trigger")} />
+          {canCreate && (
+            <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
+              <Plus className="h-3.5 w-3.5" />
+              {t("companies.create.trigger")}
+            </Button>
+          )}
+        </>
       }
     />
   );
-  const columnCount = 6;
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
@@ -215,14 +260,18 @@ export function CompaniesView({ orgId }: { orgId: string }) {
             <SortableTableHead active={sort.key === "name"} direction={sort.direction} onClick={() => toggleSort("name")}>
               {t("companies.list.name")}
             </SortableTableHead>
-            <SortableTableHead active={sort.key === "domain"} direction={sort.direction} onClick={() => toggleSort("domain")}>
-              {t("companies.list.domain")}
-            </SortableTableHead>
-            <SortableTableHead active={sort.key === "industry"} direction={sort.direction} onClick={() => toggleSort("industry")}>
-              {t("companies.list.industry")}
-            </SortableTableHead>
-            <TableHead>{t("companies.list.colDeals")}</TableHead>
-            <TableHead>{t("companies.list.colContacts")}</TableHead>
+            {isVisible("domain") && (
+              <SortableTableHead active={sort.key === "domain"} direction={sort.direction} onClick={() => toggleSort("domain")}>
+                {t("companies.list.domain")}
+              </SortableTableHead>
+            )}
+            {isVisible("industry") && (
+              <SortableTableHead active={sort.key === "industry"} direction={sort.direction} onClick={() => toggleSort("industry")}>
+                {t("companies.list.industry")}
+              </SortableTableHead>
+            )}
+            {isVisible("deals") && <TableHead>{t("companies.list.colDeals")}</TableHead>}
+            {isVisible("contacts") && <TableHead>{t("companies.list.colContacts")}</TableHead>}
             <TableHead className="w-10">
               <span className="sr-only">{t("companies.list.menu")}</span>
             </TableHead>
@@ -234,7 +283,7 @@ export function CompaniesView({ orgId }: { orgId: string }) {
               <TableCell colSpan={columnCount}>
                 <div className="flex flex-col items-center justify-center gap-2 py-16 text-muted-foreground">
                   <Building2 className="h-8 w-8" />
-                  <p>{debounced ? t("companies.page.noResults") : t("companies.page.empty")}</p>
+                  <p>{debounced || industryFilter ? t("companies.page.noResults") : t("companies.page.empty")}</p>
                 </div>
               </TableCell>
             </TableRow>
@@ -242,23 +291,32 @@ export function CompaniesView({ orgId }: { orgId: string }) {
             rows.map((company) => (
               <TableRow key={company.id} className={cn(dedupHighlight?.has(company.id) && "bg-amber-500/5")}>
                 <TableCell>
-                  <Link to="/companies/$companyId" params={{ companyId: company.id }} className="font-medium text-foreground hover:text-accent">
-                    {company.name}
+                  <Link
+                    to="/companies/$companyId"
+                    params={{ companyId: company.id }}
+                    className="group inline-flex items-center gap-1 font-medium text-foreground hover:text-accent"
+                  >
+                    <span className="truncate">{company.name}</span>
+                    <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60 transition-colors group-hover:text-accent" />
                   </Link>
                 </TableCell>
-                <TableCell className="text-muted-foreground">{company.domain ?? "—"}</TableCell>
-                <TableCell className="text-muted-foreground">{company.industry ?? "—"}</TableCell>
-                <TableCell>
-                  <DealsPopover
-                    projects={company.projects ?? []}
-                    canUnlink={canUnlinkDeal}
-                    onUnlink={(projectId) => unlinkFromProject.mutate({ projectId })}
-                    pending={unlinkFromProject.isPending}
-                  />
-                </TableCell>
-                <TableCell>
-                  <ContactsPopover contacts={company.contacts ?? []} />
-                </TableCell>
+                {isVisible("domain") && <TableCell className="text-muted-foreground">{company.domain ?? "—"}</TableCell>}
+                {isVisible("industry") && <TableCell className="text-muted-foreground">{company.industry ?? "—"}</TableCell>}
+                {isVisible("deals") && (
+                  <TableCell>
+                    <DealsPopover
+                      projects={company.projects ?? []}
+                      canUnlink={canUnlinkDeal}
+                      onUnlink={(projectId) => unlinkFromProject.mutate({ projectId })}
+                      pending={unlinkFromProject.isPending}
+                    />
+                  </TableCell>
+                )}
+                {isVisible("contacts") && (
+                  <TableCell>
+                    <ContactsPopover contacts={company.contacts ?? []} />
+                  </TableCell>
+                )}
                 <TableCell>
                   {(canUpdate || canDelete) && (
                     <DropdownMenu>
@@ -289,13 +347,23 @@ export function CompaniesView({ orgId }: { orgId: string }) {
           )}
         </TableBody>
       </Table>
-      {hasMore && (
-        <div className="flex shrink-0 justify-center">
-          <Button type="button" variant="outline" size="sm" onClick={() => loadMore.mutate()} disabled={loadMore.isPending || isFetching}>
-            {loadMore.isPending ? t("companies.list.loadingMore") : t("companies.list.loadMore")}
-          </Button>
-        </div>
-      )}
+      <Pagination
+        className="shrink-0"
+        page={pagination.page}
+        hasPrev={pagination.hasPrev && !isFetching}
+        hasNext={hasMore && !isFetching}
+        onPrev={pagination.goPrev}
+        onNext={() => {
+          const lastId = companies.at(-1)?.id;
+          if (lastId) pagination.goNext(lastId);
+        }}
+        pageSize={pageSize}
+        onPageSizeChange={setPageSize}
+        pageSizeLabel={t("table.pagination.rowsPerPage")}
+        pageLabel={(page) => t("table.pagination.page", { page })}
+        prevLabel={t("table.pagination.prevPage")}
+        nextLabel={t("table.pagination.nextPage")}
+      />
 
       <CompanyFormDialog
         orgId={orgId}

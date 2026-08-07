@@ -1,11 +1,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import type { ContactListResponse, CreateContactInput, DealRole, ProjectContactResponse, UpdateContactInput } from "@helix/api-schemas";
-import { contactListResponseSchema, contactResponseSchema, createContactResponseSchema, projectContactResponseSchema } from "@helix/api-schemas";
+import { contactResponseSchema, createContactResponseSchema, projectContactResponseSchema } from "@helix/api-schemas";
 import { queryKeys, request } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
 import { toast } from "sonner";
-import { contactQueryOptions, projectContactsQueryOptions, type ContactsListQuery } from "./queries";
+import { contactQueryOptions, projectContactsQueryOptions } from "./queries";
 import { toContactError, toLinkContactError } from "./contact-error";
 
 // Список — единственный query-key с параметрами (contactsList(orgId, query), см. query-keys.ts),
@@ -272,33 +272,6 @@ export function useMergeContact(orgId: string, projectId: string) {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: projectContactsQueryOptions(orgId, projectId).queryKey });
-    },
-  });
-}
-
-// Курсорная догрузка (§2, тот же приём, что board's useLoadMoreColumn): один query-key на весь
-// фильтр {q, companyId} (query-keys.ts contactsList), страницы дописываются в его кэш — смена
-// поиска меняет query-key целиком и сама сбрасывает пагинацию, отдельно сбрасывать курсор не надо.
-export function useLoadMoreContacts(orgId: string, query: ContactsListQuery) {
-  const queryClient = useQueryClient();
-  const queryKey = queryKeys.contactsList(orgId, query);
-
-  return useMutation({
-    mutationFn: () => {
-      const current = queryClient.getQueryData<ContactListResponse>(queryKey);
-      const cursorId = current?.contacts.at(-1)?.id;
-      return request({
-        path: "/v1/contacts",
-        searchParams: { ...query, cursorId },
-        schema: contactListResponseSchema,
-      });
-    },
-    onSuccess: (page) => {
-      queryClient.setQueryData<ContactListResponse>(queryKey, (existing) =>
-        existing
-          ? { contacts: [...existing.contacts, ...page.contacts], hasMore: page.hasMore }
-          : page,
-      );
     },
   });
 }

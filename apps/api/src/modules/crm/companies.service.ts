@@ -43,6 +43,7 @@ export class CompaniesService {
   async list(orgId: string, query: CompanyQuery): Promise<CompanyListResponse> {
     const rows = await this.companies.listByOrg(orgId, {
       q: query.q,
+      industry: query.industry,
       cursorId: query.cursorId,
       limit: query.limit,
     });

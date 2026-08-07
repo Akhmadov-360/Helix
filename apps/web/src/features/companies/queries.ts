@@ -4,7 +4,9 @@ import { queryKeys, request } from "../../shared/api";
 
 export interface CompaniesListQuery {
   q?: string;
-  [key: string]: string | undefined;
+  cursorId?: string;
+  limit?: number;
+  [key: string]: string | number | undefined;
 }
 
 export function companiesListQueryOptions(orgId: string, query: CompaniesListQuery = {}) {
