@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { authResultSchema, registerSchema, type RegisterInput } from "@helix/api-schemas";
-import { Button, Input, Label } from "@helix/ui";
+import { Button, Input, Label, PasswordInput } from "@helix/ui";
 import { request, setAccessToken, TransportError } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
 import { clearLastWorkspaceId } from "../../shared/lib/last-workspace";
@@ -37,7 +37,7 @@ export function RegisterForm() {
       className="flex flex-col gap-4"
     >
       <div className="flex flex-col gap-2">
-        <Label htmlFor="name">{t("register.name")}</Label>
+        <Label htmlFor="name" required>{t("register.name")}</Label>
         <Input
           id="name"
           type="text"
@@ -49,7 +49,7 @@ export function RegisterForm() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="email">{t("register.email")}</Label>
+        <Label htmlFor="email" required>{t("register.email")}</Label>
         <Input
           id="email"
           type="email"
@@ -61,12 +61,13 @@ export function RegisterForm() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="password">{t("register.password")}</Label>
-        <Input
+        <Label htmlFor="password" required>{t("register.password")}</Label>
+        <PasswordInput
           id="password"
-          type="password"
           autoComplete="new-password"
           aria-invalid={errors.password !== undefined}
+          showLabel={t("auth.password.show")}
+          hideLabel={t("auth.password.hide")}
           {...form.register("password")}
         />
         {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}

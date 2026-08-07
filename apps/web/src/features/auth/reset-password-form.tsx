@@ -4,7 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { resetPasswordSchema, type ResetPasswordInput } from "@helix/api-schemas";
 import { z } from "zod";
-import { Button, Input, Label } from "@helix/ui";
+import { Button, Label, PasswordInput } from "@helix/ui";
 import { request, TransportError } from "../../shared/api";
 import { toast } from "sonner";
 import { useT, type MessageKey } from "../../shared/i18n";
@@ -36,12 +36,13 @@ export function ResetPasswordForm({ token }: { token: string }) {
       className="flex flex-col gap-4"
     >
       <div className="flex flex-col gap-2">
-        <Label htmlFor="newPassword">{t("resetPassword.newPassword")}</Label>
-        <Input
+        <Label htmlFor="newPassword" required>{t("resetPassword.newPassword")}</Label>
+        <PasswordInput
           id="newPassword"
-          type="password"
           autoComplete="new-password"
           aria-invalid={errors.newPassword !== undefined}
+          showLabel={t("auth.password.show")}
+          hideLabel={t("auth.password.hide")}
           {...form.register("newPassword")}
         />
         {errors.newPassword && <p className="text-sm text-destructive">{errors.newPassword.message}</p>}

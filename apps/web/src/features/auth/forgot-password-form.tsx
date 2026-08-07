@@ -34,7 +34,7 @@ export function ForgotPasswordForm() {
       className="flex flex-col gap-4"
     >
       <div className="flex flex-col gap-2">
-        <Label htmlFor="email">{t("forgotPassword.email")}</Label>
+        <Label htmlFor="email" required>{t("forgotPassword.email")}</Label>
         <Input
           id="email"
           type="email"

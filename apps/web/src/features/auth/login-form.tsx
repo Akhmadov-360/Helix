@@ -1,9 +1,9 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useMutation } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { authResultSchema, loginSchema, type LoginInput } from "@helix/api-schemas";
-import { Button, Input, Label } from "@helix/ui";
+import { Button, Input, Label, PasswordInput } from "@helix/ui";
 import { request, setAccessToken, TransportError } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
 import { clearLastWorkspaceId } from "../../shared/lib/last-workspace";
@@ -38,7 +38,7 @@ export function LoginForm() {
       className="flex flex-col gap-4"
     >
       <div className="flex flex-col gap-2">
-        <Label htmlFor="email">{t("login.email")}</Label>
+        <Label htmlFor="email" required>{t("login.email")}</Label>
         <Input
           id="email"
           type="email"
@@ -50,12 +50,21 @@ export function LoginForm() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="password">{t("login.password")}</Label>
-        <Input
+        <div className="flex items-center justify-between">
+          <Label htmlFor="password" required>{t("login.password")}</Label>
+          <Link
+            to="/forgot-password"
+            className="text-xs font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+          >
+            {t("login.forgotPassword")}
+          </Link>
+        </div>
+        <PasswordInput
           id="password"
-          type="password"
           autoComplete="current-password"
           aria-invalid={errors.password !== undefined}
+          showLabel={t("auth.password.show")}
+          hideLabel={t("auth.password.hide")}
           {...form.register("password")}
         />
         {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
