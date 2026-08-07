@@ -185,6 +185,15 @@ export class ProjectsService {
     }));
   }
 
+  // Архив (§7): плоский список, та же 404-проверка принадлежности воркспейса орге, что у доски.
+  async listArchived(orgId: string, workspaceId: string): Promise<ProjectResponse[]> {
+    const workspace = await this.workspaces.findByIdInOrg(workspaceId, orgId);
+    if (!workspace) throw new ResourceNotFoundError("Workspace not found");
+
+    const rows = await this.projects.listArchived(workspaceId);
+    return rows.map(toProjectResponse);
+  }
+
   // Доска: фазы + первые N карточек каждой (§8). Воркспейс проверяем на принадлежность
   // орге ЗДЕСЬ (404), дальше raw-запрос по workspaceId уже безопасен.
   async getBoard(orgId: string, workspaceId: string, limitPerPhase: number): Promise<BoardResponse> {

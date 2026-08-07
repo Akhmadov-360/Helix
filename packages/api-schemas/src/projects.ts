@@ -87,6 +87,11 @@ export const projectResponseSchema = z.object({
 });
 export type ProjectResponse = z.infer<typeof projectResponseSchema>;
 
+// GET /workspaces/:id/projects/archived — плоский список, без доски/фаз-агрегатов (P3): архив
+// не рендерится колонками, отдельная страница со списком карточек.
+export const archivedProjectListResponseSchema = z.array(projectResponseSchema);
+export type ArchivedProjectListResponse = z.infer<typeof archivedProjectListResponseSchema>;
+
 // Расширение ТОЛЬКО для доски/колонки (не всего ProjectResponse — move/reassign/archive/restore
 // его тоже возвращают, пересчитывать агрегаты на каждой такой мутации незачем, P3).
 export const boardProjectResponseSchema = projectResponseSchema.extend({

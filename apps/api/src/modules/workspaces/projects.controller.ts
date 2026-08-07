@@ -20,6 +20,7 @@ import {
   reassignProjectSchema,
   updateProjectSchema,
   type ActivityEventResponse,
+  type ArchivedProjectListResponse,
   type BoardQuery,
   type BoardResponse,
   type ColumnQuery,
@@ -64,6 +65,15 @@ export class ProjectsController {
     @Query(new ZodValidationPipe(boardQuerySchema)) query: BoardQuery,
   ): Promise<BoardResponse> {
     return this.projects.getBoard(auth.activeOrgId, workspaceId, query.limitPerPhase);
+  }
+
+  @Get("workspaces/:workspaceId/projects/archived")
+  @CheckPolicy("read", "Project")
+  archived(
+    @CurrentAuth() auth: AuthContext,
+    @Param("workspaceId") workspaceId: string,
+  ): Promise<ArchivedProjectListResponse> {
+    return this.projects.listArchived(auth.activeOrgId, workspaceId);
   }
 
   // Смена фазы/позиции — не создание → 200. Политика update Project (O/A/M).

@@ -219,6 +219,28 @@ export function useArchiveProject(orgId: string, workspaceId: string) {
   });
 }
 
+// Восстановленная карточка получает НОВЫЙ ранг/статус на бэке (§7.3) — точную позицию в доске
+// не смоделировать оптимистично, поэтому оба кэша (доска + архив) просто инвалидируются.
+export function useRestoreProject(orgId: string, workspaceId: string) {
+  const queryClient = useQueryClient();
+  const t = useT();
+
+  return useMutation({
+    mutationFn: (vars: { id: string; title: string }) =>
+      request({ method: "POST", path: `/v1/projects/${vars.id}/restore`, schema: projectResponseSchema }),
+    onError: (error) => {
+      const kind = toBoardError(error);
+      if (kind === "permissionDenied") void queryClient.invalidateQueries({ queryKey: queryKeys.me() });
+      toast.error(t(boardErrorKey(kind)));
+    },
+    onSuccess: (_project, vars) => {
+      void queryClient.invalidateQueries({ queryKey: boardQueryOptions(orgId, workspaceId).queryKey });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.archivedProjects(orgId, workspaceId) });
+      toast.success(t("board.card.restored", { title: vars.title }));
+    },
+  });
+}
+
 export function useDeleteProject(orgId: string, workspaceId: string) {
   const queryClient = useQueryClient();
   const { queryKey } = boardQueryOptions(orgId, workspaceId);

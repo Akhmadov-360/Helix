@@ -44,6 +44,15 @@ export interface CreateProjectData {
 export class ProjectsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  // Плоский список (не по фазам — архив не рендерится доской), свежеархивированные сверху.
+  listArchived(workspaceId: string, tx?: Prisma.TransactionClient): Promise<ProjectRow[]> {
+    return (tx ?? this.prisma.client).project.findMany({
+      where: { workspaceId, status: "ARCHIVED" },
+      select: PROJECT_SELECT,
+      orderBy: { updatedAt: "desc" },
+    });
+  }
+
   countByPhase(phaseId: string, tx?: Prisma.TransactionClient): Promise<number> {
     return (tx ?? this.prisma.client).project.count({ where: { phaseId } });
   }
