@@ -1,21 +1,11 @@
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { ArrowRight, Calendar, MoreHorizontal, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
-import type { WorkspaceResponse } from "@helix/api-schemas";
-import {
-  Badge,
-  Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@helix/ui";
+import { ArrowRight, Calendar, Plus } from "lucide-react";
+import { Badge } from "@helix/ui";
 import { workspacesQueryOptions } from "../../../features/workspaces/queries";
 import { CreateWorkspaceDialog } from "../../../features/workspaces/create-workspace-dialog";
-import { EditWorkspaceDialog } from "../../../features/workspaces/edit-workspace-dialog";
-import { DeleteWorkspaceDialog } from "../../../features/workspaces/delete-workspace-dialog";
-import { SaveAsBlueprintDialog } from "../../../features/workspaces/save-as-blueprint-dialog";
+import { WorkspaceMenu } from "../../../features/workspaces/workspace-menu";
 import { useCan } from "../../../shared/auth/ability";
 import { useLocaleStore, useT } from "../../../shared/i18n";
 import { meQueryOptions, useMe } from "../../../shared/auth/session";
@@ -38,13 +28,7 @@ function WorkspacesPage() {
   const locale = useLocaleStore((state) => state.locale);
   const workspaces = useSuspenseQuery(workspacesQueryOptions(me.activeOrgId)).data;
   const canCreate = useCan("Workspace.create");
-  const canUpdate = useCan("Workspace.update");
-  const canDelete = useCan("Workspace.delete");
-  const canSaveBlueprint = useCan("Blueprint.create"); // blueprints.md §6: Manage blueprints = O/A only
   const [createOpen, setCreateOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<WorkspaceResponse | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
-  const [saveBlueprintTarget, setSaveBlueprintTarget] = useState<WorkspaceResponse | null>(null);
 
   const dateFormatter = new Intl.DateTimeFormat(locale, { day: "2-digit", month: "short", year: "numeric" });
 
@@ -96,44 +80,7 @@ function WorkspacesPage() {
                   {workspaceInitial(workspace.name)}
                 </span>
                 <div className="flex items-center gap-0.5">
-                  {(canUpdate || canDelete || canSaveBlueprint) && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
-                          aria-label={t("workspaces.card.menu")}
-                        >
-                          <MoreHorizontal className="h-3.5 w-3.5" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {canUpdate && (
-                          <DropdownMenuItem onSelect={() => setEditTarget(workspace)}>
-                            <Pencil className="h-3.5 w-3.5" />
-                            {t("workspaces.card.edit")}
-                          </DropdownMenuItem>
-                        )}
-                        {canSaveBlueprint && (
-                          <DropdownMenuItem onSelect={() => setSaveBlueprintTarget(workspace)}>
-                            <Sparkles className="h-3.5 w-3.5" />
-                            {t("workspaces.card.saveAsBlueprint")}
-                          </DropdownMenuItem>
-                        )}
-                        {canDelete && (
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onSelect={() => setDeleteTarget({ id: workspace.id, name: workspace.name })}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            {t("workspaces.card.delete")}
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
+                  <WorkspaceMenu orgId={me.activeOrgId} workspace={workspace} trigger="card" />
                   <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
                 </div>
               </div>
@@ -167,26 +114,6 @@ function WorkspacesPage() {
       )}
 
       {canCreate && <CreateWorkspaceDialog orgId={me.activeOrgId} open={createOpen} onOpenChange={setCreateOpen} />}
-      <EditWorkspaceDialog
-        key={editTarget?.id ?? "none"}
-        orgId={me.activeOrgId}
-        workspace={editTarget}
-        open={editTarget !== null}
-        onOpenChange={(open) => !open && setEditTarget(null)}
-      />
-      <DeleteWorkspaceDialog
-        orgId={me.activeOrgId}
-        workspace={deleteTarget}
-        open={deleteTarget !== null}
-        onOpenChange={(open) => !open && setDeleteTarget(null)}
-      />
-      <SaveAsBlueprintDialog
-        key={saveBlueprintTarget?.id ?? "none"}
-        orgId={me.activeOrgId}
-        workspace={saveBlueprintTarget}
-        open={saveBlueprintTarget !== null}
-        onOpenChange={(open) => !open && setSaveBlueprintTarget(null)}
-      />
     </div>
   );
 }

@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Link } from "@tanstack/react-router";
-import { LayoutGrid, Plus, SlidersHorizontal, Table2 } from "lucide-react";
-import type { CompanyResponse } from "@helix/api-schemas";
+import { LayoutGrid, Plus, Table2 } from "lucide-react";
+import type { CompanyResponse, WorkspaceResponse } from "@helix/api-schemas";
 import { Button, cn } from "@helix/ui";
 import { useCan } from "../../shared/auth/ability";
 import { useT } from "../../shared/i18n";
+import { WorkspaceMenu } from "../workspaces/workspace-menu";
 import { BoardView } from "./board-view";
 import { CreateDealDialog } from "./create-deal-dialog";
 import { TableView } from "./table-view";
@@ -14,6 +14,7 @@ export type BoardDisplayMode = "board" | "table";
 interface Props {
   orgId: string;
   workspaceId: string;
+  workspace: WorkspaceResponse;
   companies: CompanyResponse[];
   view: BoardDisplayMode;
   onViewChange: (view: BoardDisplayMode) => void;
@@ -22,7 +23,7 @@ interface Props {
 // Хедер (кнопка создания + переключатель Доска/Таблица) живёт на уровне страницы, а не внутри
 // BoardView — оба вида делят одну строку, а Table view не владеет DnD-состоянием доски и не должен
 // его тянуть только ради общей кнопки.
-export function BoardShell({ orgId, workspaceId, companies, view, onViewChange }: Props) {
+export function BoardShell({ orgId, workspaceId, workspace, companies, view, onViewChange }: Props) {
   const t = useT();
   const canCreate = useCan("Project.create");
   const [createOpen, setCreateOpen] = useState(false);
@@ -43,14 +44,7 @@ export function BoardShell({ orgId, workspaceId, companies, view, onViewChange }
             <ViewToggleButton active={view === "board"} icon={LayoutGrid} label={t("board.view.board")} onClick={() => onViewChange("board")} />
             <ViewToggleButton active={view === "table"} icon={Table2} label={t("board.view.table")} onClick={() => onViewChange("table")} />
           </div>
-          <Link
-            to="/workspaces/$workspaceId/fields"
-            params={{ workspaceId }}
-            aria-label={t("fields.page.trigger")}
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <SlidersHorizontal className="h-3.5 w-3.5" />
-          </Link>
+          <WorkspaceMenu orgId={orgId} workspace={workspace} trigger="toolbar" />
         </div>
       </div>
       <div className="min-h-0 flex-1">

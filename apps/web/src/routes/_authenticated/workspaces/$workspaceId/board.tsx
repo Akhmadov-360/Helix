@@ -3,6 +3,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { companiesListQueryOptions } from "../../../../features/companies/queries";
 import { boardQueryOptions } from "../../../../features/board/queries";
 import { BoardShell, type BoardDisplayMode } from "../../../../features/board/board-shell";
+import { workspaceQueryOptions } from "../../../../features/phases/queries";
 import { meQueryOptions, useMe } from "../../../../shared/auth/session";
 
 export interface BoardSearch {
@@ -22,6 +23,7 @@ export const Route = createFileRoute("/_authenticated/workspaces/$workspaceId/bo
     await Promise.all([
       context.queryClient.ensureQueryData(boardQueryOptions(me.activeOrgId, params.workspaceId)),
       context.queryClient.ensureQueryData(companiesListQueryOptions(me.activeOrgId)),
+      context.queryClient.ensureQueryData(workspaceQueryOptions(me.activeOrgId, params.workspaceId)),
     ]);
   },
   component: BoardPage,
@@ -33,11 +35,13 @@ function BoardPage() {
   const navigate = Route.useNavigate();
   const me = useMe();
   const { companies } = useSuspenseQuery(companiesListQueryOptions(me.activeOrgId)).data;
+  const workspace = useSuspenseQuery(workspaceQueryOptions(me.activeOrgId, workspaceId)).data;
 
   return (
     <BoardShell
       orgId={me.activeOrgId}
       workspaceId={workspaceId}
+      workspace={workspace}
       companies={companies}
       view={view ?? "board"}
       onViewChange={(next) =>
