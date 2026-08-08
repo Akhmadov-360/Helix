@@ -25,3 +25,73 @@ export type MyOrgResponse = z.infer<typeof myOrgResponseSchema>;
 
 export const myOrgListResponseSchema = z.array(myOrgResponseSchema);
 export type MyOrgListResponse = z.infer<typeof myOrgListResponseSchema>;
+
+// ────────────────────── создание доп. организации (FR-ORG-2) ────────────────────
+// Organization.name — простая строка (см. registration.service.ts), не LocalizedName.
+export const createOrganizationSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+});
+export type CreateOrganizationInput = z.infer<typeof createOrganizationSchema>;
+
+// ─────────────────── смена роли участника (Appendix B, O/A only) ────────────────
+export const changeMemberRoleSchema = z.object({
+  role: roleSchema,
+});
+export type ChangeMemberRoleInput = z.infer<typeof changeMemberRoleSchema>;
+
+// ───────────────────────── FR-ORG-3: org-level settings ─────────────────────────
+// Organization.settings — типизированная проекция JSON-колонки (default "{}"), не отдельные
+// колонки схемы: ни одно поле не нуждается в индексации/фильтрации, а набор естественно растёт
+// без новых миграций. Все поля опциональны — партиальный PATCH мёржится в service, не здесь.
+
+// Полные официальные списки ECMA-402 (Intl.supportedValuesOf), а не ручная курация — не устаревают
+// и не требуют поддержки. Работает и в Node (валидация на бэке), и в браузере (Select на фронте):
+// оба — часть baseline ECMA-402, доступны там, где уже используется остальной Intl (locale, дата).
+export const CURRENCY_CODES = Intl.supportedValuesOf("currency");
+export const currencyCodeSchema = z.enum(CURRENCY_CODES);
+
+export const TIME_ZONES = Intl.supportedValuesOf("timeZone");
+export const timeZoneSchema = z.enum(TIME_ZONES);
+
+// logoUrl: временно принимает и обычный URL, и data:-URI (см. организация-настройки §логотип) —
+// загрузка файла в S3/MinIO это M3 (packages/config/src/env.schema.ts помечает S3 как M3/files),
+// до тех пор фронт кодирует превью в data-URI на клиенте с проверкой размера/типа. Единственный
+// источник лимита — MAX_LOGO_FILE_BYTES; здесь его же base64-проекция (+overhead data:-префикса),
+// не отдельная константа, которая могла бы разъехаться с клиентской проверкой.
+export const MAX_LOGO_FILE_BYTES = 300 * 1024;
+const MAX_LOGO_DATA_URI_LENGTH = Math.ceil(MAX_LOGO_FILE_BYTES / 3) * 4 + 50;
+
+const brandingSchema = z.object({
+  logoUrl: z.string().url().max(MAX_LOGO_DATA_URI_LENGTH).optional(),
+  primaryColor: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/, "Ожидается hex-цвет, напр. #1a2b3c")
+    .optional(),
+});
+
+// aiProvider — конфиг-заглушка под M4 (AI/RAG ещё не построены): свободные строки, без
+// enforcement сегодня. Провайдер/регион валидируются реальными значениями, когда появится
+// потребитель (packages/ai), не раньше — не изобретаем enum под несуществующую интеграцию.
+const aiProviderSchema = z.object({
+  provider: z.string().trim().min(1).max(100).optional(),
+  region: z.string().trim().min(1).max(100).optional(),
+});
+
+export const organizationSettingsSchema = z.object({
+  currency: currencyCodeSchema.optional(),
+  timezone: timeZoneSchema.optional(),
+  branding: brandingSchema.optional(),
+  aiProvider: aiProviderSchema.optional(),
+});
+export type OrganizationSettings = z.infer<typeof organizationSettingsSchema>;
+
+// PATCH-тело — то же самое (уже все поля optional), отдельный алиас для читаемости контроллера.
+export const updateOrganizationSettingsSchema = organizationSettingsSchema;
+export type UpdateOrganizationSettingsInput = z.infer<typeof updateOrganizationSettingsSchema>;
+
+export const organizationSettingsResponseSchema = z.object({
+  orgId: z.string(),
+  name: z.string(),
+  settings: organizationSettingsSchema,
+});
+export type OrganizationSettingsResponse = z.infer<typeof organizationSettingsResponseSchema>;

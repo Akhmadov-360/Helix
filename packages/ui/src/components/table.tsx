@@ -111,17 +111,21 @@ export function SortableTableHead({
 export function TableToolbar({
   title,
   search,
+  filters,
   actions,
   className,
 }: {
   title?: ReactNode;
   search?: { value: string; onChange: (value: string) => void; placeholder?: string };
+  /** Доп. фильтры (Select и т.п.) рядом с поиском — третий потребитель (Companies/Contacts/board
+   * TableView), выносим слотом, а не жёстко зашитым набором контролов. */
+  filters?: ReactNode;
   actions?: ReactNode;
   className?: string;
 }) {
   return (
     <div className={cn("flex flex-wrap items-center justify-between gap-3", className)}>
-      <div className="flex flex-1 items-center gap-3">
+      <div className="flex flex-1 flex-wrap items-center gap-3">
         {title && <h1 className="text-lg font-semibold">{title}</h1>}
         {search && (
           <div className="relative w-full max-w-xs">
@@ -134,6 +138,7 @@ export function TableToolbar({
             />
           </div>
         )}
+        {filters}
       </div>
       {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
     </div>

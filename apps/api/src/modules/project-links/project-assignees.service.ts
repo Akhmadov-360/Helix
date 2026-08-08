@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import type { ProjectAssigneeResponse } from "@helix/api-schemas";
 import { AssigneeAlreadyExistsError, ResourceNotFoundError } from "../../core/errors/domain-error";
+import { NotificationsService } from "../notifications/notifications.service";
 import { OrganizationsRepository } from "../organizations/organizations.repository";
 import { ProjectsRepository } from "../projects/projects.repository";
 import { assertOrgMember } from "../workspaces/assert-org-member";
@@ -12,6 +13,7 @@ export class ProjectAssigneesService {
     private readonly projects: ProjectsRepository,
     private readonly assignees: ProjectAssigneeRepository,
     private readonly orgs: OrganizationsRepository,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async list(orgId: string, projectId: string): Promise<ProjectAssigneeResponse[]> {
@@ -29,6 +31,8 @@ export class ProjectAssigneesService {
       throw new AssigneeAlreadyExistsError();
     }
     const row = await this.assignees.create(projectId, userId);
+    // FR-NOTIF-2: письмо после записи (create() не в транзакции) — тот же остаточный риск, что lead.created.
+    await this.notifications.enqueueAssignment({ orgId, projectId, userId });
     return toProjectAssigneeResponse(row);
   }
 

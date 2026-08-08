@@ -166,6 +166,27 @@ export class AssigneeAlreadyExistsError extends ConflictError {
   }
 }
 
+/**
+ * Итоговый набор `Project.fields` не покрывает все `FieldDefinition{required: true}` воркспейса
+ * (custom-fields.md §7, вариант B — жёсткий backend). В details — ключи, которых не хватает.
+ */
+export class MissingRequiredFieldsError extends BadRequestError {
+  readonly code = "MISSING_REQUIRED_FIELDS";
+
+  constructor(override readonly details: { keys: string[] }) {
+    super("Required custom fields are missing");
+  }
+}
+
+/** Запрошенная смена FieldDefinition.type не входит в allow-list (custom-fields.md §5). */
+export class IncompatibleFieldTypeChangeError extends BadRequestError {
+  readonly code = "INCOMPATIBLE_FIELD_TYPE_CHANGE";
+
+  constructor() {
+    super("This field type change is not supported; create a new field instead");
+  }
+}
+
 /** Нельзя создать лид в доске без фаз (§10): Project.phaseId NOT NULL, класть некуда. */
 export class WorkspaceHasNoPhasesError extends ConflictError {
   readonly code = "WORKSPACE_HAS_NO_PHASES";
@@ -253,5 +274,95 @@ export class InvalidRefreshTokenError extends UnauthorizedError {
 
   constructor() {
     super("Refresh session is missing, invalid or expired");
+  }
+}
+
+/**
+ * Последний OWNER орги — понизить роль или удалить нельзя: орга осталась бы без
+ * единственной роли, которой доступно «Manage members & roles» (Appendix B), то есть
+ * без возможности когда-либо восстановить управление участниками.
+ */
+export class LastOwnerError extends ConflictError {
+  readonly code = "LAST_OWNER";
+
+  constructor() {
+    super("Organization must have at least one OWNER");
+  }
+}
+
+/**
+ * Удаляемое членство — единственное у пользователя (auth.md §9.1: каждый User
+ * состоит хотя бы в одной Org всегда). Удалить его значило бы сломать инвариант,
+ * от которого зависит резолюция activeOrgId на логине/refresh.
+ */
+export class SoleOrganizationMembershipError extends ConflictError {
+  readonly code = "SOLE_ORGANIZATION_MEMBERSHIP";
+
+  constructor() {
+    super("Cannot remove a member's only organization membership");
+  }
+}
+
+/**
+ * Токен сброса пароля (reset-password): не найден, истёк или уже использован.
+ * Отдельный код от INVALID_TOKEN/INVALID_REFRESH_TOKEN — фронту нужно вести на форму
+ * «ссылка недействительна, запросите новую», а не на логин/refresh.
+ */
+export class InvalidPasswordResetTokenError extends UnauthorizedError {
+  readonly code = "INVALID_PASSWORD_RESET_TOKEN";
+
+  constructor() {
+    super("Password reset link is invalid or expired");
+  }
+}
+
+/**
+ * Токен инвайта (invites.md §2/§8): не найден, отозван, принят или истёк — причина не
+ * раскрывается наружу, тот же приём, что InvalidPasswordResetTokenError.
+ */
+export class InvalidInviteTokenError extends UnauthorizedError {
+  readonly code = "INVALID_INVITE_TOKEN";
+
+  constructor() {
+    super("Invite link is invalid or expired");
+  }
+}
+
+/**
+ * invites.md §4: запрошенная при инвайте роль выше ранга самого пригласившего
+ * (`canGrantRole`, core/authz/role-hierarchy.ts).
+ */
+export class InviteRoleExceedsInviterError extends BadRequestError {
+  readonly code = "INVITE_ROLE_EXCEEDS_INVITER";
+
+  constructor() {
+    super("Cannot invite a role higher than your own");
+  }
+}
+
+/**
+ * invites.md §3(a): accept для email БЕЗ существующего User пришёл без name/password —
+ * эта ветка обязана создать User, Zod не может выразить условную обязательность полей
+ * (нет доступа к БД на этапе валидации).
+ */
+export class InviteAcceptRequiresProfileError extends BadRequestError {
+  readonly code = "INVITE_ACCEPT_REQUIRES_PROFILE";
+
+  constructor() {
+    super("Name and password are required to accept this invite");
+  }
+}
+
+/**
+ * invites.md §3: email уже состоит в целевой орге — create-time UX-guard (инвайт бессмыслен),
+ * либо defensive re-check на accept, если членство появилось другим путём между enqueue и
+ * обработкой (тогда это `Membership.@@unique` P2002, всплывающий через AllExceptionsFilter, а
+ * не этот класс напрямую — см. комментарий в invites.service.ts).
+ */
+export class AlreadyOrgMemberError extends ConflictError {
+  readonly code = "ALREADY_ORG_MEMBER";
+
+  constructor() {
+    super("This email already belongs to a member of this organization");
   }
 }

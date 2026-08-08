@@ -95,6 +95,35 @@ describe("POST /v1/workspaces/:id/projects", () => {
     expect(res.body.data.ownerId).toBe(owner?.id);
   });
 
+  it("ownerId не передан → дефолт создатель (decisions.md ADR)", async () => {
+    const { token } = await signUp(app);
+    const board = await makeBoard(token);
+    const claims = JSON.parse(Buffer.from(token.split(".")[1] ?? "", "base64url").toString());
+
+    const res = await create(token, board.id, { title: "Lead" }).expect(201);
+    expect(res.body.data.ownerId).toBe(claims.sub);
+  });
+
+  it("явный ownerId — участник орги → 201, дефолт не применяется", async () => {
+    const { token, orgId } = await signUp(app);
+    const board = await makeBoard(token);
+    const other = await prisma.user.create({ data: { email: `owner${counter++}@example.com`, name: "Other", passwordHash: "x" } });
+    await prisma.membership.create({ data: { orgId, userId: other.id, role: "MEMBER" } });
+
+    const res = await create(token, board.id, { title: "Lead", ownerId: other.id }).expect(201);
+    expect(res.body.data.ownerId).toBe(other.id);
+  });
+
+  it("ownerId — юзер чужой орги → 400 USER_NOT_ORG_MEMBER", async () => {
+    const { token } = await signUp(app);
+    const board = await makeBoard(token);
+    const stranger = await signUp(app);
+    const strangerClaims = JSON.parse(Buffer.from(stranger.token.split(".")[1] ?? "", "base64url").toString());
+
+    const res = await create(token, board.id, { title: "Lead", ownerId: strangerClaims.sub }).expect(400);
+    expect(res.body.error.code).toBe("USER_NOT_ORG_MEMBER");
+  });
+
   describe("отказы", () => {
     it("пустой title → 400", async () => {
       const { token } = await signUp(app);

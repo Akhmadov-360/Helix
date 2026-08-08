@@ -37,7 +37,9 @@ export function companyContactsQueryOptions(orgId: string, companyId: string) {
 export interface ContactsListQuery {
   q?: string;
   companyId?: string;
-  [key: string]: string | undefined;
+  cursorId?: string;
+  limit?: number;
+  [key: string]: string | number | undefined;
 }
 
 // Глобальная адресная книга (org-scoped, §архитектура): отдельная от per-project и от typeahead.

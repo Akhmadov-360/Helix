@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import type { Prisma } from "@helix/db";
 import type {
+  BlueprintDefinition,
   CreateWorkspaceInput,
   LocalizedName,
   PhaseResponse,
@@ -14,6 +15,8 @@ import {
   WorkspaceVersionConflictError,
 } from "../../core/errors/domain-error";
 import { PrismaService } from "../../core/prisma/prisma.service";
+import { BlueprintsRepository } from "../blueprints/blueprints.repository";
+import { FieldsRepository } from "../fields/fields.repository";
 import { toPhaseResponse } from "../phases/phase.mapper";
 import { PhasesRepository } from "../phases/phases.repository";
 import { WorkspacesRepository } from "./workspaces.repository";
@@ -22,10 +25,10 @@ import { WorkspacesRepository } from "./workspaces.repository";
 // лид и есть WON/LOST-фаза, без которой status не станет WON. Блюпринты (M2) заменят.
 // key статичен и уникален по построению — генератор слагов не нужен (он придёт с POST /phases).
 const DEFAULT_PHASES: ReadonlyArray<{ key: string; name: LocalizedName; type: "OPEN" | "WON" | "LOST" }> = [
-  { key: "lead", name: { en: "Lead" }, type: "OPEN" },
-  { key: "in-progress", name: { en: "In Progress" }, type: "OPEN" },
-  { key: "won", name: { en: "Won" }, type: "WON" },
-  { key: "lost", name: { en: "Lost" }, type: "LOST" },
+  { key: "lead", name: { en: "Lead", ru: "Лид", uz: "Lid" }, type: "OPEN" },
+  { key: "in-progress", name: { en: "In Progress", ru: "В работе", uz: "Jarayonda" }, type: "OPEN" },
+  { key: "won", name: { en: "Won", ru: "Выиграно", uz: "Yutildi" }, type: "WON" },
+  { key: "lost", name: { en: "Lost", ru: "Проиграно", uz: "Yutqazildi" }, type: "LOST" },
 ];
 
 interface WorkspaceRow {
@@ -43,30 +46,58 @@ export class WorkspacesService {
     private readonly prisma: PrismaService,
     private readonly workspaces: WorkspacesRepository,
     private readonly phases: PhasesRepository,
+    private readonly fields: FieldsRepository,
+    private readonly blueprints: BlueprintsRepository,
   ) {}
 
   async create(orgId: string, input: CreateWorkspaceInput): Promise<WorkspaceResponse> {
     // Доска с половиной фаз недопустима → воркспейс и дефолтные фазы в одной транзакции.
     const full = await this.prisma.client.$transaction(async (tx) => {
+      // blueprints.md §3: blueprintId опционален — без него поведение НЕ меняется (DEFAULT_PHASES,
+      // §10 workspaces-phases.md решение B). Чужой org-private блюпринт по id → 404, не 403 (IDOR).
+      const blueprint = input.blueprintId
+        ? await this.blueprints.findVisibleById(input.blueprintId, orgId, tx)
+        : null;
+      if (input.blueprintId && !blueprint) throw new ResourceNotFoundError("Blueprint not found");
+      const definition = blueprint ? (blueprint.definition as BlueprintDefinition) : null;
+
+      // Блюпринт для B2B не должен молча создать MIXED-воркспейс — audience блюпринта побеждает,
+      // если запрос его явно не переопределил.
+      const audience = input.audience ?? blueprint?.audience;
+
+      // §3.1: notificationDefaults материализуется в Workspace.settings.notifications ОДНИМ
+      // write вместе с созданием (не отдельным update после) — notifications.md §4 уже читает
+      // этот подключ, если он есть, иначе жёсткий дефолт (owner+assignees) без изменений.
+      const settings = {
+        ...(input.settings ?? {}),
+        ...(definition?.notificationDefaults ? { notifications: definition.notificationDefaults } : {}),
+      };
+
       const ws = await this.workspaces.create(
-        {
-          orgId,
-          name: input.name,
-          audience: input.audience,
-          settings: input.settings as Prisma.InputJsonValue | undefined,
-        },
+        { orgId, name: input.name, audience, settings: settings as Prisma.InputJsonValue },
         tx,
       );
-      await this.phases.createMany(
-        DEFAULT_PHASES.map((p, i) => ({
-          workspaceId: ws.id,
-          key: p.key,
-          name: p.name,
-          type: p.type,
-          order: i + 1,
-        })),
-        tx,
-      );
+
+      const phasesToCreate = definition
+        ? definition.phases.map((p) => ({ workspaceId: ws.id, key: p.key, name: p.name, type: p.type, order: p.order }))
+        : DEFAULT_PHASES.map((p, i) => ({ workspaceId: ws.id, key: p.key, name: p.name, type: p.type, order: i + 1 }));
+      await this.phases.createMany(phasesToCreate, tx);
+
+      // key — буквально из определения блюпринта (P1), не сгенерирован заново по field-key.ts.
+      if (definition && definition.projectFields.length > 0) {
+        await this.fields.createMany(
+          definition.projectFields.map((f) => ({
+            workspaceId: ws.id,
+            key: f.key,
+            label: f.label,
+            type: f.type,
+            options: f.options,
+            required: f.required ?? false,
+          })),
+          tx,
+        );
+      }
+
       return this.workspaces.findByIdInOrg(ws.id, orgId, tx);
     });
 

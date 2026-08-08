@@ -23,6 +23,37 @@ export class OrganizationsRepository {
     });
   }
 
+  /** invites.md §9: имя орги для письма-приглашения. */
+  async findById(orgId: string): Promise<OrganizationRef | null> {
+    return this.prisma.client.organization.findUnique({
+      where: { id: orgId },
+      select: { id: true, name: true },
+    });
+  }
+
+  /** FR-ORG-3: текущие org-level settings (JSON, default "{}") + name для ответа контроллера. */
+  async findSettings(orgId: string): Promise<{ name: string; settings: Prisma.JsonValue } | null> {
+    return this.prisma.client.organization.findUnique({
+      where: { id: orgId },
+      select: { name: true, settings: true },
+    });
+  }
+
+  /**
+   * Замена всей settings-колонки. Партиальный merge (старое + новое) считается в service —
+   * репозиторий получает уже готовый финальный объект, а не занимается JSON-логикой.
+   */
+  async updateSettings(
+    orgId: string,
+    settings: Prisma.InputJsonValue,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
+    await (tx ?? this.prisma.client).organization.update({
+      where: { id: orgId },
+      data: { settings },
+    });
+  }
+
   async addMember(
     data: { orgId: string; userId: string; role: Role },
     tx?: Prisma.TransactionClient,
@@ -98,5 +129,47 @@ export class OrganizationsRepository {
     });
 
     return membership?.orgId ?? null;
+  }
+
+  /** name/email включены для AuditLog-снапшота (P2) — не только role. */
+  async findMembership(
+    orgId: string,
+    userId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<{ role: Role; userName: string; userEmail: string } | null> {
+    const membership = await (tx ?? this.prisma.client).membership.findUnique({
+      where: { orgId_userId: { orgId, userId } },
+      select: { role: true, user: { select: { name: true, email: true } } },
+    });
+    if (!membership) return null;
+    return { role: membership.role, userName: membership.user.name, userEmail: membership.user.email };
+  }
+
+  /** Сколько OWNER в орге — guard против «понизили/удалили последнего». */
+  async countOwners(orgId: string, tx?: Prisma.TransactionClient): Promise<number> {
+    return (tx ?? this.prisma.client).membership.count({ where: { orgId, role: "OWNER" } });
+  }
+
+  /** В скольких оргах состоит юзер — guard против «удалили единственное членство». */
+  async countOrgsForUser(userId: string, tx?: Prisma.TransactionClient): Promise<number> {
+    return (tx ?? this.prisma.client).membership.count({ where: { userId } });
+  }
+
+  async updateMemberRole(
+    orgId: string,
+    userId: string,
+    role: Role,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
+    await (tx ?? this.prisma.client).membership.update({
+      where: { orgId_userId: { orgId, userId } },
+      data: { role },
+    });
+  }
+
+  async removeMember(orgId: string, userId: string, tx?: Prisma.TransactionClient): Promise<void> {
+    await (tx ?? this.prisma.client).membership.delete({
+      where: { orgId_userId: { orgId, userId } },
+    });
   }
 }

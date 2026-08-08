@@ -1,13 +1,14 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft, Building2 } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Building2 } from "lucide-react";
 import type { CompanyResponse } from "@helix/api-schemas";
 import { Avatar, Badge, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@helix/ui";
 import { useCan } from "../../shared/auth/ability";
 import { useLocaleStore, useT } from "../../shared/i18n";
 import { orgMembersQueryOptions } from "../../shared/org/queries";
 import { AssigneesPanel } from "./assignees-panel";
+import { CustomFieldsPanel } from "./custom-fields-panel";
 import { useReassignProject } from "./mutations";
 import { projectQueryOptions } from "./queries";
 import { ProjectTabs } from "./project-tabs";
@@ -47,13 +48,26 @@ function OwnerField({ orgId, workspaceId, projectId, ownerId }: { orgId: string;
   return (
     <div className="flex items-center justify-between gap-2">
       <dt className="shrink-0 text-muted-foreground">{t("projectDetail.overview.owner")}</dt>
+      {/* Триггер стилизован под ту же dt/dd-строку, что read-only ветка выше (без рамки/фона Select
+          по умолчанию) — design review: раньше это была ЕДИНСТВЕННАЯ строка в сайдбаре с другой
+          высотой/паддингом, шеврон уже сам по себе сигналит "кликабельно", прятать control за
+          hover незачем — тут это единственное действие в один клик, а не два (открыть+выбрать). */}
       <Select
         value={ownerId ?? NO_OWNER}
         onValueChange={(v) => reassign.mutate({ ownerId: v === NO_OWNER ? null : v })}
         disabled={reassign.isPending}
       >
-        <SelectTrigger className="h-8 w-40">
-          <SelectValue />
+        <SelectTrigger className="h-auto w-auto gap-1.5 border-none bg-transparent p-0 font-medium shadow-none hover:bg-transparent focus:ring-0 disabled:opacity-70">
+          <SelectValue>
+            {owner ? (
+              <span className="flex items-center gap-1.5">
+                <Avatar name={owner.name} size="sm" />
+                {owner.name}
+              </span>
+            ) : (
+              t("projectDetail.overview.unassigned")
+            )}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={NO_OWNER}>{t("projectDetail.overview.unassigned")}</SelectItem>
@@ -127,7 +141,7 @@ export function ProjectDetailShell({
         <aside className="flex flex-col gap-6 lg:border-l lg:border-border lg:pl-6">
           <div className="flex flex-col gap-3">
             <h2 className="text-sm font-semibold">{t("projectDetail.sidebar.details")}</h2>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1 rounded-xl border border-border/50 bg-muted/30 p-3">
               <span className="text-xs uppercase text-muted-foreground">{t("projectDetail.overview.value")}</span>
               <span className="text-2xl font-semibold tracking-tight">{value}</span>
             </div>
@@ -137,9 +151,14 @@ export function ProjectDetailShell({
                 <dt className="text-muted-foreground">{t("projectDetail.overview.company")}</dt>
                 <dd className="font-medium">
                   {company ? (
-                    <Link to="/companies/$companyId" params={{ companyId: company.id }} className="inline-flex items-center gap-1 hover:text-accent">
-                      <Building2 className="h-3.5 w-3.5" />
+                    <Link
+                      to="/companies/$companyId"
+                      params={{ companyId: company.id }}
+                      className="group inline-flex items-center gap-1 hover:text-accent"
+                    >
+                      <Building2 className="h-3.5 w-3.5 shrink-0" />
                       {company.name}
+                      <ArrowUpRight className="h-3 w-3 shrink-0 text-muted-foreground/60 transition-colors group-hover:text-accent" />
                     </Link>
                   ) : (
                     t("projectDetail.overview.empty")
@@ -160,6 +179,8 @@ export function ProjectDetailShell({
               />
             </dl>
           </div>
+
+          <CustomFieldsPanel orgId={orgId} workspaceId={project.workspaceId} projectId={projectId} fields={project.fields} />
 
           <AssigneesPanel orgId={orgId} projectId={projectId} />
         </aside>

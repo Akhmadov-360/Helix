@@ -8,12 +8,18 @@ import { z } from "zod";
 export const capabilitySubjectSchema = z.enum([
   "Workspace",
   "Phase",
+  "FieldDefinition",
   "Project",
   "Company",
   "Contact",
   "ProjectContact",
   "ProjectAssignee",
   "Task",
+  "Blueprint",
+  "Membership",
+  "AuditLog",
+  "Invite",
+  "Organization",
 ]);
 export type CapabilitySubject = z.infer<typeof capabilitySubjectSchema>;
 

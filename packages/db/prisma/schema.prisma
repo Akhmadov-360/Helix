@@ -103,6 +103,7 @@ model Organization {
   activityEvents ActivityEvent[]
   auditLogs      AuditLog[]
   tasks          Task[]
+  invites        Invite[]
 }
 
 model User {
@@ -120,6 +121,9 @@ model User {
   auditLogs        AuditLog[] // back-relation; actorId живёт на AuditLog
   tasks            Task[] // back-relation для assignee (Task.assigneeId → User, SetNull)
   refreshSessions  RefreshSession[]
+  passwordResetTokens PasswordResetToken[]
+  sentInvites      Invite[] @relation("InviteInvitedBy")
+  acceptedInvites  Invite[] @relation("InviteAcceptedBy")
 }
 
 model Membership {
@@ -132,6 +136,31 @@ model Membership {
   user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([orgId, userId])
+}
+
+// Приглашение по email (docs/specs/invites.md). НЕ Membership.pending (§12 спеки): Membership
+// обязана ссылаться на существующего User (её PK-пара), а инвайт по определению может адресовать
+// email, для которого User ещё нет. tokenHash — та же токен-механика, что PasswordResetToken
+// (§2 спеки): случайный высокоэнтропийный токен, в БД только хеш.
+model Invite {
+  id               String    @id @default(cuid())
+  orgId            String
+  email            String
+  role             Role
+  invitedByUserId  String
+  tokenHash        String    @unique
+  createdAt        DateTime  @default(now())
+  expiresAt        DateTime
+  acceptedAt       DateTime?
+  acceptedByUserId String?
+  revokedAt        DateTime?
+
+  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  invitedBy  User         @relation("InviteInvitedBy", fields: [invitedByUserId], references: [id], onDelete: Cascade)
+  acceptedBy User?        @relation("InviteAcceptedBy", fields: [acceptedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([orgId])
+  @@index([email])
 }
 
 // ──────────────────────────── WORKSPACE / PHASE ────────────────────────────
@@ -450,6 +479,23 @@ model RefreshSession {
   @@index([familyId])
   // Кандидат на составной @@index([familyId, revokedAt]) под горячий kill-family/выборку живых —
   // НЕ добавляю без профиля запросов (преждевременная оптимизация). Держу в голове.
+}
+
+// auth.md §0: сброс пароля был отложен до появления очереди+почты — теперь (M2 notifications)
+// есть оба. tokenHash — тот же приём, что RefreshSession.tokenHash: токен высокоэнтропийный
+// (crypto.randomBytes), поэтому SHA-256 корректен (argon2 добавил бы только латентность зря).
+// Разовый (usedAt) и короткоживущий (expiresAt ~1ч, короче RefreshSession — окно атаки уже).
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 // ============================================================================

@@ -1,17 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Briefcase, Link2Off, MoreHorizontal, Pencil, Plus, Trash2, Users } from "lucide-react";
-import type { CompanyResponse, ContactResponse, DealLink } from "@helix/api-schemas";
+import { ArrowUpRight, Briefcase, Link2Off, MoreHorizontal, Pencil, Plus, Trash2, Users } from "lucide-react";
+import type { CompanyResponse, ContactResponse, DealLink, DedupHint as DedupHintData } from "@helix/api-schemas";
 import {
   Button,
+  ColumnsMenu,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  Pagination,
   Popover,
   PopoverContent,
   PopoverTrigger,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   SortableTableHead,
   Table,
   TableBody,
@@ -23,23 +30,22 @@ import {
 } from "@helix/ui";
 import { useCan } from "../../shared/auth/ability";
 import { useT } from "../../shared/i18n";
+import { useColumnVisibility } from "../../shared/lib/use-column-visibility";
+import { useCursorPagination } from "../../shared/lib/use-cursor-pagination";
+import { useTableSort, type TableSort } from "../../shared/lib/use-table-sort";
 import { ContactFormDialog } from "./contact-form-dialog";
+import { DedupHint } from "./dedup-hint";
 import { DeleteContactDialog } from "./delete-contact-dialog";
-import { invalidateContactsList, useLoadMoreContacts, useUnlinkContact } from "./mutations";
+import { invalidateContactsList, useMergeContactGlobal, useUnlinkContact } from "./mutations";
 import { contactsListQueryOptions } from "./queries";
 
 type SortKey = "name" | "email" | "phone" | "company";
-type SortDirection = "asc" | "desc";
-interface SortState {
-  key: SortKey;
-  direction: SortDirection;
-}
 
 interface Row extends ContactResponse {
   companyName: string;
 }
 
-function sortRows(rows: Row[], sort: SortState): Row[] {
+function sortRows(rows: Row[], sort: TableSort<SortKey>): Row[] {
   const dir = sort.direction === "asc" ? 1 : -1;
   return [...rows].sort((a, b) => {
     const av = sort.key === "company" ? a.companyName : (a[sort.key] ?? "");
@@ -143,6 +149,9 @@ export function GlobalContactsView({ orgId, companies }: { orgId: string; compan
   const canUpdate = useCan("Contact.update");
   const canDelete = useCan("Contact.delete");
   const canUnlink = useCan("ProjectContact.delete");
+  const canMerge = useCan("Contact.merge");
+  const merge = useMergeContactGlobal(orgId);
+  const [dedup, setDedup] = useState<{ hint: DedupHintData; newContactId: string } | null>(null);
 
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
@@ -150,7 +159,13 @@ export function GlobalContactsView({ orgId, companies }: { orgId: string; compan
     const timer = setTimeout(() => setDebounced(search.trim()), 300);
     return () => clearTimeout(timer);
   }, [search]);
-  const query = useMemo(() => ({ q: debounced || undefined }), [debounced]);
+  const [companyFilter, setCompanyFilter] = useState<string | undefined>(undefined);
+  const [pageSize, setPageSize] = useState(25);
+  const pagination = useCursorPagination(`${debounced}|${companyFilter}|${pageSize}`);
+  const query = useMemo(
+    () => ({ q: debounced || undefined, companyId: companyFilter, cursorId: pagination.cursorId, limit: pageSize }),
+    [debounced, companyFilter, pagination.cursorId, pageSize],
+  );
 
   // useQuery (не useSuspenseQuery): смена поискового запроса меняет query-key (queryKeys.
   // contactsList), useSuspenseQuery на новом ключе снёс бы всю таблицу в fallback на каждую
@@ -159,9 +174,8 @@ export function GlobalContactsView({ orgId, companies }: { orgId: string; compan
   const { data, isFetching } = useQuery({ ...contactsListQueryOptions(orgId, query), placeholderData: keepPreviousData });
   const contacts = useMemo(() => data?.contacts ?? [], [data]);
   const hasMore = data?.hasMore ?? false;
-  const loadMore = useLoadMoreContacts(orgId, query);
 
-  const [sort, setSort] = useState<SortState>({ key: "name", direction: "asc" });
+  const [sort, toggleSort] = useTableSort<SortKey>({ key: "name", direction: "asc" });
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<ContactResponse | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ContactResponse | null>(null);
@@ -175,43 +189,85 @@ export function GlobalContactsView({ orgId, companies }: { orgId: string; compan
     return sortRows(withCompany, sort);
   }, [contacts, companyNameById, sort]);
 
-  function toggleSort(key: SortKey) {
-    setSort((prev) => (prev.key === key ? { key, direction: prev.direction === "asc" ? "desc" : "asc" } : { key, direction: "asc" }));
-  }
+  // Name и действия — всегда видны, остальное прячется через "Columns" (design review).
+  const columns = [
+    { key: "email", label: t("contacts.list.colEmail") },
+    { key: "phone", label: t("contacts.list.colPhone") },
+    { key: "company", label: t("contacts.list.colCompany") },
+    { key: "projects", label: t("contacts.list.colProjects") },
+  ];
+  const { isVisible, toggle: toggleColumn } = useColumnVisibility("contacts");
+  const columnCount = 2 + columns.filter((c) => isVisible(c.key)).length;
 
   const toolbar = (
     <TableToolbar
       search={{ value: search, onChange: setSearch, placeholder: t("contacts.page.searchPlaceholder") }}
-      actions={
-        canCreate && (
-          <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
-            <Plus className="h-3.5 w-3.5" />
-            {t("contacts.page.create.trigger")}
-          </Button>
+      filters={
+        companies.length > 0 && (
+          <Select value={companyFilter ?? "all"} onValueChange={(value) => setCompanyFilter(value === "all" ? undefined : value)}>
+            <SelectTrigger className="h-9 w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("contacts.filter.allCompanies")}</SelectItem>
+              {companies.map((company) => (
+                <SelectItem key={company.id} value={company.id}>
+                  {company.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         )
+      }
+      actions={
+        <>
+          <ColumnsMenu columns={columns} isVisible={isVisible} onToggle={toggleColumn} triggerLabel={t("table.columns.trigger")} />
+          {canCreate && (
+            <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
+              <Plus className="h-3.5 w-3.5" />
+              {t("contacts.page.create.trigger")}
+            </Button>
+          )}
+        </>
       }
     />
   );
-  const columnCount = 6;
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
+      {dedup && (
+        <DedupHint
+          hint={dedup.hint}
+          canMerge={canMerge}
+          onMerge={(candidateId) => {
+            merge.mutate({ targetId: candidateId, sourceId: dedup.newContactId });
+            setDedup(null);
+          }}
+          onDismiss={() => setDedup(null)}
+        />
+      )}
       <Table toolbar={toolbar} containerClassName="min-h-0 flex-1" className="min-w-[820px]">
         <TableHeader className="sticky top-0 z-10 bg-muted/80 backdrop-blur">
           <TableRow header>
             <SortableTableHead active={sort.key === "name"} direction={sort.direction} onClick={() => toggleSort("name")}>
               {t("contacts.list.colName")}
             </SortableTableHead>
-            <SortableTableHead active={sort.key === "email"} direction={sort.direction} onClick={() => toggleSort("email")}>
-              {t("contacts.list.colEmail")}
-            </SortableTableHead>
-            <SortableTableHead active={sort.key === "phone"} direction={sort.direction} onClick={() => toggleSort("phone")}>
-              {t("contacts.list.colPhone")}
-            </SortableTableHead>
-            <SortableTableHead active={sort.key === "company"} direction={sort.direction} onClick={() => toggleSort("company")}>
-              {t("contacts.list.colCompany")}
-            </SortableTableHead>
-            <TableHead>{t("contacts.list.colProjects")}</TableHead>
+            {isVisible("email") && (
+              <SortableTableHead active={sort.key === "email"} direction={sort.direction} onClick={() => toggleSort("email")}>
+                {t("contacts.list.colEmail")}
+              </SortableTableHead>
+            )}
+            {isVisible("phone") && (
+              <SortableTableHead active={sort.key === "phone"} direction={sort.direction} onClick={() => toggleSort("phone")}>
+                {t("contacts.list.colPhone")}
+              </SortableTableHead>
+            )}
+            {isVisible("company") && (
+              <SortableTableHead active={sort.key === "company"} direction={sort.direction} onClick={() => toggleSort("company")}>
+                {t("contacts.list.colCompany")}
+              </SortableTableHead>
+            )}
+            {isVisible("projects") && <TableHead>{t("contacts.list.colProjects")}</TableHead>}
             <TableHead className="w-10">
               <span className="sr-only">{t("contacts.list.menu")}</span>
             </TableHead>
@@ -223,7 +279,7 @@ export function GlobalContactsView({ orgId, companies }: { orgId: string; compan
               <TableCell colSpan={columnCount}>
                 <div className="flex flex-col items-center justify-center gap-2 py-16 text-muted-foreground">
                   <Users className="h-8 w-8" />
-                  <p>{debounced ? t("contacts.page.noResults") : t("contacts.page.empty")}</p>
+                  <p>{debounced || companyFilter ? t("contacts.page.noResults") : t("contacts.page.empty")}</p>
                 </div>
               </TableCell>
             </TableRow>
@@ -231,30 +287,39 @@ export function GlobalContactsView({ orgId, companies }: { orgId: string; compan
             rows.map((contact) => (
                 <TableRow key={contact.id}>
                   <TableCell>
-                    <Link to="/contacts/$contactId" params={{ contactId: contact.id }} className="font-medium text-foreground hover:text-accent">
-                      {contact.name}
+                    <Link
+                      to="/contacts/$contactId"
+                      params={{ contactId: contact.id }}
+                      className="group inline-flex items-center gap-1 font-medium text-foreground hover:text-accent"
+                    >
+                      <span className="truncate">{contact.name}</span>
+                      <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60 transition-colors group-hover:text-accent" />
                     </Link>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{contact.email ?? "—"}</TableCell>
-                  <TableCell className="text-muted-foreground">{contact.phone ?? "—"}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {contact.companyId ? (
-                      <Link to="/companies/$companyId" params={{ companyId: contact.companyId }} className="hover:text-accent hover:underline">
-                        {contact.companyName || "—"}
-                      </Link>
-                    ) : (
-                      "—"
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <DealsPopover
-                      orgId={orgId}
-                      contactId={contact.id}
-                      projects={contact.projects ?? []}
-                      canUnlink={canUnlink}
-                      onUnlinked={() => invalidateContactsList(queryClient, orgId)}
-                    />
-                  </TableCell>
+                  {isVisible("email") && <TableCell className="text-muted-foreground">{contact.email ?? "—"}</TableCell>}
+                  {isVisible("phone") && <TableCell className="text-muted-foreground">{contact.phone ?? "—"}</TableCell>}
+                  {isVisible("company") && (
+                    <TableCell className="text-muted-foreground">
+                      {contact.companyId ? (
+                        <Link to="/companies/$companyId" params={{ companyId: contact.companyId }} className="hover:text-accent hover:underline">
+                          {contact.companyName || "—"}
+                        </Link>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
+                  )}
+                  {isVisible("projects") && (
+                    <TableCell>
+                      <DealsPopover
+                        orgId={orgId}
+                        contactId={contact.id}
+                        projects={contact.projects ?? []}
+                        canUnlink={canUnlink}
+                        onUnlinked={() => invalidateContactsList(queryClient, orgId)}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell>
                     {(canUpdate || canDelete) && (
                       <DropdownMenu>
@@ -285,15 +350,32 @@ export function GlobalContactsView({ orgId, companies }: { orgId: string; compan
           )}
         </TableBody>
       </Table>
-      {hasMore && (
-        <div className="flex shrink-0 justify-center">
-          <Button type="button" variant="outline" size="sm" onClick={() => loadMore.mutate()} disabled={loadMore.isPending || isFetching}>
-            {loadMore.isPending ? t("contacts.list.loadingMore") : t("contacts.list.loadMore")}
-          </Button>
-        </div>
-      )}
+      <Pagination
+        className="shrink-0"
+        page={pagination.page}
+        hasPrev={pagination.hasPrev && !isFetching}
+        hasNext={hasMore && !isFetching}
+        onPrev={pagination.goPrev}
+        onNext={() => {
+          const lastId = contacts.at(-1)?.id;
+          if (lastId) pagination.goNext(lastId);
+        }}
+        pageSize={pageSize}
+        onPageSizeChange={setPageSize}
+        pageSizeLabel={t("table.pagination.rowsPerPage")}
+        pageLabel={(page) => t("table.pagination.page", { page })}
+        prevLabel={t("table.pagination.prevPage")}
+        nextLabel={t("table.pagination.nextPage")}
+      />
 
-      <ContactFormDialog orgId={orgId} contact={null} companies={companies} open={createOpen} onOpenChange={setCreateOpen} />
+      <ContactFormDialog
+        orgId={orgId}
+        contact={null}
+        companies={companies}
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreated={(newContactId, hint) => setDedup({ hint, newContactId })}
+      />
       <ContactFormDialog
         orgId={orgId}
         contact={editTarget}

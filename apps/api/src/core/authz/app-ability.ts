@@ -14,12 +14,18 @@ export type AppAction = (typeof APP_ACTIONS)[number];
 export const APP_SUBJECTS = [
   "Workspace",
   "Phase",
+  "FieldDefinition",
   "Project",
   "Company",
   "Contact",
   "ProjectContact",
   "ProjectAssignee",
   "Task",
+  "Blueprint",
+  "Membership",
+  "AuditLog",
+  "Invite",
+  "Organization",
 ] as const;
 export type AppSubject = (typeof APP_SUBJECTS)[number] | "all";
 export type AppAbility = MongoAbility<[AppAction, AppSubject]>;
@@ -50,7 +56,16 @@ export function defineAbilityForRole(role: Role): AppAbility {
       can("read", "Workspace");
       can("create", "Workspace");
       can("update", "Workspace");
+      can("read", "Blueprint"); // blueprints.md §6: список читают все — управление (create/delete) = O/A only
+      // AuditLog: сегодняшний словарь (membership.*, organization.created, contact.merged) не
+      // содержит ничего секретнее уже публичного ростера участников (GET /organizations/members
+      // без CheckPolicy вообще) — читают все роли. Когда появятся чувствительные типы событий
+      // (webhooks/API-ключи, M5-M6) — визибилити разводить per-action в словаре, не блокировкой
+      // всего лога целиком.
+      can("read", "AuditLog");
+      can("read", "Organization"); // FR-ORG-3: настройки орги видят все, меняют O/A only
       can("manage", "Phase");
+      can("manage", "FieldDefinition"); // custom-fields.md §1: те же роли, что «Create/configure workspaces & phases»
       // Лиды: create/read/update (move/archive/restore — update) + reassign, но НЕ delete (O/A).
       can("read", "Project");
       can("create", "Project");
@@ -72,6 +87,10 @@ export function defineAbilityForRole(role: Role): AppAbility {
     case "MEMBER":
       can("read", "Workspace");
       can("read", "Phase");
+      can("read", "FieldDefinition"); // custom-fields.md §1: список полей — «все» роли
+      can("read", "Blueprint");
+      can("read", "AuditLog"); // см. комментарий в ветке MANAGER
+      can("read", "Organization");
       // Лиды: create/edit/move — Member△ (PRD «Create/edit leads», «Move phases»). Scope=ORG в M1.
       // NB: reassign (смена ownerId) по матрице = Manager+, но это field-level различие внутри
       // update — не выражается action-level CASL. Отложено (field-level policy, M6-adjacent).
@@ -92,6 +111,10 @@ export function defineAbilityForRole(role: Role): AppAbility {
       // Глобальный read-only: видит всё, не меняет ничего.
       can("read", "Workspace");
       can("read", "Phase");
+      can("read", "FieldDefinition");
+      can("read", "Blueprint");
+      can("read", "AuditLog"); // см. комментарий в ветке MANAGER
+      can("read", "Organization");
       can("read", "Project");
       can("read", "Company");
       can("read", "Contact");

@@ -1,5 +1,5 @@
 import { useParams } from "@tanstack/react-router";
-import { Building2, KanbanSquare, Users } from "lucide-react";
+import { Building2, KanbanSquare, ScrollText, Settings, Users, UsersRound } from "lucide-react";
 import { LocaleSwitcher, useT } from "../../shared/i18n";
 import { getLastWorkspaceId } from "../../shared/lib/last-workspace";
 import { ThemeToggle } from "../../shared/theme";
@@ -44,6 +44,15 @@ export function Sidebar({ orgId }: { orgId: string }) {
         </div>
 
         <WorkspacesSection orgId={orgId} currentWorkspaceId={workspaceId} />
+
+        {/* Общие/Участники/Аудит читает любая роль (GET .../settings, /members, /audit-log без
+            @CheckPolicy) — страницы сами прячут контролы редактирования по своим capability,
+            здесь прятать нечего. */}
+        <div className="flex flex-col gap-0.5 border-t border-sidebar-border pt-3">
+          <SidebarNavItem to="/settings/general" icon={Settings} label={t("sidebar.nav.general")} />
+          <SidebarNavItem to="/settings/members" icon={UsersRound} label={t("sidebar.nav.members")} />
+          <SidebarNavItem to="/settings/audit-log" icon={ScrollText} label={t("sidebar.nav.auditLog")} />
+        </div>
       </nav>
 
       <div className="flex flex-col gap-1 border-t border-sidebar-border p-2">

@@ -88,3 +88,16 @@ export const authResultSchema = z.object({
   user: userProfileSchema,
 });
 export type AuthResult = z.infer<typeof authResultSchema>;
+
+// ────────────────────────── forgot / reset password ────────────────────────
+
+export const forgotPasswordSchema = z.object({
+  email: emailSchema,
+});
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1),
+  newPassword: passwordSchema,
+});
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;

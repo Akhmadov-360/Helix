@@ -1,20 +1,23 @@
 import { Injectable } from "@nestjs/common";
 import type { PhaseType } from "@helix/db";
 import type { Prisma } from "@helix/db";
-import type {
-  ActivityEventResponse,
-  BoardProjectResponse,
-  BoardResponse,
-  ColumnQuery,
-  ColumnResponse,
-  CreateProjectInput,
-  LocalizedName,
-  MoveProjectInput,
-  ProjectResponse,
-  ProjectStatus,
-  UpdateProjectInput,
+import {
+  buildProjectFieldsSchema,
+  missingRequiredFieldKeys,
+  type ActivityEventResponse,
+  type BoardProjectResponse,
+  type BoardResponse,
+  type ColumnQuery,
+  type ColumnResponse,
+  type CreateProjectInput,
+  type LocalizedName,
+  type MoveProjectInput,
+  type ProjectResponse,
+  type ProjectStatus,
+  type UpdateProjectInput,
 } from "@helix/api-schemas";
 import {
+  MissingRequiredFieldsError,
   ResourceNotFoundError,
   StaleNeighborsError,
   WorkspaceHasNoPhasesError,
@@ -22,12 +25,15 @@ import {
 import { PrismaService } from "../../core/prisma/prisma.service";
 import { ActivityRecorder } from "../activity/activity-recorder";
 import { ActivityRepository } from "../activity/activity.repository";
+import { FieldsRepository } from "../fields/fields.repository";
+import { toFieldDefinitionResponse } from "../fields/field.mapper";
 import { toPhaseResponse } from "../phases/phase.mapper";
 import { PhasesRepository } from "../phases/phases.repository";
 import { toBoardProjectResponse, toProjectResponse } from "../projects/project.mapper";
 import { ProjectsRepository } from "../projects/projects.repository";
 import { denseRanks, rankBetween } from "../projects/rank";
 import { OrganizationsRepository } from "../organizations/organizations.repository";
+import { NotificationsService } from "../notifications/notifications.service";
 import { UsersRepository } from "../users/users.repository";
 import { assertOrgMember } from "./assert-org-member";
 import { WorkspacesRepository } from "./workspaces.repository";
@@ -46,11 +52,13 @@ export class ProjectsService {
     private readonly prisma: PrismaService,
     private readonly workspaces: WorkspacesRepository,
     private readonly phases: PhasesRepository,
+    private readonly fields: FieldsRepository,
     private readonly projects: ProjectsRepository,
     private readonly users: UsersRepository,
     private readonly activity: ActivityRecorder,
     private readonly activityLog: ActivityRepository,
     private readonly orgs: OrganizationsRepository,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async getById(orgId: string, projectId: string): Promise<ProjectResponse> {
@@ -71,7 +79,24 @@ export class ProjectsService {
       const before = await this.projects.findByIdInOrg(projectId, orgId, tx);
       if (!before) throw new ResourceNotFoundError("Project not found");
 
-      const updated = await this.projects.updateFields(projectId, input, tx);
+      // §7 (пересмотрено): required проверяется ТОЛЬКО на create, не на каждый PATCH, трогающий
+      // fields. Исторический пробел в НЕтронутом required-поле (появилось после создания лида —
+      // легитимный сценарий, см. тест ниже) не должен блокировать несвязанную правку другого поля.
+      const fields =
+        input.fields !== undefined
+          ? await this.resolveFieldsForUpdate(
+              before.workspaceId,
+              tx,
+              input.fields,
+              (before.fields as Record<string, unknown>) ?? {},
+            )
+          : undefined;
+
+      const updated = await this.projects.updateFields(
+        projectId,
+        { ...input, fields: fields as Prisma.InputJsonValue | undefined },
+        tx,
+      );
 
       if (input.value !== undefined && Number(before.value ?? NaN) !== input.value) {
         const actor = await this.users.findProfileById(userId);
@@ -160,6 +185,15 @@ export class ProjectsService {
     }));
   }
 
+  // Архив (§7): плоский список, та же 404-проверка принадлежности воркспейса орге, что у доски.
+  async listArchived(orgId: string, workspaceId: string): Promise<ProjectResponse[]> {
+    const workspace = await this.workspaces.findByIdInOrg(workspaceId, orgId);
+    if (!workspace) throw new ResourceNotFoundError("Workspace not found");
+
+    const rows = await this.projects.listArchived(workspaceId);
+    return rows.map(toProjectResponse);
+  }
+
   // Доска: фазы + первые N карточек каждой (§8). Воркспейс проверяем на принадлежность
   // орге ЗДЕСЬ (404), дальше raw-запрос по workspaceId уже безопасен.
   async getBoard(orgId: string, workspaceId: string, limitPerPhase: number): Promise<BoardResponse> {
@@ -205,7 +239,8 @@ export class ProjectsService {
     projectId: string,
     input: MoveProjectInput,
   ): Promise<ProjectResponse> {
-    const updated = await this.prisma.client.$transaction(async (tx) => {
+    const { project: updated, phaseChangeEvent } = await this.prisma.client.$transaction(async (tx) => {
+      let phaseChangeEvent: { fromPhaseId: string; toPhaseId: string } | null = null;
       // Лок на ЦЕЛЕВУЮ фазу (§4.3) — до чтений, чтобы конкурентный move в неё сериализовался.
       await this.projects.lockPhase(input.toPhaseId, tx);
 
@@ -260,10 +295,22 @@ export class ProjectsService {
             },
           },
         });
+        phaseChangeEvent = { fromPhaseId: project.phaseId, toPhaseId: targetPhase.id };
       }
 
-      return moved;
+      return { project: moved, phaseChangeEvent };
     });
+
+    // FR-NOTIF-2: enqueue ПОСЛЕ $transaction() — тот же приём, что create() (§2 notifications.md).
+    if (phaseChangeEvent) {
+      await this.notifications.enqueuePhaseChanged({
+        orgId,
+        projectId,
+        actorId: userId,
+        fromPhaseId: phaseChangeEvent.fromPhaseId,
+        toPhaseId: phaseChangeEvent.toPhaseId,
+      });
+    }
 
     return toProjectResponse(updated);
   }
@@ -408,7 +455,21 @@ export class ProjectsService {
     const rank = rankBetween(null, topRank); // наверх: перед текущим первым
     const actor = await this.users.findProfileById(userId);
 
+    // ADR (decisions.md): дефолт — сам создатель, не голый input.ownerId. Без дефолта большинство
+    // лидов создавались бы без владельца (диалог создания его не требует) — "уведомить владельца
+    // о новом лиде" выродилось бы в "уведомить почти никого". Начальное назначение при create —
+    // та же легитимная операция, что явный ownerId в теле (не переоткрывает reassign-guard, см. ADR).
+    const ownerId = input.ownerId ?? userId;
+
     const created = await this.prisma.client.$transaction(async (tx) => {
+      // Явно переданный (или дефолтный) владелец обязан быть членом ЭТОЙ орги — composite-FK не
+      // ловит (Project.owner → User(id), не Membership), тот же guard, что reassign (§6.3).
+      await assertOrgMember(this.orgs, ownerId, orgId, tx);
+
+      // §7: required проверяется строго на create — новый лид обязан сразу удовлетворять все
+      // required-поля воркспейса, откатываться не на что (existing = {} по определению).
+      const fields = await this.resolveFieldsForCreate(workspaceId, tx, input.fields);
+
       const project = await this.projects.create(
         {
           orgId,
@@ -421,7 +482,8 @@ export class ProjectsService {
           currency: input.currency,
           source: input.source,
           companyId: input.companyId,
-          ownerId: input.ownerId,
+          ownerId,
+          fields: fields as Prisma.InputJsonValue,
         },
         tx,
       );
@@ -438,6 +500,51 @@ export class ProjectsService {
       return project;
     });
 
+    // §2 notifications.md: enqueue ПОСЛЕ $transaction() — код здесь гарантированно выполняется
+    // после коммита (Prisma коммитит внутри await, до возврата управления вызывающему).
+    // enqueueLeadCreated сама глотает и логирует свою ошибку (см. её комментарий) — await здесь
+    // не рискует откатить или провалить создание лида, только ждёт дешёвый Redis round-trip.
+    await this.notifications.enqueueLeadCreated({ orgId, projectId: created.id });
+
     return toProjectResponse(created);
+  }
+
+  // custom-fields.md §10 шаг 5/6, §7: типизирует incoming по актуальному FieldDefinition[]
+  // воркспейса и проверяет required на ИТОГОВОМ наборе — новый лид без fallback на existing,
+  // обязан удовлетворять все required срезу.
+  private async resolveFieldsForCreate(
+    workspaceId: string,
+    tx: Prisma.TransactionClient,
+    incoming: Record<string, unknown> | undefined,
+  ): Promise<Record<string, unknown>> {
+    const definitions = (await this.fields.listByWorkspaceOrdered(workspaceId, tx)).map(
+      toFieldDefinitionResponse,
+    );
+    const parsed = buildProjectFieldsSchema(definitions).parse(incoming ?? {});
+
+    const missing = missingRequiredFieldKeys(definitions, parsed);
+    if (missing.length > 0) throw new MissingRequiredFieldsError({ keys: missing });
+
+    return parsed;
+  }
+
+  // §7 (пересмотрено): PATCH НЕ перепроверяет required на весь смёрженный набор — только
+  // типизирует и сливает. Обнулить УЖЕ заполненное required-поле через API и так невозможно:
+  // null не проходит per-type Zod-валидацию ни для одного FieldType (buildProjectFieldsSchema),
+  // а «удалить ключ» контракт не умеет. Значит требовать здесь ещё и присутствие ВСЕХ required —
+  // значит блокировать несвязанную правку из-за чужого исторического пробела (поле стало
+  // required уже после создания лида, §10 шаг 6 теста «PATCH без ключа fields...») без какой-либо
+  // защиты взамен. Единственное место, где новый лид обязан быть required-complete — create.
+  private async resolveFieldsForUpdate(
+    workspaceId: string,
+    tx: Prisma.TransactionClient,
+    incoming: Record<string, unknown> | undefined,
+    existing: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const definitions = (await this.fields.listByWorkspaceOrdered(workspaceId, tx)).map(
+      toFieldDefinitionResponse,
+    );
+    const parsedIncoming = buildProjectFieldsSchema(definitions).parse(incoming ?? {});
+    return { ...existing, ...parsedIncoming };
   }
 }

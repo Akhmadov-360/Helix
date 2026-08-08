@@ -1,11 +1,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import type { ContactListResponse, CreateContactInput, DealRole, ProjectContactResponse, UpdateContactInput } from "@helix/api-schemas";
-import { contactListResponseSchema, contactResponseSchema, createContactResponseSchema, projectContactResponseSchema } from "@helix/api-schemas";
+import { contactResponseSchema, createContactResponseSchema, projectContactResponseSchema } from "@helix/api-schemas";
 import { queryKeys, request } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
-import { useToast } from "../../shared/toast/use-toast";
-import { contactQueryOptions, projectContactsQueryOptions, type ContactsListQuery } from "./queries";
+import { toast } from "sonner";
+import { contactQueryOptions, projectContactsQueryOptions } from "./queries";
 import { toContactError, toLinkContactError } from "./contact-error";
 
 // Список — единственный query-key с параметрами (contactsList(orgId, query), см. query-keys.ts),
@@ -55,7 +55,6 @@ export function useLinkContact(orgId: string, projectId: string) {
   const queryClient = useQueryClient();
   const { queryKey } = projectContactsQueryOptions(orgId, projectId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: LinkContactVariables) =>
@@ -93,7 +92,6 @@ export function useUpdateContactRoles(orgId: string, projectId: string) {
   const queryClient = useQueryClient();
   const { queryKey } = projectContactsQueryOptions(orgId, projectId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { contactId: string; roles: DealRole[] }) =>
@@ -132,7 +130,6 @@ export function useUnlinkContact(orgId: string, projectId: string) {
   const queryClient = useQueryClient();
   const { queryKey } = projectContactsQueryOptions(orgId, projectId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { contactId: string }) =>
@@ -166,7 +163,6 @@ export function useUnlinkContact(orgId: string, projectId: string) {
 export function useCreateContact(orgId: string) {
   const queryClient = useQueryClient();
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (input: CreateContactInput) =>
@@ -187,7 +183,6 @@ export function useCreateContact(orgId: string) {
 export function useUpdateContact(orgId: string) {
   const queryClient = useQueryClient();
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { contactId: string; input: UpdateContactInput }) =>
@@ -205,7 +200,7 @@ export function useUpdateContact(orgId: string) {
     onSuccess: (contact) => {
       queryClient.setQueryData(contactQueryOptions(orgId, contact.id).queryKey, contact);
       invalidateContactsList(queryClient, orgId);
-      toast.show(t("contacts.edit.success"));
+      toast.success(t("contacts.edit.success"));
     },
   });
 }
@@ -213,7 +208,6 @@ export function useUpdateContact(orgId: string) {
 export function useDeleteContact(orgId: string) {
   const queryClient = useQueryClient();
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { contactId: string }) =>
@@ -229,8 +223,31 @@ export function useDeleteContact(orgId: string) {
         (current) => current && { ...current, contacts: current.contacts.filter((c) => c.id !== vars.contactId) },
       );
       invalidateContactsList(queryClient, orgId);
-      toast.show(t("contacts.delete.success"));
+      toast.success(t("contacts.delete.success"));
     },
+  });
+}
+
+// Тот же POST /contacts/:targetId/merge, что useMergeContact ниже — но без привязки к сделке:
+// вызывается со страницы /contacts (глобальная адресная книга), а не из карточки лида, поэтому
+// инвалидирует contactsList, а не кэш конкретного проекта.
+export function useMergeContactGlobal(orgId: string) {
+  const queryClient = useQueryClient();
+  const t = useT();
+
+  return useMutation({
+    mutationFn: (vars: { targetId: string; sourceId: string }) =>
+      request({
+        method: "POST",
+        path: `/v1/contacts/${vars.targetId}/merge`,
+        body: { sourceId: vars.sourceId },
+        schema: contactResponseSchema,
+      }),
+    onError: (error) => {
+      const kind = toContactError(error);
+      toast.error(t(contactErrorKey(kind)));
+    },
+    onSuccess: () => invalidateContactsList(queryClient, orgId),
   });
 }
 
@@ -240,7 +257,6 @@ export function useDeleteContact(orgId: string) {
 export function useMergeContact(orgId: string, projectId: string) {
   const queryClient = useQueryClient();
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { targetId: string; sourceId: string }) =>
@@ -256,33 +272,6 @@ export function useMergeContact(orgId: string, projectId: string) {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: projectContactsQueryOptions(orgId, projectId).queryKey });
-    },
-  });
-}
-
-// Курсорная догрузка (§2, тот же приём, что board's useLoadMoreColumn): один query-key на весь
-// фильтр {q, companyId} (query-keys.ts contactsList), страницы дописываются в его кэш — смена
-// поиска меняет query-key целиком и сама сбрасывает пагинацию, отдельно сбрасывать курсор не надо.
-export function useLoadMoreContacts(orgId: string, query: ContactsListQuery) {
-  const queryClient = useQueryClient();
-  const queryKey = queryKeys.contactsList(orgId, query);
-
-  return useMutation({
-    mutationFn: () => {
-      const current = queryClient.getQueryData<ContactListResponse>(queryKey);
-      const cursorId = current?.contacts.at(-1)?.id;
-      return request({
-        path: "/v1/contacts",
-        searchParams: { ...query, cursorId },
-        schema: contactListResponseSchema,
-      });
-    },
-    onSuccess: (page) => {
-      queryClient.setQueryData<ContactListResponse>(queryKey, (existing) =>
-        existing
-          ? { contacts: [...existing.contacts, ...page.contacts], hasMore: page.hasMore }
-          : page,
-      );
     },
   });
 }

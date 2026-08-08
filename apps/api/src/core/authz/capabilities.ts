@@ -26,12 +26,29 @@ import { APP_SUBJECTS, defineAbilityForRole, type AppAction } from "./app-abilit
 const SUBJECT_OPERATIONS = {
   Workspace: ["create", "read", "update", "delete"],
   Phase: ["create", "update", "delete"],
+  FieldDefinition: ["create", "read", "update", "delete"],
   Project: ["create", "read", "update", "delete", "reassign"],
   Company: ["create", "read", "update", "delete"],
   Contact: ["create", "read", "update", "delete", "merge"],
   ProjectContact: ["create", "read", "update", "delete"],
   ProjectAssignee: ["create", "read", "delete"],
   Task: ["create", "read", "update", "delete"],
+  // blueprints.md §0: без update (PRD не требует редактируемости — создал неправильно, удали).
+  Blueprint: ["create", "read", "delete"],
+  // Appendix B «Manage members & roles» = O/A only. update = смена роли участника,
+  // delete = удаление из орги. read/create нет: ростер читают все (без @CheckPolicy,
+  // см. organizations.controller.ts), создание — это POST /v1/organizations (новая
+  // орга целиком, не Membership конкретного юзера) — отдельный сценарий без CASL-гейта.
+  Membership: ["update", "delete"],
+  // Читают все роли (app-ability.ts) — сегодняшний словарь не секретнее уже публичного ростера.
+  AuditLog: ["read"],
+  // invites.md §5: create/read/delete = O/A only, тот же паттерн, что Membership. "accept" —
+  // публичный эндпоинт (владение токеном из письма = личность), не через CASL вообще.
+  Invite: ["create", "read", "delete"],
+  // FR-ORG-3: currency/timezone/branding/aiProvider. read — все роли (не секретнее ростера),
+  // update — O/A only (Appendix B «Manage org settings»). create/delete нет: Organization.settings
+  // всегда существует (default "{}" из схемы), отдельного create-эндпоинта не завели.
+  Organization: ["read", "update"],
 } as const satisfies Record<(typeof APP_SUBJECTS)[number], readonly AppAction[]>;
 
 /**

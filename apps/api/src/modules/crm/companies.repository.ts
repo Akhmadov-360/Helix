@@ -93,7 +93,7 @@ export class CompaniesRepository {
   // страницу, не N+1 по строкам.
   listByOrg(
     orgId: string,
-    opts: { q?: string; cursorId?: string; limit: number },
+    opts: { q?: string; industry?: string; cursorId?: string; limit: number },
   ): Promise<
     Array<CompanyRow & { projects: Array<{ id: string; title: string }>; contacts: Array<{ id: string; name: string }> }>
   > {
@@ -101,6 +101,7 @@ export class CompaniesRepository {
       where: {
         orgId,
         ...(opts.q ? { name: { contains: opts.q, mode: "insensitive" } } : {}),
+        ...(opts.industry ? { industry: opts.industry } : {}),
       },
       select: {
         ...COMPANY_SELECT,

@@ -66,9 +66,13 @@ export function TasksView({ orgId, projectId }: { orgId: string; projectId: stri
               <AssigneeField value={assigneeId} onChange={setAssigneeId} members={members} compact />
             </div>
           </div>
-          <Button type="submit" disabled={!title.trim() || create.isPending} className="shrink-0">
-            {t("tasks.quickAdd.submit")}
-          </Button>
+          {/* Форма уже сабмитится по Enter — кнопка не единственный способ создать задачу, поэтому
+              не занимает место, пока нечего сохранять (design review). */}
+          {title.trim().length > 0 && (
+            <Button type="submit" disabled={create.isPending} className="shrink-0">
+              {t("tasks.quickAdd.submit")}
+            </Button>
+          )}
         </form>
       )}
 

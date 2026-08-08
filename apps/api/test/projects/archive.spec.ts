@@ -106,6 +106,32 @@ describe("archive / restore (§7)", () => {
     expect(await eventCount(p.id, "project.restored")).toBe(0);
   });
 
+  describe("GET /workspaces/:id/projects/archived", () => {
+    it("список содержит только ARCHIVED, свежие сверху", async () => {
+      const open = await seed("a0");
+      const archived1 = await seed("z0", "ARCHIVED");
+      const archived2 = await seed("z1", "ARCHIVED");
+
+      const res = await request(app.getHttpServer())
+        .get(`/v1/workspaces/${wsId}/projects/archived`)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(200);
+
+      const ids = res.body.data.map((p: { id: string }) => p.id);
+      expect(ids).toContain(archived1.id);
+      expect(ids).toContain(archived2.id);
+      expect(ids).not.toContain(open.id);
+    });
+
+    it("чужой воркспейс → 404", async () => {
+      const stranger = await signUp(app);
+      await request(app.getHttpServer())
+        .get(`/v1/workspaces/${wsId}/projects/archived`)
+        .set("Authorization", `Bearer ${stranger.token}`)
+        .expect(404);
+    });
+  });
+
   describe("отказы", () => {
     it("чужой проект → 404", async () => {
       const p = await seed("a0");

@@ -9,7 +9,7 @@ import type {
 import { columnResponseSchema, projectResponseSchema } from "@helix/api-schemas";
 import { request, queryKeys } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
-import { useToast } from "../../shared/toast/use-toast";
+import { toast } from "sonner";
 import { boardQueryOptions } from "./queries";
 import { toBoardError } from "./board-error";
 
@@ -109,6 +109,8 @@ function boardErrorKey(kind: ReturnType<typeof toBoardError>): MessageKey {
   switch (kind) {
     case "staleNeighbors":
       return "board.error.staleNeighbors";
+    case "missingRequiredFields":
+      return "board.error.missingRequiredFields";
     case "permissionDenied":
       return "board.error.permissionDenied";
     case "notFound":
@@ -122,7 +124,6 @@ export function useMoveProject(orgId: string, workspaceId: string) {
   const queryClient = useQueryClient();
   const { queryKey } = boardQueryOptions(orgId, workspaceId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: MoveVariables) =>
@@ -159,7 +160,6 @@ export function useCreateProject(orgId: string, workspaceId: string) {
   const queryClient = useQueryClient();
   const { queryKey } = boardQueryOptions(orgId, workspaceId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (input: CreateProjectInput) =>
@@ -169,14 +169,17 @@ export function useCreateProject(orgId: string, workspaceId: string) {
         body: input,
         schema: projectResponseSchema,
       }),
+    // missingRequiredFields — развилка, которую показывает сама форма (подсветка полей, §7), не
+    // тост-ошибка (тот же приём, что notEmpty у useDeletePhase).
     onError: (error) => {
       const kind = toBoardError(error);
+      if (kind === "missingRequiredFields") return;
       if (kind === "permissionDenied") void queryClient.invalidateQueries({ queryKey: queryKeys.me() });
       toast.error(t(boardErrorKey(kind)));
     },
     onSuccess: (project) => {
       queryClient.setQueryData<BoardResponse>(queryKey, (current) => current && prependProject(current, project));
-      toast.show(t("board.create.success", { title: project.title }));
+      toast.success(t("board.create.success", { title: project.title }));
     },
   });
 }
@@ -200,7 +203,6 @@ export function useArchiveProject(orgId: string, workspaceId: string) {
   const queryClient = useQueryClient();
   const { queryKey } = boardQueryOptions(orgId, workspaceId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { id: string; title: string }) =>
@@ -212,7 +214,29 @@ export function useArchiveProject(orgId: string, workspaceId: string) {
     },
     onSuccess: (_project, vars) => {
       queryClient.setQueryData<BoardResponse>(queryKey, (current) => current && removeProject(current, vars.id));
-      toast.show(t("board.card.archived", { title: vars.title }));
+      toast.success(t("board.card.archived", { title: vars.title }));
+    },
+  });
+}
+
+// Восстановленная карточка получает НОВЫЙ ранг/статус на бэке (§7.3) — точную позицию в доске
+// не смоделировать оптимистично, поэтому оба кэша (доска + архив) просто инвалидируются.
+export function useRestoreProject(orgId: string, workspaceId: string) {
+  const queryClient = useQueryClient();
+  const t = useT();
+
+  return useMutation({
+    mutationFn: (vars: { id: string; title: string }) =>
+      request({ method: "POST", path: `/v1/projects/${vars.id}/restore`, schema: projectResponseSchema }),
+    onError: (error) => {
+      const kind = toBoardError(error);
+      if (kind === "permissionDenied") void queryClient.invalidateQueries({ queryKey: queryKeys.me() });
+      toast.error(t(boardErrorKey(kind)));
+    },
+    onSuccess: (_project, vars) => {
+      void queryClient.invalidateQueries({ queryKey: boardQueryOptions(orgId, workspaceId).queryKey });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.archivedProjects(orgId, workspaceId) });
+      toast.success(t("board.card.restored", { title: vars.title }));
     },
   });
 }
@@ -221,7 +245,6 @@ export function useDeleteProject(orgId: string, workspaceId: string) {
   const queryClient = useQueryClient();
   const { queryKey } = boardQueryOptions(orgId, workspaceId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { id: string; title: string }) =>
@@ -233,7 +256,7 @@ export function useDeleteProject(orgId: string, workspaceId: string) {
     },
     onSuccess: (_response, vars) => {
       queryClient.setQueryData<BoardResponse>(queryKey, (current) => current && removeProject(current, vars.id));
-      toast.show(t("board.card.deleted", { title: vars.title }));
+      toast.success(t("board.card.deleted", { title: vars.title }));
     },
   });
 }
@@ -244,7 +267,6 @@ export function useLoadMoreColumn(orgId: string, workspaceId: string) {
   const queryClient = useQueryClient();
   const { queryKey } = boardQueryOptions(orgId, workspaceId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { phaseId: string }) => {

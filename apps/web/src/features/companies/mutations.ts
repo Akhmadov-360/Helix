@@ -1,17 +1,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import type { CompanyDetailResponse, CompanyListResponse, CreateCompanyInput, UpdateCompanyInput } from "@helix/api-schemas";
-import {
-  companyListResponseSchema,
-  companyResponseSchema,
-  contactResponseSchema,
-  createCompanyResponseSchema,
-  projectResponseSchema,
-} from "@helix/api-schemas";
+import { companyResponseSchema, contactResponseSchema, createCompanyResponseSchema, projectResponseSchema } from "@helix/api-schemas";
 import { queryKeys, request } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
-import { useToast } from "../../shared/toast/use-toast";
-import { companiesListQueryOptions, companyQueryOptions, type CompaniesListQuery } from "./queries";
+import { toast } from "sonner";
+import { companiesListQueryOptions, companyQueryOptions } from "./queries";
 import { toCompanyError } from "./company-error";
 
 function companyErrorKey(kind: ReturnType<typeof toCompanyError>): MessageKey {
@@ -38,7 +32,6 @@ export function invalidateCompaniesList(queryClient: ReturnType<typeof useQueryC
 export function useCreateCompany(orgId: string) {
   const queryClient = useQueryClient();
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (input: CreateCompanyInput) =>
@@ -50,7 +43,7 @@ export function useCreateCompany(orgId: string) {
     },
     onSuccess: ({ company }) => {
       invalidateCompaniesList(queryClient, orgId);
-      toast.show(t("companies.create.success", { name: company.name }));
+      toast.success(t("companies.create.success", { name: company.name }));
     },
   });
 }
@@ -58,7 +51,6 @@ export function useCreateCompany(orgId: string) {
 export function useUpdateCompany(orgId: string) {
   const queryClient = useQueryClient();
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { companyId: string; input: UpdateCompanyInput }) =>
@@ -83,7 +75,7 @@ export function useUpdateCompany(orgId: string) {
         (current) => current && { ...current, ...company, contacts: current.contacts },
       );
       invalidateCompaniesList(queryClient, orgId);
-      toast.show(t("companies.edit.success"));
+      toast.success(t("companies.edit.success"));
     },
   });
 }
@@ -91,7 +83,6 @@ export function useUpdateCompany(orgId: string) {
 export function useDeleteCompany(orgId: string) {
   const queryClient = useQueryClient();
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { companyId: string }) =>
@@ -107,7 +98,7 @@ export function useDeleteCompany(orgId: string) {
         (current) => current && { ...current, companies: current.companies.filter((c) => c.id !== vars.companyId) },
       );
       void queryClient.invalidateQueries({ queryKey: companiesListQueryOptions(orgId).queryKey });
-      toast.show(t("companies.delete.success"));
+      toast.success(t("companies.delete.success"));
     },
   });
 }
@@ -120,7 +111,6 @@ export function useDeleteCompany(orgId: string) {
 export function useUnlinkCompanyFromProject(orgId: string) {
   const queryClient = useQueryClient();
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { projectId: string }) =>
@@ -147,7 +137,6 @@ export function useUnlinkCompanyFromProject(orgId: string) {
 export function useSetContactCompany(orgId: string, companyId: string) {
   const queryClient = useQueryClient();
   const t = useT();
-  const toast = useToast();
   const queryKey = companyQueryOptions(orgId, companyId).queryKey;
 
   return useMutation({
@@ -168,32 +157,6 @@ export function useSetContactCompany(orgId: string, companyId: string) {
         return { ...current, contacts };
       });
       invalidateCompaniesList(queryClient, orgId);
-    },
-  });
-}
-
-// Курсорная догрузка — тот же приём, что contacts/mutations.ts useLoadMoreContacts: один
-// query-key на весь фильтр {q} (query-keys.ts companiesList), страницы дописываются в его кэш.
-export function useLoadMoreCompanies(orgId: string, query: CompaniesListQuery) {
-  const queryClient = useQueryClient();
-  const queryKey = queryKeys.companiesList(orgId, query);
-
-  return useMutation({
-    mutationFn: () => {
-      const current = queryClient.getQueryData<CompanyListResponse>(queryKey);
-      const cursorId = current?.companies.at(-1)?.id;
-      return request({
-        path: "/v1/companies",
-        searchParams: { ...query, cursorId },
-        schema: companyListResponseSchema,
-      });
-    },
-    onSuccess: (page) => {
-      queryClient.setQueryData<CompanyListResponse>(queryKey, (existing) =>
-        existing
-          ? { companies: [...existing.companies, ...page.companies], hasMore: page.hasMore }
-          : page,
-      );
     },
   });
 }

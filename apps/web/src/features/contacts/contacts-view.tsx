@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { Users } from "lucide-react";
+import { Plus, Users, X } from "lucide-react";
 import type { Audience, CompanyResponse, ContactResponse, DedupHint as DedupHintData } from "@helix/api-schemas";
 import { Button, Card, cn } from "@helix/ui";
 import { useCan } from "../../shared/auth/ability";
@@ -38,6 +38,11 @@ export function ContactsView({
   const canEditRoles = useCan("ProjectContact.update");
   const canMerge = useCan("Contact.merge");
   const [dedup, setDedup] = useState<{ hint: DedupHintData; newContactId: string } | null>(null);
+  // Пока контактов нет — поиск открыт сразу (нечего показывать взамен). Как только хотя бы один
+  // привязан, сворачиваем его за "+ Привязать контакт": постоянно видимая строка поиска+подсказки
+  // компании раньше отнимала место на каждом лиде, даже когда все нужные контакты уже добавлены.
+  const [searching, setSearching] = useState(false);
+  const showSearch = canLink && (contacts.length === 0 || searching);
 
   const excludeIds = new Set(contacts.map((c) => c.contactId));
   // Связь баннера с карточками ниже (UI-обзор): без этого пользователь сопоставляет текст баннера
@@ -66,14 +71,39 @@ export function ContactsView({
 
   return (
     <div className="flex flex-col gap-4">
-      {canLink && (
-        <ContactSearch
-          orgId={orgId}
-          excludeIds={excludeIds}
-          onLinkExisting={linkExisting}
-          onCreated={handleCreated}
-          company={company}
-        />
+      {showSearch ? (
+        <div className="flex flex-col items-start gap-2">
+          <ContactSearch
+            orgId={orgId}
+            excludeIds={excludeIds}
+            onLinkExisting={(contact) => {
+              linkExisting(contact);
+              setSearching(false);
+            }}
+            onCreated={(contact, hint) => {
+              handleCreated(contact, hint);
+              setSearching(false);
+            }}
+            company={company}
+          />
+          {contacts.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setSearching(false)}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-3 w-3" />
+              {t("contacts.search.cancel")}
+            </button>
+          )}
+        </div>
+      ) : (
+        canLink && (
+          <Button type="button" variant="outline" size="sm" className="w-fit" onClick={() => setSearching(true)}>
+            <Plus className="h-3.5 w-3.5" />
+            {t("contacts.search.linkTrigger")}
+          </Button>
+        )
       )}
 
       {dedup && (
@@ -89,10 +119,14 @@ export function ContactsView({
       )}
 
       {contacts.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-8 text-center text-muted-foreground">
-          <Users className="h-8 w-8" />
-          <p>{t("contacts.list.empty")}</p>
-        </div>
+        // Company suggestions в ContactSearch выше уже предлагают конкретное следующее действие —
+        // дублировать его нейтральным "не привязан ни один контакт" рядом излишне (design review).
+        !company && (
+          <div className="flex flex-col items-center gap-2 py-8 text-center text-muted-foreground">
+            <Users className="h-8 w-8" />
+            <p>{t("contacts.list.empty")}</p>
+          </div>
+        )
       ) : (
         <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {contacts.map((contact) => (

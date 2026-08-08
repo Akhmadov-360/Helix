@@ -13,6 +13,7 @@ export interface ProjectRow {
   companyId: string | null;
   ownerId: string | null;
   rank: string;
+  fields: Prisma.JsonValue;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -31,6 +32,7 @@ export function toProjectResponse(p: ProjectRow): ProjectResponse {
     companyId: p.companyId,
     ownerId: p.ownerId,
     rank: p.rank,
+    fields: (p.fields as Record<string, unknown>) ?? {},
     createdAt: p.createdAt.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
   };

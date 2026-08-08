@@ -1,9 +1,9 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Audience, CreateWorkspaceInput, UpdateWorkspaceInput, WorkspaceResponse } from "@helix/api-schemas";
+import type { CreateWorkspaceInput, UpdateWorkspaceInput, WorkspaceResponse } from "@helix/api-schemas";
 import { workspaceResponseSchema } from "@helix/api-schemas";
 import { queryKeys, request } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
-import { useToast } from "../../shared/toast/use-toast";
+import { toast } from "sonner";
 import { toWorkspaceError } from "./workspace-error";
 
 function workspaceErrorKey(kind: ReturnType<typeof toWorkspaceError>): MessageKey {
@@ -21,14 +21,15 @@ export function useCreateWorkspace(orgId: string) {
   const queryClient = useQueryClient();
   const queryKey = queryKeys.workspaces(orgId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
-    mutationFn: (input: { name: string; audience: Audience }) =>
+    // audience опционален (blueprints.md §3: если не передан, побеждает audience блюпринта) —
+    // отдельная перегрузка на "с блюпринтом"/"без" не нужна, форма запроса общая.
+    mutationFn: (input: CreateWorkspaceInput) =>
       request({
         method: "POST",
         path: "/v1/workspaces",
-        body: input satisfies CreateWorkspaceInput,
+        body: input,
         schema: workspaceResponseSchema,
       }),
     onError: (error) => {
@@ -38,7 +39,7 @@ export function useCreateWorkspace(orgId: string) {
     },
     onSuccess: (workspace) => {
       queryClient.setQueryData<WorkspaceResponse[]>(queryKey, (current) => [...(current ?? []), workspace]);
-      toast.show(t("workspaces.create.success", { name: workspace.name }));
+      toast.success(t("workspaces.create.success", { name: workspace.name }));
     },
   });
 }
@@ -47,7 +48,6 @@ export function useUpdateWorkspace(orgId: string) {
   const queryClient = useQueryClient();
   const queryKey = queryKeys.workspaces(orgId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { id: string; input: UpdateWorkspaceInput }) =>
@@ -66,7 +66,7 @@ export function useUpdateWorkspace(orgId: string) {
       queryClient.setQueryData<WorkspaceResponse[]>(queryKey, (current) =>
         current?.map((w) => (w.id === workspace.id ? workspace : w)),
       );
-      toast.show(t("workspaces.edit.success", { name: workspace.name }));
+      toast.success(t("workspaces.edit.success", { name: workspace.name }));
     },
   });
 }
@@ -75,7 +75,6 @@ export function useDeleteWorkspace(orgId: string) {
   const queryClient = useQueryClient();
   const queryKey = queryKeys.workspaces(orgId);
   const t = useT();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (vars: { id: string; name: string }) =>
@@ -87,7 +86,7 @@ export function useDeleteWorkspace(orgId: string) {
     },
     onSuccess: (_response, vars) => {
       queryClient.setQueryData<WorkspaceResponse[]>(queryKey, (current) => current?.filter((w) => w.id !== vars.id));
-      toast.show(t("workspaces.delete.success", { name: vars.name }));
+      toast.success(t("workspaces.delete.success", { name: vars.name }));
     },
   });
 }

@@ -15,7 +15,7 @@ import {
   SelfMergeError,
 } from "../../core/errors/domain-error";
 import { PrismaService } from "../../core/prisma/prisma.service";
-import { AuditRecorder } from "./audit.recorder";
+import { AuditRecorder } from "../audit/audit.recorder";
 import { toContactResponse, type ContactInternalRow } from "./contact.mapper";
 import { ContactsRepository, type UpdateContactData } from "./contacts.repository";
 import { normalizeEmail } from "./normalize";

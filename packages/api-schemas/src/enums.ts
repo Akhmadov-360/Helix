@@ -7,3 +7,22 @@ export type Audience = z.infer<typeof audienceSchema>;
 
 export const phaseTypeSchema = z.enum(["OPEN", "WON", "LOST"]);
 export type PhaseType = z.infer<typeof phaseTypeSchema>;
+
+export const fieldTypeSchema = z.enum([
+  "text",
+  "longtext",
+  "number",
+  "currency",
+  "date",
+  "datetime",
+  "select",
+  "multiselect",
+  "boolean",
+  "url",
+  "email",
+  "phone",
+  "contactRef",
+  "companyRef",
+  "userRef",
+]);
+export type FieldType = z.infer<typeof fieldTypeSchema>;
