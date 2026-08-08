@@ -315,3 +315,54 @@ export class InvalidPasswordResetTokenError extends UnauthorizedError {
     super("Password reset link is invalid or expired");
   }
 }
+
+/**
+ * Токен инвайта (invites.md §2/§8): не найден, отозван, принят или истёк — причина не
+ * раскрывается наружу, тот же приём, что InvalidPasswordResetTokenError.
+ */
+export class InvalidInviteTokenError extends UnauthorizedError {
+  readonly code = "INVALID_INVITE_TOKEN";
+
+  constructor() {
+    super("Invite link is invalid or expired");
+  }
+}
+
+/**
+ * invites.md §4: запрошенная при инвайте роль выше ранга самого пригласившего
+ * (`canGrantRole`, core/authz/role-hierarchy.ts).
+ */
+export class InviteRoleExceedsInviterError extends BadRequestError {
+  readonly code = "INVITE_ROLE_EXCEEDS_INVITER";
+
+  constructor() {
+    super("Cannot invite a role higher than your own");
+  }
+}
+
+/**
+ * invites.md §3(a): accept для email БЕЗ существующего User пришёл без name/password —
+ * эта ветка обязана создать User, Zod не может выразить условную обязательность полей
+ * (нет доступа к БД на этапе валидации).
+ */
+export class InviteAcceptRequiresProfileError extends BadRequestError {
+  readonly code = "INVITE_ACCEPT_REQUIRES_PROFILE";
+
+  constructor() {
+    super("Name and password are required to accept this invite");
+  }
+}
+
+/**
+ * invites.md §3: email уже состоит в целевой орге — create-time UX-guard (инвайт бессмыслен),
+ * либо defensive re-check на accept, если членство появилось другим путём между enqueue и
+ * обработкой (тогда это `Membership.@@unique` P2002, всплывающий через AllExceptionsFilter, а
+ * не этот класс напрямую — см. комментарий в invites.service.ts).
+ */
+export class AlreadyOrgMemberError extends ConflictError {
+  readonly code = "ALREADY_ORG_MEMBER";
+
+  constructor() {
+    super("This email already belongs to a member of this organization");
+  }
+}

@@ -9,6 +9,9 @@ export const auditActionSchema = z.enum([
   "membership.role_changed",
   "membership.removed",
   "organization.created",
+  "invite.created",
+  "invite.accepted",
+  "invite.revoked",
 ]);
 export type AuditAction = z.infer<typeof auditActionSchema>;
 
@@ -46,6 +49,26 @@ const organizationCreatedPayloadSchema = z.object({
   name: z.string(),
 });
 
+// invites.md §10: email+role+снапшот имени актора на момент события (P2/P3) — не userId ссылка
+// на Invite (P3: минимум для истории, не денормализуем всю строку).
+const inviteCreatedPayloadSchema = z.object({
+  email: z.string(),
+  role: roleSchema,
+  invitedByName: z.string(),
+});
+
+const inviteAcceptedPayloadSchema = z.object({
+  email: z.string(),
+  role: roleSchema,
+  acceptedByName: z.string(),
+});
+
+const inviteRevokedPayloadSchema = z.object({
+  email: z.string(),
+  role: roleSchema,
+  revokedByName: z.string(),
+});
+
 // Писательский контракт AuditRecorder (валидируется перед записью). discriminatedUnion — задел
 // под рост словаря без ломки существующих поколений.
 export const auditEventSchema = z.discriminatedUnion("action", [
@@ -68,6 +91,21 @@ export const auditEventSchema = z.discriminatedUnion("action", [
     action: z.literal("organization.created"),
     schemaVersion: z.literal(1),
     payload: organizationCreatedPayloadSchema,
+  }),
+  z.object({
+    action: z.literal("invite.created"),
+    schemaVersion: z.literal(1),
+    payload: inviteCreatedPayloadSchema,
+  }),
+  z.object({
+    action: z.literal("invite.accepted"),
+    schemaVersion: z.literal(1),
+    payload: inviteAcceptedPayloadSchema,
+  }),
+  z.object({
+    action: z.literal("invite.revoked"),
+    schemaVersion: z.literal(1),
+    payload: inviteRevokedPayloadSchema,
   }),
 ]);
 export type AuditEvent = z.infer<typeof auditEventSchema>;

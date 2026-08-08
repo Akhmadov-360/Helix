@@ -103,6 +103,7 @@ model Organization {
   activityEvents ActivityEvent[]
   auditLogs      AuditLog[]
   tasks          Task[]
+  invites        Invite[]
 }
 
 model User {
@@ -121,6 +122,8 @@ model User {
   tasks            Task[] // back-relation для assignee (Task.assigneeId → User, SetNull)
   refreshSessions  RefreshSession[]
   passwordResetTokens PasswordResetToken[]
+  sentInvites      Invite[] @relation("InviteInvitedBy")
+  acceptedInvites  Invite[] @relation("InviteAcceptedBy")
 }
 
 model Membership {
@@ -133,6 +136,31 @@ model Membership {
   user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([orgId, userId])
+}
+
+// Приглашение по email (docs/specs/invites.md). НЕ Membership.pending (§12 спеки): Membership
+// обязана ссылаться на существующего User (её PK-пара), а инвайт по определению может адресовать
+// email, для которого User ещё нет. tokenHash — та же токен-механика, что PasswordResetToken
+// (§2 спеки): случайный высокоэнтропийный токен, в БД только хеш.
+model Invite {
+  id               String    @id @default(cuid())
+  orgId            String
+  email            String
+  role             Role
+  invitedByUserId  String
+  tokenHash        String    @unique
+  createdAt        DateTime  @default(now())
+  expiresAt        DateTime
+  acceptedAt       DateTime?
+  acceptedByUserId String?
+  revokedAt        DateTime?
+
+  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  invitedBy  User         @relation("InviteInvitedBy", fields: [invitedByUserId], references: [id], onDelete: Cascade)
+  acceptedBy User?        @relation("InviteAcceptedBy", fields: [acceptedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([orgId])
+  @@index([email])
 }
 
 // ──────────────────────────── WORKSPACE / PHASE ────────────────────────────

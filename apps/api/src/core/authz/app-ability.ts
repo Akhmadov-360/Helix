@@ -24,6 +24,7 @@ export const APP_SUBJECTS = [
   "Blueprint",
   "Membership",
   "AuditLog",
+  "Invite",
 ] as const;
 export type AppSubject = (typeof APP_SUBJECTS)[number] | "all";
 export type AppAbility = MongoAbility<[AppAction, AppSubject]>;

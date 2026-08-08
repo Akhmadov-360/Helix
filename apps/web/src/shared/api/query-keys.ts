@@ -6,6 +6,8 @@
 // orgId (identity), поэтому в его ключе orgId нет.
 export const queryKeys = {
   me: () => ["me"] as const,
+  // Публичный, не org-scoped (принимающий ещё не обязательно аутентифицирован) — как me()/myOrgs().
+  invitePreview: (token: string) => ["invitePreview", token] as const,
   // Как me() — источник личности (список орг ЮЗЕРА, не одной орги), orgId в ключе нет.
   myOrgs: () => ["myOrgs"] as const,
   workspaces: (orgId: string) => ["org", orgId, "workspaces"] as const,
@@ -21,6 +23,7 @@ export const queryKeys = {
   projectAssignees: (orgId: string, projectId: string) =>
     ["org", orgId, "project", projectId, "assignees"] as const,
   orgMembers: (orgId: string) => ["org", orgId, "members"] as const,
+  orgInvites: (orgId: string) => ["org", orgId, "invites"] as const,
   // Typeahead-поиск (§13.1) — НЕ в loader (§4.2), короткоживущий, свой ключ под debounce-запрос.
   contactSearch: (orgId: string, q: string) => ["org", orgId, "contacts", "search", { q }] as const,
   projectTasks: (orgId: string, projectId: string) =>

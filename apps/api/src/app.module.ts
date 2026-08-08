@@ -11,6 +11,8 @@ import { CrmModule } from "./modules/crm/crm.module";
 import { ProjectLinksModule } from "./modules/project-links/project-links.module";
 import { TasksModule } from "./modules/tasks/tasks.module";
 import { HealthModule } from "./modules/health/health.module";
+import { MaintenanceModule } from "./modules/maintenance/maintenance.module";
+import { InvitesModule } from "./modules/invites/invites.module";
 import { AllExceptionsFilter } from "./core/filters/all-exceptions.filter";
 import { ResponseTransformInterceptor } from "./core/interceptors/response-transform.interceptor";
 
@@ -27,6 +29,8 @@ import { ResponseTransformInterceptor } from "./core/interceptors/response-trans
     ProjectLinksModule,
     TasksModule,
     HealthModule,
+    MaintenanceModule,
+    InvitesModule,
   ],
   providers: [
     // Глобальные cross-cutting провайдеры через APP_* (DI-friendly).

@@ -23,6 +23,14 @@ export class OrganizationsRepository {
     });
   }
 
+  /** invites.md §9: имя орги для письма-приглашения. */
+  async findById(orgId: string): Promise<OrganizationRef | null> {
+    return this.prisma.client.organization.findUnique({
+      where: { id: orgId },
+      select: { id: true, name: true },
+    });
+  }
+
   async addMember(
     data: { orgId: string; userId: string; role: Role },
     tx?: Prisma.TransactionClient,

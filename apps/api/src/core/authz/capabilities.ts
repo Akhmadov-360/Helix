@@ -42,6 +42,9 @@ const SUBJECT_OPERATIONS = {
   Membership: ["update", "delete"],
   // Читают все роли (app-ability.ts) — сегодняшний словарь не секретнее уже публичного ростера.
   AuditLog: ["read"],
+  // invites.md §5: create/read/delete = O/A only, тот же паттерн, что Membership. "accept" —
+  // публичный эндпоинт (владение токеном из письма = личность), не через CASL вообще.
+  Invite: ["create", "read", "delete"],
 } as const satisfies Record<(typeof APP_SUBJECTS)[number], readonly AppAction[]>;
 
 /**

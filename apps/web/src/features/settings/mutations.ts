@@ -1,12 +1,12 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
-import type { ChangeMemberRoleInput, CreateOrganizationInput, Role } from "@helix/api-schemas";
+import type { ChangeMemberRoleInput, CreateInviteInput, CreateOrganizationInput, Role } from "@helix/api-schemas";
 import { myOrgResponseSchema } from "@helix/api-schemas";
 import { queryKeys, request } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
 import { useSwitchOrg } from "../../shared/org/mutations";
-import { toMemberError } from "./settings-error";
+import { toInviteError, toMemberError } from "./settings-error";
 
 function memberErrorKey(kind: ReturnType<typeof toMemberError>): MessageKey {
   switch (kind) {
@@ -64,6 +64,61 @@ export function useRemoveMember(orgId: string) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.orgMembers(orgId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.auditLog(orgId) });
       toast.success(t("settings.members.removed"));
+    },
+  });
+}
+
+function inviteErrorKey(kind: ReturnType<typeof toInviteError>): MessageKey {
+  switch (kind) {
+    case "permissionDenied":
+      return "settings.members.error.permissionDenied";
+    case "notFound":
+      return "settings.members.invite.error.notFound";
+    case "roleTooHigh":
+      return "settings.members.invite.error.roleTooHigh";
+    case "alreadyMember":
+      return "settings.members.invite.error.alreadyMember";
+    default:
+      return "settings.members.error.unexpected";
+  }
+}
+
+// resend = revoke старого pending на тот же email + create нового, одной операцией на бэке
+// (invites.md §1) — фронту не нужно ничего решать, просто зовёт create ещё раз.
+export function useCreateInvite(orgId: string) {
+  const queryClient = useQueryClient();
+  const t = useT();
+
+  return useMutation({
+    mutationFn: (input: CreateInviteInput) =>
+      request({ method: "POST", path: "/v1/organizations/invites", body: input, schema: z.null() }),
+    onError: (error) => {
+      const kind = toInviteError(error);
+      if (kind === "permissionDenied") void queryClient.invalidateQueries({ queryKey: queryKeys.me() });
+      toast.error(t(inviteErrorKey(kind)));
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.orgInvites(orgId) });
+      toast.success(t("settings.members.invite.sent"));
+    },
+  });
+}
+
+export function useRevokeInvite(orgId: string) {
+  const queryClient = useQueryClient();
+  const t = useT();
+
+  return useMutation({
+    mutationFn: (vars: { id: string }) =>
+      request({ method: "DELETE", path: `/v1/organizations/invites/${vars.id}`, schema: z.null() }),
+    onError: (error) => {
+      const kind = toInviteError(error);
+      if (kind === "permissionDenied") void queryClient.invalidateQueries({ queryKey: queryKeys.me() });
+      toast.error(t(inviteErrorKey(kind)));
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.orgInvites(orgId) });
+      toast.success(t("settings.members.pending.revoked"));
     },
   });
 }

@@ -7,6 +7,10 @@ import { ENV } from "../config/config.module";
  * получат свои имена здесь же, когда придёт их черёд — не отдельным модулем на очередь. */
 export const EMAIL_QUEUE = "email";
 
+/** Repeatable/cron-джобы обслуживания (RefreshSession cleanup — первый потребитель). Отдельно от
+ * EMAIL_QUEUE: это не письма, смешивать в дашборде очередей/метриках вводит в заблуждение. */
+export const MAINTENANCE_QUEUE = "maintenance";
+
 /**
  * BullMQ-подключение (Redis) — по аналогии с PrismaModule/ConfigModule: глобальный, поднимается
  * один раз, потребители инжектят `@InjectQueue(EMAIL_QUEUE)` без повторного импорта этого модуля.
@@ -26,6 +30,7 @@ export const EMAIL_QUEUE = "email";
       }),
     }),
     BullModule.registerQueue({ name: EMAIL_QUEUE }),
+    BullModule.registerQueue({ name: MAINTENANCE_QUEUE }),
   ],
   exports: [BullModule],
 })

@@ -16,6 +16,7 @@ import { Route as AuthLoginRouteImport } from './routes/_auth/login'
 import { Route as AuthRegisterRouteImport } from './routes/_auth/register'
 import { Route as AuthResetPasswordRouteImport } from './routes/_auth/reset-password'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as InviteAcceptRouteImport } from './routes/invite.accept'
 import { Route as AuthenticatedCompaniesIndexRouteImport } from './routes/_authenticated/companies/index'
 import { Route as AuthenticatedCompaniesCompanyIdRouteImport } from './routes/_authenticated/companies/$companyId'
 import { Route as AuthenticatedContactsIndexRouteImport } from './routes/_authenticated/contacts/index'
@@ -64,6 +65,11 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedRoute,
+} as any)
+const InviteAcceptRoute = InviteAcceptRouteImport.update({
+  id: '/invite/accept',
+  path: '/invite/accept',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedCompaniesIndexRoute =
   AuthenticatedCompaniesIndexRouteImport.update({
@@ -162,6 +168,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof AuthLoginRoute
   '/register': typeof AuthRegisterRoute
   '/reset-password': typeof AuthResetPasswordRoute
+  '/invite/accept': typeof InviteAcceptRoute
   '/companies/$companyId': typeof AuthenticatedCompaniesCompanyIdRoute
   '/contacts/$contactId': typeof AuthenticatedContactsContactIdRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRouteWithChildren
@@ -184,6 +191,7 @@ export interface FileRoutesByTo {
   '/login': typeof AuthLoginRoute
   '/register': typeof AuthRegisterRoute
   '/reset-password': typeof AuthResetPasswordRoute
+  '/invite/accept': typeof InviteAcceptRoute
   '/companies/$companyId': typeof AuthenticatedCompaniesCompanyIdRoute
   '/contacts/$contactId': typeof AuthenticatedContactsContactIdRoute
   '/settings/audit-log': typeof AuthenticatedSettingsAuditLogRoute
@@ -207,6 +215,7 @@ export interface FileRoutesById {
   '/_auth/login': typeof AuthLoginRoute
   '/_auth/register': typeof AuthRegisterRoute
   '/_auth/reset-password': typeof AuthResetPasswordRoute
+  '/invite/accept': typeof InviteAcceptRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/companies/$companyId': typeof AuthenticatedCompaniesCompanyIdRoute
   '/_authenticated/contacts/$contactId': typeof AuthenticatedContactsContactIdRoute
@@ -232,6 +241,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/reset-password'
+    | '/invite/accept'
     | '/companies/$companyId'
     | '/contacts/$contactId'
     | '/projects/$projectId'
@@ -254,6 +264,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/reset-password'
+    | '/invite/accept'
     | '/companies/$companyId'
     | '/contacts/$contactId'
     | '/settings/audit-log'
@@ -276,6 +287,7 @@ export interface FileRouteTypes {
     | '/_auth/login'
     | '/_auth/register'
     | '/_auth/reset-password'
+    | '/invite/accept'
     | '/_authenticated/'
     | '/_authenticated/companies/$companyId'
     | '/_authenticated/contacts/$contactId'
@@ -297,6 +309,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AuthRoute: typeof AuthRouteWithChildren
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
+  InviteAcceptRoute: typeof InviteAcceptRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -349,6 +362,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
+    }
+    '/invite/accept': {
+      id: '/invite/accept'
+      path: '/invite/accept'
+      fullPath: '/invite/accept'
+      preLoaderRoute: typeof InviteAcceptRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/companies/': {
       id: '/_authenticated/companies/'
@@ -539,6 +559,7 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRouteWithChildren,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
+  InviteAcceptRoute: InviteAcceptRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

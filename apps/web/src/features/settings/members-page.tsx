@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { Trash2, Users } from "lucide-react";
+import { Plus, Trash2, Users } from "lucide-react";
 import type { OrgMemberResponse, Role } from "@helix/api-schemas";
 import {
   Button,
@@ -22,6 +22,8 @@ import { useMe } from "../../shared/auth/session";
 import { useT } from "../../shared/i18n";
 import { useChangeMemberRole } from "./mutations";
 import { orgMembersQueryOptions } from "../../shared/org/queries";
+import { InviteMemberDialog } from "./invite-member-dialog";
+import { PendingInvitesSection } from "./pending-invites-section";
 import { RemoveMemberDialog } from "./remove-member-dialog";
 
 const COLUMN_COUNT = 4;
@@ -36,9 +38,24 @@ export function MembersPage({ orgId }: { orgId: string }) {
   const canUpdate = useCan("Membership.update");
   const canDelete = useCan("Membership.delete");
   const changeRole = useChangeMemberRole(orgId);
+  const canInvite = useCan("Invite.create");
+  const canReadInvites = useCan("Invite.read");
   const [removeTarget, setRemoveTarget] = useState<OrgMemberResponse | null>(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
 
-  const toolbar = <TableToolbar title={t("settings.members.title")} />;
+  const toolbar = (
+    <TableToolbar
+      title={t("settings.members.title")}
+      actions={
+        canInvite && (
+          <Button type="button" size="sm" onClick={() => setInviteOpen(true)}>
+            <Plus className="h-3.5 w-3.5" />
+            {t("settings.members.invite.trigger")}
+          </Button>
+        )
+      }
+    />
+  );
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
@@ -119,12 +136,15 @@ export function MembersPage({ orgId }: { orgId: string }) {
         </TableBody>
       </Table>
 
+      {canReadInvites && <PendingInvitesSection orgId={orgId} />}
+
       <RemoveMemberDialog
         orgId={orgId}
         member={removeTarget}
         open={removeTarget !== null}
         onOpenChange={(open) => !open && setRemoveTarget(null)}
       />
+      <InviteMemberDialog orgId={orgId} actorRole={me.role} open={inviteOpen} onOpenChange={setInviteOpen} />
     </div>
   );
 }
