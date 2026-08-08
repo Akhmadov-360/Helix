@@ -7,12 +7,23 @@ import { EMAIL_QUEUE } from "../../core/queue/queue.module";
 import { MAILER, type MailerService } from "./mailer/mailer.interface";
 import { NotificationsRepository } from "./notifications.repository";
 import { resolveLeadCreatedRecipients } from "./recipients";
+import { renderAssignmentEmail } from "./templates/assignment-email";
 import { renderLeadCreatedEmail } from "./templates/lead-created-email";
+import { renderOrgInviteEmail } from "./templates/org-invite-email";
 import { renderPasswordResetEmail } from "./templates/password-reset-email";
+import { renderPhaseChangedEmail } from "./templates/phase-changed-email";
+import { ASSIGNMENT_JOB, type AssignmentJobData } from "./assignment-job";
 import type { LeadCreatedJobData } from "./lead-created-job";
+import { ORG_INVITE_JOB, type OrgInviteJobData } from "./org-invite-job";
 import { PASSWORD_RESET_JOB, type PasswordResetJobData } from "./password-reset-job";
+import { PHASE_CHANGED_JOB, type PhaseChangedJobData } from "./phase-changed-job";
 
-type EmailJobData = LeadCreatedJobData | PasswordResetJobData;
+type EmailJobData =
+  | LeadCreatedJobData
+  | PasswordResetJobData
+  | AssignmentJobData
+  | PhaseChangedJobData
+  | OrgInviteJobData;
 
 /**
  * Консьюмер очереди `email` (§1). Живёт в том же Nest-приложении, не отдельным процессом —
@@ -38,6 +49,15 @@ export class EmailWorker extends WorkerHost {
   async process(job: Job<EmailJobData>): Promise<void> {
     if (job.name === PASSWORD_RESET_JOB) {
       return this.processPasswordReset(job.data as PasswordResetJobData);
+    }
+    if (job.name === ASSIGNMENT_JOB) {
+      return this.processAssignment(job.data as AssignmentJobData);
+    }
+    if (job.name === PHASE_CHANGED_JOB) {
+      return this.processPhaseChanged(job.data as PhaseChangedJobData);
+    }
+    if (job.name === ORG_INVITE_JOB) {
+      return this.processOrgInvite(job.data as OrgInviteJobData);
     }
     return this.processLeadCreated(job.data as LeadCreatedJobData);
   }
@@ -68,5 +88,59 @@ export class EmailWorker extends WorkerHost {
   private async processPasswordReset(data: PasswordResetJobData): Promise<void> {
     const email = renderPasswordResetEmail({ name: data.name, token: data.token, appUrl: this.env.APP_URL });
     await this.mailer.send({ to: [data.email], ...email });
+  }
+
+  private async processOrgInvite(data: OrgInviteJobData): Promise<void> {
+    const email = renderOrgInviteEmail({
+      orgName: data.orgName,
+      inviterName: data.inviterName,
+      role: data.role,
+      token: data.token,
+      appUrl: this.env.APP_URL,
+    });
+    await this.mailer.send({ to: [data.email], ...email });
+  }
+
+  private async processAssignment(data: AssignmentJobData): Promise<void> {
+    const context = await this.repo.findAssignmentContext(data.orgId, data.projectId, data.userId);
+    if (!context) {
+      this.logger.error(`project.assigned: project ${data.projectId} or user ${data.userId} not found in org ${data.orgId}`);
+      return;
+    }
+    if (!context.assigneeEmail) return; // пользователь удалён между enqueue и обработкой — не штатная ошибка
+
+    const email = renderAssignmentEmail({
+      projectId: data.projectId,
+      projectTitle: context.projectTitle,
+      appUrl: this.env.APP_URL,
+    });
+    await this.mailer.send({ to: [context.assigneeEmail], ...email });
+  }
+
+  private async processPhaseChanged(data: PhaseChangedJobData): Promise<void> {
+    const context = await this.repo.findPhaseChangedContext(data.orgId, data.projectId, data.fromPhaseId, data.toPhaseId);
+    if (!context) {
+      this.logger.error(`project.phase_changed: project ${data.projectId} not found in org ${data.orgId}`);
+      return;
+    }
+
+    // Owner+assignees минус сам actor (§ решение): не пинговать пользователя о его же действии.
+    const recipients = new Set(
+      [
+        context.ownerId !== data.actorId ? context.ownerEmail : null,
+        ...context.assignees.filter((a) => a.userId !== data.actorId).map((a) => a.email),
+      ].filter((email): email is string => Boolean(email)),
+    );
+    if (recipients.size === 0) return;
+
+    const email = renderPhaseChangedEmail({
+      projectId: data.projectId,
+      projectTitle: context.projectTitle,
+      fromPhaseName: context.fromPhaseName,
+      toPhaseName: context.toPhaseName,
+      toPhaseType: context.toPhaseType,
+      appUrl: this.env.APP_URL,
+    });
+    await this.mailer.send({ to: [...recipients], ...email });
   }
 }

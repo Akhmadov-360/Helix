@@ -239,7 +239,8 @@ export class ProjectsService {
     projectId: string,
     input: MoveProjectInput,
   ): Promise<ProjectResponse> {
-    const updated = await this.prisma.client.$transaction(async (tx) => {
+    const { project: updated, phaseChangeEvent } = await this.prisma.client.$transaction(async (tx) => {
+      let phaseChangeEvent: { fromPhaseId: string; toPhaseId: string } | null = null;
       // Лок на ЦЕЛЕВУЮ фазу (§4.3) — до чтений, чтобы конкурентный move в неё сериализовался.
       await this.projects.lockPhase(input.toPhaseId, tx);
 
@@ -294,10 +295,22 @@ export class ProjectsService {
             },
           },
         });
+        phaseChangeEvent = { fromPhaseId: project.phaseId, toPhaseId: targetPhase.id };
       }
 
-      return moved;
+      return { project: moved, phaseChangeEvent };
     });
+
+    // FR-NOTIF-2: enqueue ПОСЛЕ $transaction() — тот же приём, что create() (§2 notifications.md).
+    if (phaseChangeEvent) {
+      await this.notifications.enqueuePhaseChanged({
+        orgId,
+        projectId,
+        actorId: userId,
+        fromPhaseId: phaseChangeEvent.fromPhaseId,
+        toPhaseId: phaseChangeEvent.toPhaseId,
+      });
+    }
 
     return toProjectResponse(updated);
   }
