@@ -1,12 +1,18 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { z } from "zod";
-import type { ChangeMemberRoleInput, CreateInviteInput, CreateOrganizationInput, Role } from "@helix/api-schemas";
-import { myOrgResponseSchema } from "@helix/api-schemas";
+import type {
+  ChangeMemberRoleInput,
+  CreateInviteInput,
+  CreateOrganizationInput,
+  Role,
+  UpdateOrganizationSettingsInput,
+} from "@helix/api-schemas";
+import { myOrgResponseSchema, organizationSettingsResponseSchema } from "@helix/api-schemas";
 import { queryKeys, request } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
 import { useSwitchOrg } from "../../shared/org/mutations";
-import { toInviteError, toMemberError } from "./settings-error";
+import { toInviteError, toMemberError, toOrgSettingsError } from "./settings-error";
 
 function memberErrorKey(kind: ReturnType<typeof toMemberError>): MessageKey {
   switch (kind) {
@@ -119,6 +125,43 @@ export function useRevokeInvite(orgId: string) {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.orgInvites(orgId) });
       toast.success(t("settings.members.pending.revoked"));
+    },
+  });
+}
+
+function orgSettingsErrorKey(kind: ReturnType<typeof toOrgSettingsError>): MessageKey {
+  switch (kind) {
+    case "permissionDenied":
+      return "settings.members.error.permissionDenied";
+    case "validation":
+      return "settings.general.error.validation";
+    default:
+      return "settings.members.error.unexpected";
+  }
+}
+
+// PATCH-семантика на бэке (партиальный merge) — форма шлёт всегда все 4 группы полей разом,
+// т.к. это единственная форма-редактор settings (не построчный список, как invites/members).
+export function useUpdateOrgSettings(orgId: string) {
+  const queryClient = useQueryClient();
+  const t = useT();
+
+  return useMutation({
+    mutationFn: (input: UpdateOrganizationSettingsInput) =>
+      request({
+        method: "PATCH",
+        path: "/v1/organizations/settings",
+        body: input,
+        schema: organizationSettingsResponseSchema,
+      }),
+    onError: (error) => {
+      const kind = toOrgSettingsError(error);
+      if (kind === "permissionDenied") void queryClient.invalidateQueries({ queryKey: queryKeys.me() });
+      toast.error(t(orgSettingsErrorKey(kind)));
+    },
+    onSuccess: (settings) => {
+      queryClient.setQueryData(queryKeys.orgSettings(orgId), settings);
+      toast.success(t("settings.general.saved"));
     },
   });
 }

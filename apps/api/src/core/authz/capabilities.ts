@@ -45,6 +45,10 @@ const SUBJECT_OPERATIONS = {
   // invites.md §5: create/read/delete = O/A only, тот же паттерн, что Membership. "accept" —
   // публичный эндпоинт (владение токеном из письма = личность), не через CASL вообще.
   Invite: ["create", "read", "delete"],
+  // FR-ORG-3: currency/timezone/branding/aiProvider. read — все роли (не секретнее ростера),
+  // update — O/A only (Appendix B «Manage org settings»). create/delete нет: Organization.settings
+  // всегда существует (default "{}" из схемы), отдельного create-эндпоинта не завели.
+  Organization: ["read", "update"],
 } as const satisfies Record<(typeof APP_SUBJECTS)[number], readonly AppAction[]>;
 
 /**

@@ -23,3 +23,12 @@ export function toInviteError(error: unknown): InviteError {
   if (error.kind === "conflict" && error.code === "ALREADY_ORG_MEMBER") return "alreadyMember";
   return "unexpected";
 }
+
+export type OrgSettingsError = "permissionDenied" | "validation" | "unexpected";
+
+export function toOrgSettingsError(error: unknown): OrgSettingsError {
+  if (!(error instanceof TransportError)) return "unexpected";
+  if (error.kind === "forbidden") return "permissionDenied";
+  if (error.kind === "validation") return "validation";
+  return "unexpected";
+}

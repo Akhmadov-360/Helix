@@ -5,6 +5,8 @@ import type {
   AuditLogQuery,
   MyOrgListResponse,
   MyOrgResponse,
+  OrganizationSettings,
+  OrganizationSettingsResponse,
   OrgMemberListResponse,
 } from "@helix/api-schemas";
 import {
@@ -120,6 +122,43 @@ export class OrganizationsService {
         },
       });
     });
+  }
+
+  /** FR-ORG-3: текущие org-level settings. Читают все роли (см. app-ability.ts). */
+  async getSettings(orgId: string): Promise<OrganizationSettingsResponse> {
+    const org = await this.orgs.findSettings(orgId);
+    if (!org) throw new ResourceNotFoundError("Organization not found");
+    return { orgId, name: org.name, settings: (org.settings ?? {}) as OrganizationSettings };
+  }
+
+  /**
+   * Партиальный merge: undefined-ключи во входе не трогают существующее значение (PATCH-семантика,
+   * не PUT) — иначе фронт был бы обязан прислать все 4 группы полей на каждое сохранение формы.
+   * changedKeys для аудита — только верхнеуровневые ключи, чьё значение реально отличается
+   * (JSON.stringify-сравнение: значения — плоские объекты/примитивы, глубокий diff избыточен).
+   */
+  async updateSettings(orgId: string, actorId: string, patch: OrganizationSettings): Promise<OrganizationSettingsResponse> {
+    const org = await this.orgs.findSettings(orgId);
+    if (!org) throw new ResourceNotFoundError("Organization not found");
+
+    const current = (org.settings ?? {}) as OrganizationSettings;
+    const merged: OrganizationSettings = { ...current, ...patch };
+    const changedKeys = Object.keys(patch).filter(
+      (key) => JSON.stringify(patch[key as keyof OrganizationSettings]) !== JSON.stringify(current[key as keyof OrganizationSettings]),
+    );
+
+    if (changedKeys.length === 0) return { orgId, name: org.name, settings: current };
+
+    await this.prisma.client.$transaction(async (tx) => {
+      await this.orgs.updateSettings(orgId, merged, tx);
+      await this.audit.record(tx, {
+        orgId,
+        actorId,
+        event: { action: "organization.settings_updated", schemaVersion: 1, payload: { changedKeys } },
+      });
+    });
+
+    return { orgId, name: org.name, settings: merged };
   }
 
   /** Org-уровневый аудит (Appendix B, O/A only — см. CheckPolicy на контроллере). */

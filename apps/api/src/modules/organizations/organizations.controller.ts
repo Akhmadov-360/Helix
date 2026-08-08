@@ -4,13 +4,16 @@ import {
   auditLogQuerySchema,
   changeMemberRoleSchema,
   createOrganizationSchema,
+  updateOrganizationSettingsSchema,
   type AuditLogListResponse,
   type AuditLogQuery,
   type ChangeMemberRoleInput,
   type CreateOrganizationInput,
   type MyOrgListResponse,
   type MyOrgResponse,
+  type OrganizationSettingsResponse,
   type OrgMemberListResponse,
+  type UpdateOrganizationSettingsInput,
 } from "@helix/api-schemas";
 import { CurrentAuth, type AuthContext } from "../../core/auth-context";
 import { CheckPolicy } from "../../core/authz/check-policy.decorator";
@@ -69,6 +72,22 @@ export class OrganizationsController {
   async removeMember(@CurrentAuth() auth: AuthContext, @Param("userId") userId: string): Promise<null> {
     await this.organizations.removeMember(auth.activeOrgId, auth.userId, userId);
     return null;
+  }
+
+  // FR-ORG-3: настройки видят все роли (см. app-ability.ts) — без @CheckPolicy, как ростер.
+  @Get("settings")
+  getSettings(@CurrentAuth() auth: AuthContext): Promise<OrganizationSettingsResponse> {
+    return this.organizations.getSettings(auth.activeOrgId);
+  }
+
+  // Appendix B «Manage org settings» = O/A only.
+  @Patch("settings")
+  @CheckPolicy("update", "Organization")
+  updateSettings(
+    @CurrentAuth() auth: AuthContext,
+    @Body(new ZodValidationPipe(updateOrganizationSettingsSchema)) dto: UpdateOrganizationSettingsInput,
+  ): Promise<OrganizationSettingsResponse> {
+    return this.organizations.updateSettings(auth.activeOrgId, auth.userId, dto);
   }
 
   // decisions.md D5: org-security-аудит, admin-only.

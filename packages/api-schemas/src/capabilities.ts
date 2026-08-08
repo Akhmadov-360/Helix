@@ -19,6 +19,7 @@ export const capabilitySubjectSchema = z.enum([
   "Membership",
   "AuditLog",
   "Invite",
+  "Organization",
 ]);
 export type CapabilitySubject = z.infer<typeof capabilitySubjectSchema>;
 

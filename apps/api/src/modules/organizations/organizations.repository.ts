@@ -31,6 +31,29 @@ export class OrganizationsRepository {
     });
   }
 
+  /** FR-ORG-3: текущие org-level settings (JSON, default "{}") + name для ответа контроллера. */
+  async findSettings(orgId: string): Promise<{ name: string; settings: Prisma.JsonValue } | null> {
+    return this.prisma.client.organization.findUnique({
+      where: { id: orgId },
+      select: { name: true, settings: true },
+    });
+  }
+
+  /**
+   * Замена всей settings-колонки. Партиальный merge (старое + новое) считается в service —
+   * репозиторий получает уже готовый финальный объект, а не занимается JSON-логикой.
+   */
+  async updateSettings(
+    orgId: string,
+    settings: Prisma.InputJsonValue,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
+    await (tx ?? this.prisma.client).organization.update({
+      where: { id: orgId },
+      data: { settings },
+    });
+  }
+
   async addMember(
     data: { orgId: string; userId: string; role: Role },
     tx?: Prisma.TransactionClient,

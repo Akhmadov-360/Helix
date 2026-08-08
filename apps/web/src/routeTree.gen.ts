@@ -23,6 +23,7 @@ import { Route as AuthenticatedContactsIndexRouteImport } from './routes/_authen
 import { Route as AuthenticatedContactsContactIdRouteImport } from './routes/_authenticated/contacts/$contactId'
 import { Route as AuthenticatedProjectsProjectIdRouteImport } from './routes/_authenticated/projects/$projectId'
 import { Route as AuthenticatedSettingsAuditLogRouteImport } from './routes/_authenticated/settings/audit-log'
+import { Route as AuthenticatedSettingsGeneralRouteImport } from './routes/_authenticated/settings/general'
 import { Route as AuthenticatedSettingsMembersRouteImport } from './routes/_authenticated/settings/members'
 import { Route as AuthenticatedWorkspacesIndexRouteImport } from './routes/_authenticated/workspaces/index'
 import { Route as AuthenticatedProjectsProjectIdIndexRouteImport } from './routes/_authenticated/projects/$projectId/index'
@@ -107,6 +108,12 @@ const AuthenticatedSettingsAuditLogRoute =
     path: '/settings/audit-log',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedSettingsGeneralRoute =
+  AuthenticatedSettingsGeneralRouteImport.update({
+    id: '/settings/general',
+    path: '/settings/general',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedSettingsMembersRoute =
   AuthenticatedSettingsMembersRouteImport.update({
     id: '/settings/members',
@@ -173,6 +180,7 @@ export interface FileRoutesByFullPath {
   '/contacts/$contactId': typeof AuthenticatedContactsContactIdRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRouteWithChildren
   '/settings/audit-log': typeof AuthenticatedSettingsAuditLogRoute
+  '/settings/general': typeof AuthenticatedSettingsGeneralRoute
   '/settings/members': typeof AuthenticatedSettingsMembersRoute
   '/companies/': typeof AuthenticatedCompaniesIndexRoute
   '/contacts/': typeof AuthenticatedContactsIndexRoute
@@ -195,6 +203,7 @@ export interface FileRoutesByTo {
   '/companies/$companyId': typeof AuthenticatedCompaniesCompanyIdRoute
   '/contacts/$contactId': typeof AuthenticatedContactsContactIdRoute
   '/settings/audit-log': typeof AuthenticatedSettingsAuditLogRoute
+  '/settings/general': typeof AuthenticatedSettingsGeneralRoute
   '/settings/members': typeof AuthenticatedSettingsMembersRoute
   '/companies': typeof AuthenticatedCompaniesIndexRoute
   '/contacts': typeof AuthenticatedContactsIndexRoute
@@ -221,6 +230,7 @@ export interface FileRoutesById {
   '/_authenticated/contacts/$contactId': typeof AuthenticatedContactsContactIdRoute
   '/_authenticated/projects/$projectId': typeof AuthenticatedProjectsProjectIdRouteWithChildren
   '/_authenticated/settings/audit-log': typeof AuthenticatedSettingsAuditLogRoute
+  '/_authenticated/settings/general': typeof AuthenticatedSettingsGeneralRoute
   '/_authenticated/settings/members': typeof AuthenticatedSettingsMembersRoute
   '/_authenticated/companies/': typeof AuthenticatedCompaniesIndexRoute
   '/_authenticated/contacts/': typeof AuthenticatedContactsIndexRoute
@@ -246,6 +256,7 @@ export interface FileRouteTypes {
     | '/contacts/$contactId'
     | '/projects/$projectId'
     | '/settings/audit-log'
+    | '/settings/general'
     | '/settings/members'
     | '/companies/'
     | '/contacts/'
@@ -268,6 +279,7 @@ export interface FileRouteTypes {
     | '/companies/$companyId'
     | '/contacts/$contactId'
     | '/settings/audit-log'
+    | '/settings/general'
     | '/settings/members'
     | '/companies'
     | '/contacts'
@@ -293,6 +305,7 @@ export interface FileRouteTypes {
     | '/_authenticated/contacts/$contactId'
     | '/_authenticated/projects/$projectId'
     | '/_authenticated/settings/audit-log'
+    | '/_authenticated/settings/general'
     | '/_authenticated/settings/members'
     | '/_authenticated/companies/'
     | '/_authenticated/contacts/'
@@ -412,6 +425,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsAuditLogRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/settings/general': {
+      id: '/_authenticated/settings/general'
+      path: '/settings/general'
+      fullPath: '/settings/general'
+      preLoaderRoute: typeof AuthenticatedSettingsGeneralRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/settings/members': {
       id: '/_authenticated/settings/members'
       path: '/settings/members'
@@ -524,6 +544,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedContactsContactIdRoute: typeof AuthenticatedContactsContactIdRoute
   AuthenticatedProjectsProjectIdRoute: typeof AuthenticatedProjectsProjectIdRouteWithChildren
   AuthenticatedSettingsAuditLogRoute: typeof AuthenticatedSettingsAuditLogRoute
+  AuthenticatedSettingsGeneralRoute: typeof AuthenticatedSettingsGeneralRoute
   AuthenticatedSettingsMembersRoute: typeof AuthenticatedSettingsMembersRoute
   AuthenticatedCompaniesIndexRoute: typeof AuthenticatedCompaniesIndexRoute
   AuthenticatedContactsIndexRoute: typeof AuthenticatedContactsIndexRoute
@@ -540,6 +561,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedProjectsProjectIdRoute:
     AuthenticatedProjectsProjectIdRouteWithChildren,
   AuthenticatedSettingsAuditLogRoute: AuthenticatedSettingsAuditLogRoute,
+  AuthenticatedSettingsGeneralRoute: AuthenticatedSettingsGeneralRoute,
   AuthenticatedSettingsMembersRoute: AuthenticatedSettingsMembersRoute,
   AuthenticatedCompaniesIndexRoute: AuthenticatedCompaniesIndexRoute,
   AuthenticatedContactsIndexRoute: AuthenticatedContactsIndexRoute,

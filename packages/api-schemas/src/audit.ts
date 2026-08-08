@@ -12,6 +12,7 @@ export const auditActionSchema = z.enum([
   "invite.created",
   "invite.accepted",
   "invite.revoked",
+  "organization.settings_updated",
 ]);
 export type AuditAction = z.infer<typeof auditActionSchema>;
 
@@ -69,6 +70,15 @@ const inviteRevokedPayloadSchema = z.object({
   revokedByName: z.string(),
 });
 
+// FR-ORG-3: только ИЗМЕНИВШИЕСЯ ключи (P3 — минимум для истории), не весь settings-блоб —
+// значения могут содержать branding/URL-и, которым незачем дублироваться в аудите навечно.
+// Актор резолвится на чтении через AuditLog.actorId → User (audit.repository.ts), как везде —
+// без денормализованного имени в payload (в отличие от membership.*, где userName — снапшот
+// ЦЕЛИ действия, не актора, и обязан пережить её уход из орги).
+const organizationSettingsUpdatedPayloadSchema = z.object({
+  changedKeys: z.array(z.string()),
+});
+
 // Писательский контракт AuditRecorder (валидируется перед записью). discriminatedUnion — задел
 // под рост словаря без ломки существующих поколений.
 export const auditEventSchema = z.discriminatedUnion("action", [
@@ -106,6 +116,11 @@ export const auditEventSchema = z.discriminatedUnion("action", [
     action: z.literal("invite.revoked"),
     schemaVersion: z.literal(1),
     payload: inviteRevokedPayloadSchema,
+  }),
+  z.object({
+    action: z.literal("organization.settings_updated"),
+    schemaVersion: z.literal(1),
+    payload: organizationSettingsUpdatedPayloadSchema,
   }),
 ]);
 export type AuditEvent = z.infer<typeof auditEventSchema>;

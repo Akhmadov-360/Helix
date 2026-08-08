@@ -1,5 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
-import { auditLogListResponseSchema, inviteListResponseSchema } from "@helix/api-schemas";
+import { auditLogListResponseSchema, inviteListResponseSchema, organizationSettingsResponseSchema } from "@helix/api-schemas";
 import { queryKeys, request } from "../../shared/api";
 
 // D5 (decisions.md): org-security-аудит, O/A only (сервер отказывает остальным ролям 403 —
@@ -17,5 +17,13 @@ export function orgInvitesQueryOptions(orgId: string) {
   return queryOptions({
     queryKey: queryKeys.orgInvites(orgId),
     queryFn: () => request({ path: "/v1/organizations/invites", schema: inviteListResponseSchema }),
+  });
+}
+
+// FR-ORG-3: читают все роли (см. app-ability.ts) — та же видимость, что ростер участников.
+export function orgSettingsQueryOptions(orgId: string) {
+  return queryOptions({
+    queryKey: queryKeys.orgSettings(orgId),
+    queryFn: () => request({ path: "/v1/organizations/settings", schema: organizationSettingsResponseSchema }),
   });
 }
