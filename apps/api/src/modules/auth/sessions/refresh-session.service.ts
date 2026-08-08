@@ -6,6 +6,7 @@ import type { Request } from "express";
 import { ENV } from "../../../core/config/config.module";
 import { InvalidRefreshTokenError } from "../../../core/errors/domain-error";
 import { PrismaService } from "../../../core/prisma/prisma.service";
+import { AuditRecorder } from "../../audit/audit.recorder";
 import { RefreshSessionsRepository } from "./refresh-sessions.repository";
 import { generateRefreshToken, hashRefreshToken } from "./refresh-token";
 
@@ -33,6 +34,7 @@ export class RefreshSessionService {
   constructor(
     private readonly sessions: RefreshSessionsRepository,
     private readonly prisma: PrismaService,
+    private readonly audit: AuditRecorder,
     @Inject(ENV) private readonly env: Env,
   ) {}
 
@@ -142,6 +144,7 @@ export class RefreshSessionService {
           // невозможно — поэтому единственное безопасное действие убить цепочку.
           // Простой отказ не спас бы: если ротировал вор, у него свежий валидный токен.
           await this.sessions.revokeFamily(session.familyId, "REUSE", tx);
+          await this.recordReuse(tx, session);
           return { kind: "reuse" };
         }
 
@@ -149,6 +152,7 @@ export class RefreshSessionService {
         // запрос: по строгой политике M0 (§5) это тот же класс события, что reuse.
         if ((await this.sessions.markUsed(session.id, tx)) === 0) {
           await this.sessions.revokeFamily(session.familyId, "REUSE", tx);
+          await this.recordReuse(tx, session);
           return { kind: "reuse" };
         }
 
@@ -181,6 +185,35 @@ export class RefreshSessionService {
 
     if (outcome.kind !== "rotated") throw new InvalidRefreshTokenError();
     return outcome;
+  }
+
+  /**
+   * REUSE — security-инцидент, а не просто состояние сессии (ADR: RefreshSession retention
+   * стала operational-only после этого изменения, forensic-след живёт здесь, в AuditLog, не в
+   * самой RefreshSession-строке — та теперь хранится считанные дни после смерти).
+   *
+   * actorId: null — userId сессии НЕ актор действия. Токен мог прислать атакующий, укравший
+   * чужой refresh; сам userId здесь ПОСТРАДАВШИЙ, а не тот, кто совершил REUSE (см. payload-
+   * комментарий в api-schemas/audit.ts). orgId берём из lastActiveOrgId сессии — единственного
+   * доступного org-контекста; он nullable в схеме (задел под будущие non-org auth-сценарии), и
+   * если вдруг пуст — просто не пишем аудит: AuditLog по конструкции org-scoped, писать в него
+   * без orgId было бы уже не тем же контрактом. revokeFamily() при этом отработал в любом случае.
+   */
+  private async recordReuse(
+    tx: Prisma.TransactionClient,
+    session: { userId: string; familyId: string; lastActiveOrgId: string | null },
+  ): Promise<void> {
+    if (!session.lastActiveOrgId) return;
+
+    await this.audit.record(tx, {
+      orgId: session.lastActiveOrgId,
+      actorId: null,
+      event: {
+        action: "security.refresh_token_reuse_detected",
+        schemaVersion: 1,
+        payload: { userId: session.userId, familyId: session.familyId },
+      },
+    });
   }
 }
 

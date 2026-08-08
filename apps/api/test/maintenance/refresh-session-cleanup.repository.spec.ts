@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "@helix/db";
 import { PrismaService } from "../../src/core/prisma/prisma.service";
+import { REFRESH_SESSION_CLEANUP_BATCH_SIZE } from "../../src/modules/maintenance/refresh-session-cleanup-job";
 import { RefreshSessionCleanupRepository } from "../../src/modules/maintenance/refresh-session-cleanup.repository";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -65,5 +66,27 @@ describe("RefreshSessionCleanupRepository.deleteStale", () => {
     const cutoff = new Date(Date.now() - 30 * DAY_MS);
     expect(await repo.deleteStale(cutoff)).toBe(1);
     expect(await prisma.refreshSession.count()).toBe(2);
+  });
+
+  // Батчинг (EXPLAIN-обоснование в refresh-session-cleanup-job.ts): проверяем, что цикл
+  // findMany→deleteMany реально проходит НЕСКОЛЬКО итераций и не останавливается на первой
+  // (BATCH_SIZE+1 строк — минимум 2 батча), и не оставляет "хвост" ровно на границе размера батча.
+  it("больше одного батча: удаляет ВСЕ мёртвые строки, не только первый BATCH_SIZE", async () => {
+    const deadAt = new Date(Date.now() - 40 * DAY_MS);
+    const total = REFRESH_SESSION_CLEANUP_BATCH_SIZE + 137;
+    await prisma.refreshSession.createMany({
+      data: Array.from({ length: total }, (_, i) => ({
+        userId,
+        tokenHash: `batch-tok-${i}`,
+        familyId: "fam-batch",
+        expiresAt: new Date(Date.now() + 7 * DAY_MS),
+        revokedAt: deadAt,
+      })),
+    });
+
+    const deleted = await repo.deleteStale(new Date(Date.now() - 30 * DAY_MS));
+
+    expect(deleted).toBe(total);
+    expect(await prisma.refreshSession.count()).toBe(0);
   });
 });

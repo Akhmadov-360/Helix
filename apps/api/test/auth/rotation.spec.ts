@@ -136,6 +136,21 @@ describe("Ротация refresh + reuse detection (§5)", () => {
       // умирает целиком. Простой отказ не спас бы — если ротировал вор, у него
       // на руках валидный токен.
       await refresh(second).expect(401);
+
+      // ADR (refresh-session-retention): REUSE — forensic-факт, который переживает саму
+      // RefreshSession-строку (retention теперь короткий, operational-only) — уходит в AuditLog
+      // атомарно с revokeFamily. actorId=null: userId здесь ПОСТРАДАВШИЙ, не актор действия.
+      const session = sessions[0];
+      const membership = await prisma.membership.findFirstOrThrow({ where: { userId: session?.userId } });
+      const auditEntry = await prisma.auditLog.findFirstOrThrow({
+        where: { orgId: membership.orgId, action: "security.refresh_token_reuse_detected" },
+      });
+      expect(auditEntry.actorId).toBeNull();
+      expect(auditEntry.payload).toEqual({
+        schemaVersion: 1,
+        userId: session?.userId,
+        familyId: session?.familyId,
+      });
     });
 
     it("отзыв цепочки ПЕРЕЖИВАЕТ откат — kill family реально коммитится", async () => {

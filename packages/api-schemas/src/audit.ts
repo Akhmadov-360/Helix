@@ -13,6 +13,7 @@ export const auditActionSchema = z.enum([
   "invite.accepted",
   "invite.revoked",
   "organization.settings_updated",
+  "security.refresh_token_reuse_detected",
 ]);
 export type AuditAction = z.infer<typeof auditActionSchema>;
 
@@ -79,6 +80,18 @@ const organizationSettingsUpdatedPayloadSchema = z.object({
   changedKeys: z.array(z.string()),
 });
 
+// RefreshSession retention — operational, не forensic (ADR: refresh-session-retention).
+// REUSE-детект уносит forensic-след сюда, в AuditLog, ИМЕННО ПОТОМУ что сама RefreshSession-строка
+// живёт лишь несколько дней после смерти — без этого события инцидент был бы виден только пока
+// жива строка. actorId у этого события ВСЕГДА null (см. audit.recorder.ts: null = система) —
+// userId здесь НЕ актор, а ПОСТРАДАВШИЙ (см. RefreshSessionService.rotate): токен мог прийти от
+// атакующего, укравшего чужой refresh, а не от самого userId. familyId — вся цепочка ротаций уже
+// убита revokeFamily() в той же транзакции, что и эта запись (P4).
+const securityRefreshTokenReuseDetectedPayloadSchema = z.object({
+  userId: z.string(),
+  familyId: z.string(),
+});
+
 // Писательский контракт AuditRecorder (валидируется перед записью). discriminatedUnion — задел
 // под рост словаря без ломки существующих поколений.
 export const auditEventSchema = z.discriminatedUnion("action", [
@@ -121,6 +134,11 @@ export const auditEventSchema = z.discriminatedUnion("action", [
     action: z.literal("organization.settings_updated"),
     schemaVersion: z.literal(1),
     payload: organizationSettingsUpdatedPayloadSchema,
+  }),
+  z.object({
+    action: z.literal("security.refresh_token_reuse_detected"),
+    schemaVersion: z.literal(1),
+    payload: securityRefreshTokenReuseDetectedPayloadSchema,
   }),
 ]);
 export type AuditEvent = z.infer<typeof auditEventSchema>;
