@@ -3,6 +3,7 @@ import { APP_FILTER, APP_INTERCEPTOR } from "@nestjs/core";
 import { ConfigModule } from "./core/config/config.module";
 import { PrismaModule } from "./core/prisma/prisma.module";
 import { QueueModule } from "./core/queue/queue.module";
+import { StorageModule } from "./core/storage/storage.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { BlueprintsModule } from "./modules/blueprints/blueprints.module";
 import { RegistrationModule } from "./modules/registration/registration.module";
@@ -13,6 +14,7 @@ import { TasksModule } from "./modules/tasks/tasks.module";
 import { HealthModule } from "./modules/health/health.module";
 import { MaintenanceModule } from "./modules/maintenance/maintenance.module";
 import { InvitesModule } from "./modules/invites/invites.module";
+import { AttachmentsModule } from "./modules/attachments/attachments.module";
 import { AllExceptionsFilter } from "./core/filters/all-exceptions.filter";
 import { ResponseTransformInterceptor } from "./core/interceptors/response-transform.interceptor";
 
@@ -21,6 +23,7 @@ import { ResponseTransformInterceptor } from "./core/interceptors/response-trans
     ConfigModule,
     PrismaModule,
     QueueModule,
+    StorageModule,
     AuthModule,
     BlueprintsModule,
     RegistrationModule,
@@ -31,6 +34,7 @@ import { ResponseTransformInterceptor } from "./core/interceptors/response-trans
     HealthModule,
     MaintenanceModule,
     InvitesModule,
+    AttachmentsModule,
   ],
   providers: [
     // Глобальные cross-cutting провайдеры через APP_* (DI-friendly).

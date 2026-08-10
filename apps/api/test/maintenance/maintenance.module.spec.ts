@@ -3,6 +3,7 @@ import { getQueueToken } from "@nestjs/bullmq";
 import type { Queue } from "bullmq";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { MAINTENANCE_QUEUE } from "../../src/core/queue/queue.module";
+import { ATTACHMENT_UPLOAD_CLEANUP_JOB } from "../../src/modules/maintenance/attachment-upload-cleanup-job";
 import { INVITE_CLEANUP_JOB } from "../../src/modules/maintenance/invite-cleanup-job";
 import { REFRESH_SESSION_CLEANUP_JOB } from "../../src/modules/maintenance/refresh-session-cleanup-job";
 import { createTestApp } from "../helpers/create-test-app";
@@ -38,13 +39,28 @@ describe("MaintenanceModule — регистрация repeatable job на ст�
     expect(job?.pattern).toBe("0 4 * * *");
   });
 
+  it("attachment-upload.cleanup зарегистрирован отдельным repeatable job (files.md §6.1)", async () => {
+    const queue = app.get<Queue>(getQueueToken(MAINTENANCE_QUEUE));
+    const repeatable = await queue.getRepeatableJobs();
+
+    const job = repeatable.find((j) => j.name === ATTACHMENT_UPLOAD_CLEANUP_JOB);
+    expect(job).toBeDefined();
+    expect(job?.pattern).toBe("0 5 * * *");
+  });
+
   it("повторная инициализация (эмуляция рестарта) не плодит дубликат ни для одной из джоб", async () => {
     const queue = app.get<Queue>(getQueueToken(MAINTENANCE_QUEUE));
     await queue.add(REFRESH_SESSION_CLEANUP_JOB, {}, { repeat: { pattern: "0 3 * * *" }, jobId: REFRESH_SESSION_CLEANUP_JOB });
     await queue.add(INVITE_CLEANUP_JOB, {}, { repeat: { pattern: "0 4 * * *" }, jobId: INVITE_CLEANUP_JOB });
+    await queue.add(
+      ATTACHMENT_UPLOAD_CLEANUP_JOB,
+      {},
+      { repeat: { pattern: "0 5 * * *" }, jobId: ATTACHMENT_UPLOAD_CLEANUP_JOB },
+    );
 
     const repeatable = await queue.getRepeatableJobs();
     expect(repeatable.filter((j) => j.name === REFRESH_SESSION_CLEANUP_JOB)).toHaveLength(1);
     expect(repeatable.filter((j) => j.name === INVITE_CLEANUP_JOB)).toHaveLength(1);
+    expect(repeatable.filter((j) => j.name === ATTACHMENT_UPLOAD_CLEANUP_JOB)).toHaveLength(1);
   });
 });

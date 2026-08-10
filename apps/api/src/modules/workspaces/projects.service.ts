@@ -25,6 +25,8 @@ import {
 import { PrismaService } from "../../core/prisma/prisma.service";
 import { ActivityRecorder } from "../activity/activity-recorder";
 import { ActivityRepository } from "../activity/activity.repository";
+import { AttachmentCleanupProducer } from "../attachments/attachment-cleanup.producer";
+import { AttachmentsRepository } from "../attachments/attachments.repository";
 import { FieldsRepository } from "../fields/fields.repository";
 import { toFieldDefinitionResponse } from "../fields/field.mapper";
 import { toPhaseResponse } from "../phases/phase.mapper";
@@ -59,6 +61,8 @@ export class ProjectsService {
     private readonly activityLog: ActivityRepository,
     private readonly orgs: OrganizationsRepository,
     private readonly notifications: NotificationsService,
+    private readonly attachments: AttachmentsRepository,
+    private readonly attachmentCleanup: AttachmentCleanupProducer,
   ) {}
 
   async getById(orgId: string, projectId: string): Promise<ProjectResponse> {
@@ -163,10 +167,26 @@ export class ProjectsService {
     return toProjectResponse(row);
   }
 
+  // files.md §6: storage keys читаются ДО удаления — после каскада (onDelete: Cascade на
+  // Attachment.project) строк уже не будет, взять ключи будет неоткуда. Чтение и удаление — в
+  // ОДНОЙ транзакции (code-review: раньше это были два отдельных await с сервисным зазором между
+  // ними — окно, в которое мог успеть закоммититься параллельный upload-url+confirm на этот же
+  // projectId, чей storageKey тогда не попал бы в снимок и остался бы сиротой в S3 навсегда).
+  // Одна транзакция не даёт полной сериализации (для этого нужен SELECT ... FOR UPDATE на Project
+  // и с этой, и с стороны createUploadUrl — сознательно не делаем: реальный риск после этого
+  // изменения — доли миллисекунды между двумя statement'ами одной транзакции, а не сервисный
+  // round-trip, и полная пессимистичная блокировка ради этого остатка риска непропорциональна).
+  // Enqueue — ПОСЛЕ коммита (P4: сайд-эффект после факта, тот же принцип, что письма).
   async remove(orgId: string, projectId: string): Promise<void> {
     const project = await this.projects.findByIdInOrg(projectId, orgId);
     if (!project) throw new ResourceNotFoundError("Project not found");
-    await this.projects.delete(projectId);
+
+    const storageKeys = await this.prisma.client.$transaction(async (tx) => {
+      const keys = await this.attachments.listStorageKeysByProject(projectId, tx);
+      await this.projects.delete(projectId, tx);
+      return keys;
+    });
+    await this.attachmentCleanup.enqueueProjectCleanup(storageKeys);
   }
 
   // Лента проекта (§6). Tenant-скоуп: сначала проверяем проект по орге (404), затем события.

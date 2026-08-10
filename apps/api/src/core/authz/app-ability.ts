@@ -26,6 +26,7 @@ export const APP_SUBJECTS = [
   "AuditLog",
   "Invite",
   "Organization",
+  "Attachment",
 ] as const;
 export type AppSubject = (typeof APP_SUBJECTS)[number] | "all";
 export type AppAbility = MongoAbility<[AppAction, AppSubject]>;
@@ -74,6 +75,7 @@ export function defineAbilityForRole(role: Role): AppAbility {
       can("manage", "ProjectContact"); // состав сделки — Manager+ тоже (⊃ Member+)
       can("manage", "ProjectAssignee"); // co-workers — управленческое действие, Manager+
       can("manage", "Task"); // чеклист — Manager+ тоже (⊃ Member+)
+      can("manage", "Attachment"); // files.md §7: Appendix B «Upload files» = O/A/M
       // Contact/Company: полный CRUD-мутатор (update/delete=Manager+), но НЕ merge (=O/A).
       can("read", "Company");
       can("create", "Company");
@@ -106,6 +108,10 @@ export function defineAbilityForRole(role: Role): AppAbility {
       can("manage", "ProjectContact");
       can("read", "ProjectAssignee"); // видит co-workers, но назначение — Manager+ (§2)
       can("manage", "Task"); // чеклист — часть «edit leads» (§2): Member ведёт таски
+      // files.md §7: △ — capability allowed, scope=ORG до M6 (тот же принцип, что Task/ProjectContact выше).
+      can("create", "Attachment");
+      can("read", "Attachment");
+      can("delete", "Attachment");
       break;
     case "VIEWER":
       // Глобальный read-only: видит всё, не меняет ничего.
@@ -121,6 +127,7 @@ export function defineAbilityForRole(role: Role): AppAbility {
       can("read", "ProjectContact");
       can("read", "ProjectAssignee");
       can("read", "Task");
+      can("read", "Attachment");
       break;
   }
 

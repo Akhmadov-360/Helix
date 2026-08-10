@@ -83,7 +83,8 @@ services:
       timeout: 5s
       retries: 10
 
-  # One-shot: ждёт MinIO и создаёт бакет helix-uploads. Выходит по завершении.
+  # One-shot: ждёт MinIO и создаёт бакеты helix-uploads (dev) и helix-test (тесты, docs/specs/
+  # files.md §14 — тот же MinIO-контейнер, отдельный неймспейс, не отдельный сервис). Выходит по завершении.
   minio-init:
     image: minio/mc:latest
     depends_on:
@@ -93,7 +94,8 @@ services:
       /bin/sh -c "
       mc alias set local http://minio:9000 helix helixsecret &&
       mc mb --ignore-existing local/helix-uploads &&
-      echo 'bucket helix-uploads ready';
+      mc mb --ignore-existing local/helix-test &&
+      echo 'buckets helix-uploads, helix-test ready';
       "
 
 volumes:

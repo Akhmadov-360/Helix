@@ -4,8 +4,9 @@ import { z } from "zod";
  * Env-контракт Helix.
  *
  * M0-скоуп: обязательны DATABASE_URL (API + Prisma-CLI) и JWT (auth входит в M0, см. ниже).
- * S3 ещё не подключён (нет модуля файлов) → OPTIONAL. Redis был OPTIONAL до M2 (BullMQ ещё не
- * существовал) — теперь обязателен, см. REDIS_URL ниже. Ужесточаем per-веха: S3 → M3 (files).
+ * Redis был OPTIONAL до M2 (BullMQ ещё не существовал) — теперь обязателен, см. REDIS_URL ниже.
+ * S3 — M3 (files, docs/specs/files.md §12): S3_BUCKET обязателен, остальные S3_*
+ * условны на провайдере (MinIO в деве нуждается в explicit-кредах/эндпоинте, реальный AWS S3 — нет).
  */
 export const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -26,12 +27,12 @@ export const envSchema = z.object({
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().optional(),
 
-  // ── Files / S3 · MinIO (M3) ──────────────────────────────────────────────────
-  S3_ENDPOINT: z.url().optional(),
-  S3_REGION: z.string().optional(),
-  S3_ACCESS_KEY: z.string().optional(),
-  S3_SECRET_KEY: z.string().optional(),
-  S3_BUCKET: z.string().optional(),
+  // ── Files / S3 · MinIO (M3, docs/specs/files.md §12) ──────────────────────────
+  S3_ENDPOINT: z.url().optional(),   // задан → MinIO/S3-совместимый (dev); не задан → настоящий AWS S3 (prod)
+  S3_REGION: z.string().optional(),  // как SES_REGION — не обязателен, SDK резолвит по умолчанию
+  S3_ACCESS_KEY: z.string().optional(), // нужен только при заданном S3_ENDPOINT (MinIO)
+  S3_SECRET_KEY: z.string().optional(), // нужен только при заданном S3_ENDPOINT (MinIO)
+  S3_BUCKET: z.string(), // ОБЯЗАТЕЛЕН: без него Attachment-модуль не может работать вообще
 
   // ── Auth / JWT (M0 — см. docs/specs/auth.md) ─────────────────────────────────
   // ОБЯЗАТЕЛЕН: auth входит в M0. Без секрета приложение не должно подниматься —

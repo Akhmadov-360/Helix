@@ -49,6 +49,8 @@ const SUBJECT_OPERATIONS = {
   // update — O/A only (Appendix B «Manage org settings»). create/delete нет: Organization.settings
   // всегда существует (default "{}" из схемы), отдельного create-эндпоинта не завели.
   Organization: ["read", "update"],
+  // files.md §7: нет "update" — вложение не редактируется, перезалить = удалить+создать заново.
+  Attachment: ["create", "read", "delete"],
 } as const satisfies Record<(typeof APP_SUBJECTS)[number], readonly AppAction[]>;
 
 /**

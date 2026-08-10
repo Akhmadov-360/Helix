@@ -18,3 +18,4 @@ export * from "./organizations";
 export * from "./capabilities";
 export * from "./blueprints";
 export * from "./invites";
+export * from "./attachments";

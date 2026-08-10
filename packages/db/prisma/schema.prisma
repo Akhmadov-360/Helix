@@ -104,6 +104,7 @@ model Organization {
   auditLogs      AuditLog[]
   tasks          Task[]
   invites        Invite[]
+  attachments    Attachment[]
 }
 
 model User {
@@ -124,6 +125,7 @@ model User {
   passwordResetTokens PasswordResetToken[]
   sentInvites      Invite[] @relation("InviteInvitedBy")
   acceptedInvites  Invite[] @relation("InviteAcceptedBy")
+  attachments      Attachment[]
 }
 
 model Membership {
@@ -273,10 +275,11 @@ model Project {
   company   Company?     @relation(fields: [companyId, orgId], references: [id, orgId])
   owner     User?        @relation("ProjectOwner", fields: [ownerId], references: [id])
 
-  contacts  ProjectContact[]
-  assignees ProjectAssignee[]
-  tasks     Task[]
-  activity  ActivityEvent[]
+  contacts    ProjectContact[]
+  assignees   ProjectAssignee[]
+  tasks       Task[]
+  activity    ActivityEvent[]
+  attachments Attachment[]
 
   @@unique([id, orgId]) // цель composite-FK из ProjectContact(projectId, orgId) — backbone
   @@index([workspaceId, phaseId]) // рендер доски
@@ -498,11 +501,44 @@ model PasswordResetToken {
   @@index([userId])
 }
 
+// docs/specs/files.md (M3, часть 1) — вложения на Project через S3/MinIO, presigned upload/
+// download. БЕЗ извлечения текста/эмбеддингов (см. ADR «embedding ingest → M4») — Attachment
+// здесь только цель для будущего FR-FILE-3, не потребитель.
+model Attachment {
+  id           String               @id @default(cuid())
+  orgId        String
+  projectId    String
+  storageKey   String               @unique // "{orgId}/{projectId}/{id}/{filename}" — files.md §2
+  filename     String // исходное имя — ТОЛЬКО для отображения (P1: не парсим, не полагаемся)
+  mimeType     String
+  sizeBytes    Int // заявлено клиентом на upload-url; реальный размер сверяется на confirm (files.md §3)
+  uploadedById String?
+  scanStatus   AttachmentScanStatus @default(SKIPPED) // сканера нет (files.md §0) — дефолт, не "ожидание"
+  confirmedAt  DateTime? // null = загрузка начата, не подтверждена — терминальный статус, как PasswordResetToken.usedAt
+  createdAt    DateTime             @default(now())
+
+  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  project    Project      @relation(fields: [projectId, orgId], references: [id, orgId], onDelete: Cascade)
+  uploadedBy User?        @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+}
+
+enum AttachmentScanStatus {
+  SKIPPED // files.md §0: сканер не подключён — дефолт, не "ожидание"
+  CLEAN
+  INFECTED
+}
+
 // ============================================================================
 //  ЗА ПРЕДЕЛАМИ ЭТОГО ФАЙЛА — приходят в своих вехах, НЕ проектировались здесь:
-//    M3: Page, KBArticle, Attachment        (rich docs / KB / файлы)
-//    M4: AiThread, Message, EmbeddingChunk   (RAG — требует pgvector)
+//    M3: Page, KBArticle                     (rich docs / KB — docs/specs/pages-kb.md)
+//    M4: AiThread, Message, EmbeddingChunk   (RAG — требует pgvector; сюда же переехала
+//                                             экстракция текста из Page/KBArticle/Attachment)
 //    M5: ApiKey, Webhook                     (публичный API + вебхуки)
-//    M6: AuditLog                            (org-security-аудит, admin-only)
 //  Добавляем осознанно на своей вехе, а не «на всякий случай» сейчас.
+//
+//  AuditLog — НЕ здесь: этот комментарий раньше (ошибочно) относил его к M6, но модель уже
+//  реализована выше (см. `model AuditLog`) — построена в M2 вместе с membership/invite-аудитом,
+//  на год раньше, чем предполагал первоначальный план вех.
 // ============================================================================

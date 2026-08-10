@@ -2,6 +2,11 @@ import { Module, type OnModuleInit } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bullmq";
 import type { Queue } from "bullmq";
 import { MAINTENANCE_QUEUE } from "../../core/queue/queue.module";
+import { AttachmentsModule } from "../attachments/attachments.module";
+import {
+  ATTACHMENT_UPLOAD_CLEANUP_JOB,
+  ATTACHMENT_UPLOAD_CLEANUP_REPEAT_OPTIONS,
+} from "./attachment-upload-cleanup-job";
 import { INVITE_CLEANUP_JOB, INVITE_CLEANUP_REPEAT_OPTIONS } from "./invite-cleanup-job";
 import { InviteCleanupRepository } from "./invite-cleanup.repository";
 import { MaintenanceWorker } from "./maintenance.worker";
@@ -21,7 +26,11 @@ import { RefreshSessionCleanupRepository } from "./refresh-session-cleanup.repos
  * repeatable-джобы по (name, repeat-опции, jobId) — повторный add() при каждом рестарте
  * приложения не плодит дубликаты, а просто подтверждает то же расписание.
  */
+// AttachmentsModule — за AttachmentsRepository (§6.1, upload-cleanup). ATTACHMENT_CLEANUP_JOB
+// (§6, project-delete) сюда НЕ регистрируется repeatable — это одноразовая джоба на конкретное
+// событие, её добавляет AttachmentCleanupProducer, не OnModuleInit.
 @Module({
+  imports: [AttachmentsModule],
   providers: [RefreshSessionCleanupRepository, InviteCleanupRepository, MaintenanceWorker],
 })
 export class MaintenanceModule implements OnModuleInit {
@@ -37,6 +46,11 @@ export class MaintenanceModule implements OnModuleInit {
       INVITE_CLEANUP_JOB,
       {},
       { repeat: INVITE_CLEANUP_REPEAT_OPTIONS, jobId: INVITE_CLEANUP_JOB },
+    );
+    await this.queue.add(
+      ATTACHMENT_UPLOAD_CLEANUP_JOB,
+      {},
+      { repeat: ATTACHMENT_UPLOAD_CLEANUP_REPEAT_OPTIONS, jobId: ATTACHMENT_UPLOAD_CLEANUP_JOB },
     );
   }
 }

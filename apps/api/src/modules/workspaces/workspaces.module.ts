@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { AuthzModule } from "../../core/authz/authz.module";
 import { ActivityModule } from "../activity/activity.module";
+import { AttachmentsModule } from "../attachments/attachments.module";
 import { AuthModule } from "../auth/auth.module";
 import { BlueprintsModule } from "../blueprints/blueprints.module";
 import { FieldsModule } from "../fields/fields.module";
@@ -35,6 +36,7 @@ import { WorkspacesService } from "./workspaces.service";
     ActivityModule,
     AuthzModule,
     NotificationsModule,
+    AttachmentsModule,
   ],
   controllers: [WorkspacesController, PhasesController, FieldsController, ProjectsController],
   providers: [WorkspacesService, WorkspacesRepository, PhasesService, FieldsService, ProjectsService],

@@ -366,3 +366,25 @@ export class AlreadyOrgMemberError extends ConflictError {
     super("This email already belongs to a member of this organization");
   }
 }
+
+/** files.md §3: confirm вызван, но HeadObjectCommand не находит файл в S3 — загрузка не завершилась. */
+export class AttachmentUploadNotConfirmedError extends BadRequestError {
+  readonly code = "ATTACHMENT_UPLOAD_NOT_CONFIRMED";
+
+  constructor() {
+    super("Upload has not completed yet — please try again");
+  }
+}
+
+/**
+ * files.md §3/§4: реальный размер объекта (HeadObjectCommand.ContentLength) больше
+ * MAX_ATTACHMENT_SIZE_BYTES — единственная настоящая граница размера. Заявленный sizeBytes на
+ * upload-url — лишь ранний UX-отказ, presigned PUT сам по себе размер не ограничивает.
+ */
+export class AttachmentTooLargeError extends BadRequestError {
+  readonly code = "ATTACHMENT_TOO_LARGE";
+
+  constructor() {
+    super("File exceeds the maximum allowed size");
+  }
+}
