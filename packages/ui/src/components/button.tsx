@@ -18,6 +18,10 @@ const buttonVariants = cva(
         sm: "h-9 px-3",
         lg: "h-11 px-6",
         icon: "h-10 w-10",
+        // Доп. компактные размеры — первый потребитель: attachment.tsx/message-scroller.tsx
+        // (shadcn-компоненты Files/Pages M3). Добавлены рядом с существующими, не заменяют их.
+        "icon-xs": "h-6 w-6",
+        "icon-sm": "h-8 w-8",
       },
     },
     defaultVariants: { variant: "default", size: "default" },

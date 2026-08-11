@@ -58,3 +58,59 @@ export {
 export { Collapsible, CollapsibleTrigger, CollapsibleContent } from "./components/collapsible";
 export { Pagination } from "./components/pagination";
 export { ColumnsMenu, type ColumnsMenuColumn } from "./components/columns-menu";
+export {
+  Attachment,
+  AttachmentGroup,
+  AttachmentMedia,
+  AttachmentContent,
+  AttachmentTitle,
+  AttachmentDescription,
+  AttachmentActions,
+  AttachmentAction,
+  AttachmentTrigger,
+} from "./components/attachment";
+export {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuCheckboxItem,
+  ContextMenuRadioItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuShortcut,
+  ContextMenuGroup,
+  ContextMenuPortal,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuRadioGroup,
+} from "./components/context-menu";
+export { Marker, MarkerIcon, MarkerContent, markerVariants } from "./components/marker";
+export {
+  MessageGroup,
+  Message,
+  MessageAvatar,
+  MessageContent,
+  MessageFooter,
+  MessageHeader,
+} from "./components/message";
+export {
+  MessageScrollerProvider,
+  MessageScroller,
+  MessageScrollerViewport,
+  MessageScrollerContent,
+  MessageScrollerItem,
+  MessageScrollerButton,
+  useMessageScroller,
+  useMessageScrollerScrollable,
+  useMessageScrollerVisibility,
+} from "./components/message-scroller";
+export { Progress } from "./components/progress";
+export { RichTextEditor, type RichTextEditorProps } from "./components/rich-text-editor";
+export {
+  MentionTextarea,
+  type MentionCandidate,
+  type MentionTextareaHandle,
+  type MentionTextareaProps,
+} from "./components/mention-textarea";
