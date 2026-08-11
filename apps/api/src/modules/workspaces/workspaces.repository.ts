@@ -17,6 +17,7 @@ const WORKSPACE_SELECT = {
   settings: true,
   version: true,
   createdAt: true,
+  blueprintId: true, // pages-kb.md §3 — ProjectsService.create читает при инстанцировании pageTemplates
 } as const;
 
 @Injectable()
@@ -24,7 +25,13 @@ export class WorkspacesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   create(
-    data: { orgId: string; name: string; audience?: Audience; settings?: Prisma.InputJsonValue },
+    data: {
+      orgId: string;
+      name: string;
+      audience?: Audience;
+      settings?: Prisma.InputJsonValue;
+      blueprintId?: string;
+    },
     tx?: Prisma.TransactionClient,
   ) {
     return (tx ?? this.prisma.client).workspace.create({ data, select: WORKSPACE_SELECT });

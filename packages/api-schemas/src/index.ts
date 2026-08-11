@@ -19,3 +19,5 @@ export * from "./capabilities";
 export * from "./blueprints";
 export * from "./invites";
 export * from "./attachments";
+export * from "./pages";
+export * from "./kb-articles";

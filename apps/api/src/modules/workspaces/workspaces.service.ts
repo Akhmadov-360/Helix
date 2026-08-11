@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import type { Prisma } from "@helix/db";
 import type {
   BlueprintDefinition,
@@ -16,7 +16,9 @@ import {
 } from "../../core/errors/domain-error";
 import { PrismaService } from "../../core/prisma/prisma.service";
 import { BlueprintsRepository } from "../blueprints/blueprints.repository";
+import { parseTemplateItems } from "../blueprints/template-content";
 import { FieldsRepository } from "../fields/fields.repository";
+import { KbRepository } from "../kb/kb.repository";
 import { toPhaseResponse } from "../phases/phase.mapper";
 import { PhasesRepository } from "../phases/phases.repository";
 import { WorkspacesRepository } from "./workspaces.repository";
@@ -42,12 +44,15 @@ interface WorkspaceRow {
 
 @Injectable()
 export class WorkspacesService {
+  private readonly logger = new Logger(WorkspacesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly workspaces: WorkspacesRepository,
     private readonly phases: PhasesRepository,
     private readonly fields: FieldsRepository,
     private readonly blueprints: BlueprintsRepository,
+    private readonly kb: KbRepository,
   ) {}
 
   async create(orgId: string, input: CreateWorkspaceInput): Promise<WorkspaceResponse> {
@@ -74,7 +79,15 @@ export class WorkspacesService {
       };
 
       const ws = await this.workspaces.create(
-        { orgId, name: input.name, audience, settings: settings as Prisma.InputJsonValue },
+        {
+          orgId,
+          name: input.name,
+          audience,
+          settings: settings as Prisma.InputJsonValue,
+          // pages-kb.md §3: копия происхождения (P1/P2) — ProjectsService.create читает это поле,
+          // чтобы позже инстанцировать pageTemplates при создании проекта В ЭТОМ воркспейсе.
+          blueprintId: blueprint?.id,
+        },
         tx,
       );
 
@@ -96,6 +109,19 @@ export class WorkspacesService {
           })),
           tx,
         );
+      }
+
+      // pages-kb.md §3: kbSeed → KBArticle ОДИН РАЗ на воркспейс (не на проект — KB не
+      // project-scoped), workspaceId = этот воркспейс (per-workspace, не org-wide: у блюпринта нет
+      // мандата на org-wide контент).
+      if (definition?.kbSeed) {
+        const items = parseTemplateItems(definition.kbSeed, this.logger, `Blueprint kbSeed (workspace ${ws.id})`);
+        for (const item of items) {
+          await this.kb.create(
+            { orgId, workspaceId: ws.id, title: item.title, content: item.contentJson as Prisma.InputJsonValue | undefined },
+            tx,
+          );
+        }
       }
 
       return this.workspaces.findByIdInOrg(ws.id, orgId, tx);

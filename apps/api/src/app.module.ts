@@ -15,6 +15,8 @@ import { HealthModule } from "./modules/health/health.module";
 import { MaintenanceModule } from "./modules/maintenance/maintenance.module";
 import { InvitesModule } from "./modules/invites/invites.module";
 import { AttachmentsModule } from "./modules/attachments/attachments.module";
+import { PagesModule } from "./modules/pages/pages.module";
+import { KbModule } from "./modules/kb/kb.module";
 import { AllExceptionsFilter } from "./core/filters/all-exceptions.filter";
 import { ResponseTransformInterceptor } from "./core/interceptors/response-transform.interceptor";
 
@@ -35,6 +37,8 @@ import { ResponseTransformInterceptor } from "./core/interceptors/response-trans
     MaintenanceModule,
     InvitesModule,
     AttachmentsModule,
+    PagesModule,
+    KbModule,
   ],
   providers: [
     // Глобальные cross-cutting провайдеры через APP_* (DI-friendly).

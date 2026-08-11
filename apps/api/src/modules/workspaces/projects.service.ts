@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import type { PhaseType } from "@helix/db";
 import type { Prisma } from "@helix/db";
 import {
@@ -27,8 +27,11 @@ import { ActivityRecorder } from "../activity/activity-recorder";
 import { ActivityRepository } from "../activity/activity.repository";
 import { AttachmentCleanupProducer } from "../attachments/attachment-cleanup.producer";
 import { AttachmentsRepository } from "../attachments/attachments.repository";
+import { BlueprintsRepository } from "../blueprints/blueprints.repository";
+import { parseTemplateItems } from "../blueprints/template-content";
 import { FieldsRepository } from "../fields/fields.repository";
 import { toFieldDefinitionResponse } from "../fields/field.mapper";
+import { PagesRepository } from "../pages/pages.repository";
 import { toPhaseResponse } from "../phases/phase.mapper";
 import { PhasesRepository } from "../phases/phases.repository";
 import { toBoardProjectResponse, toProjectResponse } from "../projects/project.mapper";
@@ -50,6 +53,8 @@ function statusForPhaseType(type: PhaseType): ProjectStatus {
 
 @Injectable()
 export class ProjectsService {
+  private readonly logger = new Logger(ProjectsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly workspaces: WorkspacesRepository,
@@ -63,6 +68,8 @@ export class ProjectsService {
     private readonly notifications: NotificationsService,
     private readonly attachments: AttachmentsRepository,
     private readonly attachmentCleanup: AttachmentCleanupProducer,
+    private readonly blueprints: BlueprintsRepository,
+    private readonly pages: PagesRepository,
   ) {}
 
   async getById(orgId: string, projectId: string): Promise<ProjectResponse> {
@@ -517,6 +524,21 @@ export class ProjectsService {
           payload: { actorName: actor?.name ?? null },
         },
       });
+
+      // pages-kb.md §3: pageTemplates инстанцируются на создание ПРОЕКТА (не воркспейса, FR-PG-4),
+      // читаются из блюпринта-происхождения этого воркспейса — та же транзакция (P4-соседний принцип).
+      if (workspace.blueprintId) {
+        const blueprint = await this.blueprints.findVisibleById(workspace.blueprintId, orgId, tx);
+        const pageTemplates = (blueprint?.definition as { pageTemplates?: unknown[] } | undefined)?.pageTemplates;
+        const items = parseTemplateItems(pageTemplates, this.logger, `Blueprint pageTemplates (project ${project.id})`);
+        for (const item of items) {
+          await this.pages.create(
+            { orgId, projectId: project.id, title: item.title, content: item.contentJson as Prisma.InputJsonValue | undefined },
+            tx,
+          );
+        }
+      }
+
       return project;
     });
 

@@ -51,6 +51,9 @@ const SUBJECT_OPERATIONS = {
   Organization: ["read", "update"],
   // files.md §7: нет "update" — вложение не редактируется, перезалить = удалить+создать заново.
   Attachment: ["create", "read", "delete"],
+  Page: ["create", "read", "update", "delete"],
+  // pages-kb.md §4: живой документ, правят по мере устаревания — есть update (в отличие от Blueprint).
+  KBArticle: ["create", "read", "update", "delete"],
 } as const satisfies Record<(typeof APP_SUBJECTS)[number], readonly AppAction[]>;
 
 /**

@@ -5,6 +5,8 @@ import { AttachmentsModule } from "../attachments/attachments.module";
 import { AuthModule } from "../auth/auth.module";
 import { BlueprintsModule } from "../blueprints/blueprints.module";
 import { FieldsModule } from "../fields/fields.module";
+import { KbModule } from "../kb/kb.module";
+import { PagesModule } from "../pages/pages.module";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { PhasesModule } from "../phases/phases.module";
@@ -37,6 +39,8 @@ import { WorkspacesService } from "./workspaces.service";
     AuthzModule,
     NotificationsModule,
     AttachmentsModule,
+    KbModule,
+    PagesModule,
   ],
   controllers: [WorkspacesController, PhasesController, FieldsController, ProjectsController],
   providers: [WorkspacesService, WorkspacesRepository, PhasesService, FieldsService, ProjectsService],

@@ -27,6 +27,8 @@ export const APP_SUBJECTS = [
   "Invite",
   "Organization",
   "Attachment",
+  "Page",
+  "KBArticle",
 ] as const;
 export type AppSubject = (typeof APP_SUBJECTS)[number] | "all";
 export type AppAbility = MongoAbility<[AppAction, AppSubject]>;
@@ -76,6 +78,8 @@ export function defineAbilityForRole(role: Role): AppAbility {
       can("manage", "ProjectAssignee"); // co-workers — управленческое действие, Manager+
       can("manage", "Task"); // чеклист — Manager+ тоже (⊃ Member+)
       can("manage", "Attachment"); // files.md §7: Appendix B «Upload files» = O/A/M
+      can("manage", "Page"); // pages-kb.md §4: Appendix B «Upload files / edit pages» = O/A/M
+      can("manage", "KBArticle");
       // Contact/Company: полный CRUD-мутатор (update/delete=Manager+), но НЕ merge (=O/A).
       can("read", "Company");
       can("create", "Company");
@@ -112,6 +116,12 @@ export function defineAbilityForRole(role: Role): AppAbility {
       can("create", "Attachment");
       can("read", "Attachment");
       can("delete", "Attachment");
+      // pages-kb.md §4: △ — Member редактирует Page (часть «edit pages»), создаёт/читает KB, но не удаляет чужое.
+      can("create", "Page");
+      can("read", "Page");
+      can("update", "Page");
+      can("create", "KBArticle");
+      can("read", "KBArticle");
       break;
     case "VIEWER":
       // Глобальный read-only: видит всё, не меняет ничего.
@@ -128,6 +138,8 @@ export function defineAbilityForRole(role: Role): AppAbility {
       can("read", "ProjectAssignee");
       can("read", "Task");
       can("read", "Attachment");
+      can("read", "Page");
+      can("read", "KBArticle");
       break;
   }
 

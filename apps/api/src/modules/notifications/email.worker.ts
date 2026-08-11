@@ -9,11 +9,13 @@ import { NotificationsRepository } from "./notifications.repository";
 import { resolveLeadCreatedRecipients } from "./recipients";
 import { renderAssignmentEmail } from "./templates/assignment-email";
 import { renderLeadCreatedEmail } from "./templates/lead-created-email";
+import { renderMentionEmail } from "./templates/mention-email";
 import { renderOrgInviteEmail } from "./templates/org-invite-email";
 import { renderPasswordResetEmail } from "./templates/password-reset-email";
 import { renderPhaseChangedEmail } from "./templates/phase-changed-email";
 import { ASSIGNMENT_JOB, type AssignmentJobData } from "./assignment-job";
 import type { LeadCreatedJobData } from "./lead-created-job";
+import { MENTION_JOB, type MentionJobData } from "./mention-job";
 import { ORG_INVITE_JOB, type OrgInviteJobData } from "./org-invite-job";
 import { PASSWORD_RESET_JOB, type PasswordResetJobData } from "./password-reset-job";
 import { PHASE_CHANGED_JOB, type PhaseChangedJobData } from "./phase-changed-job";
@@ -23,7 +25,8 @@ type EmailJobData =
   | PasswordResetJobData
   | AssignmentJobData
   | PhaseChangedJobData
-  | OrgInviteJobData;
+  | OrgInviteJobData
+  | MentionJobData;
 
 /**
  * Консьюмер очереди `email` (§1). Живёт в том же Nest-приложении, не отдельным процессом —
@@ -58,6 +61,9 @@ export class EmailWorker extends WorkerHost {
     }
     if (job.name === ORG_INVITE_JOB) {
       return this.processOrgInvite(job.data as OrgInviteJobData);
+    }
+    if (job.name === MENTION_JOB) {
+      return this.processMention(job.data as MentionJobData);
     }
     return this.processLeadCreated(job.data as LeadCreatedJobData);
   }
@@ -142,5 +148,19 @@ export class EmailWorker extends WorkerHost {
       appUrl: this.env.APP_URL,
     });
     await this.mailer.send({ to: [...recipients], ...email });
+  }
+
+  /** pages-kb.md §2 — данные уже резолвлены на enqueue (не рефетчим), см. mention-job.ts. */
+  private async processMention(data: MentionJobData): Promise<void> {
+    const email = renderMentionEmail({
+      mentionedUserName: data.mentionedUserName,
+      actorName: data.actorName,
+      pageId: data.pageId,
+      pageTitle: data.pageTitle,
+      projectId: data.projectId,
+      commentBody: data.commentBody,
+      appUrl: this.env.APP_URL,
+    });
+    await this.mailer.send({ to: [data.mentionedUserEmail], ...email });
   }
 }

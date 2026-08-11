@@ -1,0 +1,75 @@
+import { z } from "zod";
+
+// docs/specs/pages-kb.md §5 — лимит на TipTap/ProseMirror JSON-документ. Не типизируем content
+// построчно (P3: бэкенд не источник истины по форме rich-контента, см. врезка в спеке) — только
+// z.record (валидный JSON-объект) + лимит РЕАЛЬНОГО байтового размера.
+export const MAX_CONTENT_JSON_BYTES = 256 * 1024; // 256 KB
+
+// Ручной подсчёт UTF-8 байт, не `Buffer.byteLength`/`TextEncoder` — этот пакет шарится с фронтом
+// (apps/web импортирует схемы для форм валидации), а ни `Buffer` (Node-глобал), ни типы
+// `TextEncoder` не доступны здесь без лишней зависимости (нет `@types/node`, lib — ES2022 без DOM).
+// `for...of` по строке идёт по code points (не UTF-16 code units) — переживает суррогатные пары
+// (§5 врезка: `.length` строки занижает байтовый размер кириллического контента вдвое).
+export function utf8ByteLength(value: string): number {
+  let bytes = 0;
+  for (const char of value) {
+    const codePoint = char.codePointAt(0) ?? 0;
+    if (codePoint <= 0x7f) bytes += 1;
+    else if (codePoint <= 0x7ff) bytes += 2;
+    else if (codePoint <= 0xffff) bytes += 3;
+    else bytes += 4;
+  }
+  return bytes;
+}
+
+export const pageContentSchema = z
+  .record(z.string(), z.unknown())
+  .refine((value) => utf8ByteLength(JSON.stringify(value)) <= MAX_CONTENT_JSON_BYTES, {
+    message: `content превышает лимит ${MAX_CONTENT_JSON_BYTES} байт (UTF-8)`,
+  });
+export type PageContent = z.infer<typeof pageContentSchema>;
+
+export const createPageSchema = z.object({
+  title: z.string().trim().min(1).max(255),
+  content: pageContentSchema.optional(),
+});
+export type CreatePageInput = z.infer<typeof createPageSchema>;
+
+export const updatePageSchema = z.object({
+  title: z.string().trim().min(1).max(255).optional(),
+  content: pageContentSchema.optional(),
+});
+export type UpdatePageInput = z.infer<typeof updatePageSchema>;
+
+export const pageResponseSchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  title: z.string(),
+  content: z.record(z.string(), z.unknown()),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+});
+export type PageResponse = z.infer<typeof pageResponseSchema>;
+
+export const pageListResponseSchema = z.array(pageResponseSchema);
+export type PageListResponse = z.infer<typeof pageListResponseSchema>;
+
+// §2 — mentionedUserIds: фронт резолвит "@Имя" → id (ростер участников), бэкенд не парсит текст.
+export const createPageCommentSchema = z.object({
+  body: z.string().trim().min(1).max(5000),
+  mentionedUserIds: z.array(z.string()).max(50).optional(),
+});
+export type CreatePageCommentInput = z.infer<typeof createPageCommentSchema>;
+
+export const pageCommentResponseSchema = z.object({
+  id: z.string(),
+  pageId: z.string(),
+  authorId: z.string().nullable(),
+  authorName: z.string().nullable(),
+  body: z.string(),
+  createdAt: z.iso.datetime(),
+});
+export type PageCommentResponse = z.infer<typeof pageCommentResponseSchema>;
+
+export const pageCommentListResponseSchema = z.array(pageCommentResponseSchema);
+export type PageCommentListResponse = z.infer<typeof pageCommentListResponseSchema>;

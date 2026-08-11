@@ -105,6 +105,8 @@ model Organization {
   tasks          Task[]
   invites        Invite[]
   attachments    Attachment[]
+  pages          Page[]
+  kbArticles     KBArticle[]
 }
 
 model User {
@@ -126,6 +128,7 @@ model User {
   sentInvites      Invite[] @relation("InviteInvitedBy")
   acceptedInvites  Invite[] @relation("InviteAcceptedBy")
   attachments      Attachment[]
+  pageComments     PageComment[]
 }
 
 model Membership {
@@ -182,6 +185,7 @@ model Workspace {
   members WorkspaceMember[]
   fields  FieldDefinition[]
   projects Project[]
+  kbArticles KBArticle[]
 
   // Открывает composite-FK для детей: гарантирует, что child.orgId == workspace.orgId
   // на уровне БД (тенант-инвариант, не надежда на сервис).
@@ -280,6 +284,7 @@ model Project {
   tasks       Task[]
   activity    ActivityEvent[]
   attachments Attachment[]
+  pages       Page[]
 
   @@unique([id, orgId]) // цель composite-FK из ProjectContact(projectId, orgId) — backbone
   @@index([workspaceId, phaseId]) // рендер доски
@@ -530,9 +535,60 @@ enum AttachmentScanStatus {
   INFECTED
 }
 
+// ──────────────────────────── PAGES / KNOWLEDGE BASE ───────────────────────
+// docs/specs/pages-kb.md. content: Json — TipTap/ProseMirror-документ, форма не валидируется
+// построчно (бэкенд не источник истины по rich-контенту, P3) — только z.record + лимит байт (§5).
+
+model Page {
+  id        String   @id @default(cuid())
+  orgId     String
+  projectId String
+  title     String
+  content   Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  org      Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  project  Project       @relation(fields: [projectId, orgId], references: [id, orgId], onDelete: Cascade)
+  comments PageComment[]
+
+  @@index([projectId])
+}
+
+model PageComment {
+  id        String   @id @default(cuid())
+  pageId    String
+  authorId  String?
+  body      String // plain text с @упоминаниями как id-списком (не хранится в тексте, §2), не TipTap-документ
+  createdAt DateTime @default(now())
+
+  page   Page  @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  author User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([pageId])
+}
+
+model KBArticle {
+  id          String   @id @default(cuid())
+  orgId       String
+  workspaceId String? // null = org-wide; задан = виден только этому воркспейсу (FR-PG-2)
+  title       String
+  content     Json     @default("{}")
+  tags        String[] @default([])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  // Composite-FK, резолвится только когда workspaceId задан — тот же паттерн, что Project.company (nullable composite-FK).
+  workspace Workspace?   @relation(fields: [workspaceId, orgId], references: [id, orgId])
+
+  @@index([orgId])
+  @@index([workspaceId])
+  @@index([tags], type: Gin) // поиск по тегам (§6 pages-kb.md) — синтаксис проверить сгенерированной миграцией
+}
+
 // ============================================================================
 //  ЗА ПРЕДЕЛАМИ ЭТОГО ФАЙЛА — приходят в своих вехах, НЕ проектировались здесь:
-//    M3: Page, KBArticle                     (rich docs / KB — docs/specs/pages-kb.md)
 //    M4: AiThread, Message, EmbeddingChunk   (RAG — требует pgvector; сюда же переехала
 //                                             экстракция текста из Page/KBArticle/Attachment)
 //    M5: ApiKey, Webhook                     (публичный API + вебхуки)

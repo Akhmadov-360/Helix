@@ -4,6 +4,7 @@ import type { Queue } from "bullmq";
 import { EMAIL_QUEUE } from "../../core/queue/queue.module";
 import { ASSIGNMENT_JOB, type AssignmentJobData } from "./assignment-job";
 import { LEAD_CREATED_JOB, type LeadCreatedJobData } from "./lead-created-job";
+import { MENTION_JOB, type MentionJobData } from "./mention-job";
 import { ORG_INVITE_JOB, type OrgInviteJobData } from "./org-invite-job";
 import { PASSWORD_RESET_JOB, type PasswordResetJobData } from "./password-reset-job";
 import { PHASE_CHANGED_JOB, type PhaseChangedJobData } from "./phase-changed-job";
@@ -17,7 +18,8 @@ export type EmailJobData =
   | PasswordResetJobData
   | AssignmentJobData
   | PhaseChangedJobData
-  | OrgInviteJobData;
+  | OrgInviteJobData
+  | MentionJobData;
 
 /**
  * Тонкий фасад над BullMQ `Queue` (§1). Вызывается ПОСЛЕ коммита транзакции/записи создателем
@@ -75,6 +77,16 @@ export class NotificationsService {
       // Инвайт уже записан в БД и действителен 7 дней — админ может нажать «Resend» повторно;
       // падение enqueue не должно всплыть в ответ POST /organizations/invites.
       this.logger.error(`Failed to enqueue org.invite for ${data.email}`, err instanceof Error ? err.stack : err);
+    }
+  }
+
+  /** pages-kb.md §2 — вызывается после коммита создания PageComment, по одному job на упомянутого. */
+  async enqueueMention(data: MentionJobData): Promise<void> {
+    try {
+      await this.emailQueue.add(MENTION_JOB, data, EMAIL_JOB_OPTIONS);
+    } catch (err) {
+      // Комментарий уже закоммичен — письмо вторично, тот же остаточный риск, что project.assigned.
+      this.logger.error(`Failed to enqueue page.mention for page ${data.pageId}`, err instanceof Error ? err.stack : err);
     }
   }
 }
