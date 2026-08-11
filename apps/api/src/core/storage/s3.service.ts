@@ -40,9 +40,25 @@ export class S3Service {
     return getSignedUrl(this.client, command, { expiresIn: UPLOAD_URL_TTL_SECONDS });
   }
 
-  /** files.md §5 — короткоживущий (FR-FILE-2), единственный путь прочитать объект. */
-  getPresignedGetUrl(key: string): Promise<string> {
-    const command = new GetObjectCommand({ Bucket: this.bucket, Key: key });
+  /**
+   * files.md §5 — короткоживущий (FR-FILE-2), единственный путь прочитать объект.
+   *
+   * ResponseContentDisposition переопределяет заголовок ОТВЕТА S3 на этот конкретный GET, не
+   * трогая сам объект — сервер, не клиентский `download`-атрибут (тот молча игнорируется браузером
+   * для cross-origin URL, чем и был вызван репорт "скачивание открывает файл в табе вместо
+   * скачивания"). "attachment" — форсирует Save As; "inline" — для предпросмотра в диалоге
+   * (картинка/текст/pdf рендерятся прямо в браузере, не уходят на диск).
+   *
+   * filename* (RFC 6266, UTF-8) — кириллица в имени файла не редкость (ru/uz-первый продукт);
+   * filename= — ASCII-фолбэк для клиентов, не понимающих filename*.
+   */
+  getPresignedGetUrl(key: string, filename: string, disposition: "inline" | "attachment" = "attachment"): Promise<string> {
+    const asciiFallback = filename.replace(/[^\x20-\x7e]/g, "_").replace(/"/g, "'");
+    const command = new GetObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+      ResponseContentDisposition: `${disposition}; filename="${asciiFallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+    });
     return getSignedUrl(this.client, command, { expiresIn: DOWNLOAD_URL_TTL_SECONDS });
   }
 

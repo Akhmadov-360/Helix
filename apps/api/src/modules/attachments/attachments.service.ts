@@ -1,6 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { Injectable } from "@nestjs/common";
-import { MAX_ATTACHMENT_SIZE_BYTES, type AttachmentResponse, type CreateUploadUrlInput, type UploadUrlResponse } from "@helix/api-schemas";
+import {
+  MAX_ATTACHMENT_SIZE_BYTES,
+  type AttachmentResponse,
+  type CreateUploadUrlInput,
+  type UpdateAttachmentInput,
+  type UploadUrlResponse,
+} from "@helix/api-schemas";
 import {
   AttachmentTooLargeError,
   AttachmentUploadNotConfirmedError,
@@ -75,10 +81,24 @@ export class AttachmentsService {
   }
 
   /** files.md §5 — presigned GET, короткий TTL, единственный путь прочитать объект. */
-  async getDownloadUrl(orgId: string, projectId: string, attachmentId: string): Promise<{ downloadUrl: string }> {
+  async getDownloadUrl(
+    orgId: string,
+    projectId: string,
+    attachmentId: string,
+    disposition: "inline" | "attachment" = "attachment",
+  ): Promise<{ downloadUrl: string }> {
     const row = await this.findConfirmed(orgId, projectId, attachmentId);
-    const downloadUrl = await this.s3.getPresignedGetUrl(row.storageKey);
+    const downloadUrl = await this.s3.getPresignedGetUrl(row.storageKey, row.filename, disposition);
     return { downloadUrl };
+  }
+
+  /** files.md §7 (пересмотрено) — только filename, S3-объект не трогается. */
+  async update(orgId: string, projectId: string, attachmentId: string, dto: UpdateAttachmentInput): Promise<AttachmentResponse> {
+    const row = await this.attachments.findById(attachmentId, orgId, projectId);
+    if (!row) throw new ResourceNotFoundError("Attachment not found");
+
+    const updated = await this.attachments.update(attachmentId, { filename: dto.filename });
+    return toAttachmentResponse(updated);
   }
 
   /** files.md §6 — удаление одного вложения, синхронно (объект + строка). */

@@ -29,6 +29,8 @@ export const queryKeys = {
   contactSearch: (orgId: string, q: string) => ["org", orgId, "contacts", "search", { q }] as const,
   projectTasks: (orgId: string, projectId: string) =>
     ["org", orgId, "project", projectId, "tasks"] as const,
+  projectAttachments: (orgId: string, projectId: string) =>
+    ["org", orgId, "project", projectId, "attachments"] as const,
   // Глобальная адресная книга (org-scoped, не workspace-scoped) — отдельная "list"-ветка от
   // contactSearch ("search"), чтобы инвалидация одного не путалась с другим, но оба под общим
   // ["org", orgId, "contacts"] — мутация контакта инвалидирует и то, и другое разом.

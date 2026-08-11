@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { cn } from "@helix/ui";
 import { useT } from "../../shared/i18n";
 
-const TABS = ["contacts", "tasks", "activity"] as const;
+const TABS = ["contacts", "tasks", "files", "activity"] as const;
 
 // Единственная tab-nav в приложении — Link'и, без отдельного примитива в packages/ui: один
 // потребитель (project detail), выносить незачем, пока не появится второй.

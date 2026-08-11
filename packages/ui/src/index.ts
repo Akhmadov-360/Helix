@@ -114,3 +114,4 @@ export {
   type MentionTextareaHandle,
   type MentionTextareaProps,
 } from "./components/mention-textarea";
+export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "./components/tooltip";

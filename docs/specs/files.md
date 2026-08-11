@@ -300,15 +300,23 @@ can("manage", "Attachment"); // upload/read/delete — управленческ�
 // MEMBER (в ветке case "MEMBER"):
 can("create", "Attachment");
 can("read", "Attachment");
+can("update", "Attachment"); // переименование — тот же △-объём, что create/delete (см. правку §7 ниже)
 can("delete", "Attachment"); // △: Member может управлять вложениями СВОИХ (scope=ORG сегодня, см. выше)
 
 // VIEWER:
 can("read", "Attachment");
 ```
 
-`capabilities.ts`: `Attachment: ["create", "read", "delete"]` (нет `update` — вложение не
-редактируется, перезалить = удалить+создать заново, §0). Зеркало в
+`capabilities.ts`: `Attachment: ["create", "read", "update", "delete"]`. Зеркало в
 `packages/api-schemas/src/capabilities.ts`.
+
+> **Пересмотрено после первого прохода фронта.** Первая редакция намеренно исключала `update`:
+> "вложение не редактируется, перезалить = удалить+создать заново" (§0). На практике это верно
+> для СОДЕРЖИМОГО файла (перезалить — значит новый объект в S3, тут решение не меняется), но не
+> для `filename` — скриншоты/фото массово сохраняются с неосмысленными системными именами
+> (`Screenshot_2026...`), и заставлять пользователя удалять+перезаливать файл целиком только
+> чтобы дать ему нормальное имя — трение без причины. `PATCH .../attachments/:id` теперь
+> существует, меняет только колонку `filename`, `storageKey`/S3-объект не трогает (§9).
 
 ---
 
@@ -319,7 +327,8 @@ can("read", "Attachment");
 | `POST` | `/v1/projects/:projectId/attachments/upload-url` | `@CheckPolicy("create", "Attachment")` | Выдать presigned PUT URL (§3, шаг 1) |
 | `POST` | `/v1/projects/:projectId/attachments/:attachmentId/confirm` | `@CheckPolicy("create", "Attachment")` | Подтвердить загрузку, создать строку (§3, шаг 3) |
 | `GET` | `/v1/projects/:projectId/attachments` | `@CheckPolicy("read", "Attachment")` | Список вложений проекта |
-| `GET` | `/v1/projects/:projectId/attachments/:attachmentId/download-url` | `@CheckPolicy("read", "Attachment")` | Выдать presigned GET URL (§5) |
+| `GET` | `/v1/projects/:projectId/attachments/:attachmentId/download-url?disposition=inline\|attachment` | `@CheckPolicy("read", "Attachment")` | Выдать presigned GET URL (§5). `disposition` (default `attachment`) управляет `Content-Disposition` ответа S3: `inline` — рендер в браузере (предпросмотр), `attachment` — форс Save As |
+| `PATCH` | `/v1/projects/:projectId/attachments/:attachmentId` | `@CheckPolicy("update", "Attachment")` | Переименовать (только `filename`, §9) |
 | `DELETE` | `/v1/projects/:projectId/attachments/:attachmentId` | `@CheckPolicy("delete", "Attachment")` | Удалить (§6) |
 
 Новый модуль `apps/api/src/modules/attachments/` — не внутри `workspaces/` (где живёт

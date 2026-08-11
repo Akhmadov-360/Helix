@@ -75,6 +75,11 @@ describe("Attachments (files.md) — presigned upload/download на реальн
     request(app.getHttpServer())
       .delete(`/v1/projects/${pid}/attachments/${aid}`)
       .set("Authorization", `Bearer ${tok}`);
+  const update = (pid: string, aid: string, tok: string, body: object) =>
+    request(app.getHttpServer())
+      .patch(`/v1/projects/${pid}/attachments/${aid}`)
+      .set("Authorization", `Bearer ${tok}`)
+      .send(body);
 
   async function uploadRealFile(uploadUrl: string, bytes: Buffer, contentType: string): Promise<void> {
     const res = await fetch(uploadUrl, { method: "PUT", body: bytes, headers: { "Content-Type": contentType } });
@@ -143,6 +148,41 @@ describe("Attachments (files.md) — presigned upload/download на реальн
     expect(await fileRes.text()).toBe("downloadable");
   });
 
+  it("download-url без disposition форсирует Save As (Content-Disposition: attachment)", async () => {
+    const bytes = Buffer.from("attachment disposition");
+    const created = await createUploadUrl(projectId, token, {
+      filename: "форсаж.txt", // кириллица — проверяем filename*/UTF-8, не только ASCII-фолбэк
+      mimeType: "text/plain",
+      sizeBytes: bytes.length,
+    }).expect(201);
+    await uploadRealFile(created.body.data.uploadUrl, bytes, "text/plain");
+    await confirm(projectId, created.body.data.attachmentId, token).expect(201);
+
+    const res = await downloadUrl(projectId, created.body.data.attachmentId, token).expect(200);
+    const fileRes = await fetch(res.body.data.downloadUrl);
+    const disposition = fileRes.headers.get("content-disposition");
+    expect(disposition).toMatch(/^attachment;/);
+    expect(disposition).toContain("filename*=UTF-8''");
+  });
+
+  it("download-url?disposition=inline рендерится в браузере (Content-Disposition: inline)", async () => {
+    const bytes = Buffer.from("inline disposition");
+    const created = await createUploadUrl(projectId, token, {
+      filename: "preview.txt",
+      mimeType: "text/plain",
+      sizeBytes: bytes.length,
+    }).expect(201);
+    await uploadRealFile(created.body.data.uploadUrl, bytes, "text/plain");
+    await confirm(projectId, created.body.data.attachmentId, token).expect(201);
+
+    const res = await request(app.getHttpServer())
+      .get(`/v1/projects/${projectId}/attachments/${created.body.data.attachmentId}/download-url?disposition=inline`)
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200);
+    const fileRes = await fetch(res.body.data.downloadUrl);
+    expect(fileRes.headers.get("content-disposition")).toMatch(/^inline;/);
+  });
+
   it("download-url на неподтверждённое вложение → 404", async () => {
     const created = await createUploadUrl(projectId, token, {
       filename: "pending.txt",
@@ -175,7 +215,7 @@ describe("Attachments (files.md) — presigned upload/download на реальн
       await list(projectId, token).expect(200);
     });
 
-    it("Member → может create/read/delete (△, scope=ORG)", async () => {
+    it("Member → может create/read/update/delete (△, scope=ORG)", async () => {
       await prisma.membership.updateMany({ where: { userId }, data: { role: "MEMBER" } });
       const bytes = Buffer.from("member upload");
       const created = await createUploadUrl(projectId, token, {
@@ -185,7 +225,52 @@ describe("Attachments (files.md) — presigned upload/download на реальн
       }).expect(201);
       await uploadRealFile(created.body.data.uploadUrl, bytes, "text/plain");
       await confirm(projectId, created.body.data.attachmentId, token).expect(201);
+      await update(projectId, created.body.data.attachmentId, token, { filename: "renamed-by-member.m" }).expect(200);
       await del(projectId, created.body.data.attachmentId, token).expect(200);
+    });
+  });
+
+  describe("PATCH /v1/projects/:projectId/attachments/:attachmentId — переименование (files.md §7)", () => {
+    it("меняет filename, storageKey и содержимое объекта не трогает", async () => {
+      const bytes = Buffer.from("rename me");
+      const created = await createUploadUrl(projectId, token, {
+        filename: "IMG_2026.jpg",
+        mimeType: "text/plain",
+        sizeBytes: bytes.length,
+      }).expect(201);
+      await uploadRealFile(created.body.data.uploadUrl, bytes, "text/plain");
+      await confirm(projectId, created.body.data.attachmentId, token).expect(201);
+
+      const renamed = await update(projectId, created.body.data.attachmentId, token, {
+        filename: "Скриншот презентации.jpg",
+      }).expect(200);
+      expect(renamed.body.data.filename).toBe("Скриншот презентации.jpg");
+      expect(renamed.body.data.id).toBe(created.body.data.attachmentId);
+
+      const listed = await list(projectId, token).expect(200);
+      expect(listed.body.data[0].filename).toBe("Скриншот презентации.jpg");
+
+      // Объект в S3 не переехал (storageKey не менялся) — скачивание всё ещё работает.
+      const res = await downloadUrl(projectId, created.body.data.attachmentId, token).expect(200);
+      const fileRes = await fetch(res.body.data.downloadUrl);
+      expect(await fileRes.text()).toBe("rename me");
+    });
+
+    it("пустое имя → 400 (Zod min(1))", async () => {
+      const created = await createUploadUrl(projectId, token, { filename: "x.txt", mimeType: "text/plain", sizeBytes: 5 }).expect(201);
+      await update(projectId, created.body.data.attachmentId, token, { filename: "" }).expect(400);
+    });
+
+    it("чужая орга → 404", async () => {
+      const created = await createUploadUrl(projectId, token, { filename: "x.txt", mimeType: "text/plain", sizeBytes: 5 }).expect(201);
+      const stranger = await signUp(app);
+      await update(projectId, created.body.data.attachmentId, stranger.token, { filename: "hijacked.txt" }).expect(404);
+    });
+
+    it("Viewer → 403", async () => {
+      const created = await createUploadUrl(projectId, token, { filename: "x.txt", mimeType: "text/plain", sizeBytes: 5 }).expect(201);
+      await prisma.membership.updateMany({ where: { userId }, data: { role: "VIEWER" } });
+      await update(projectId, created.body.data.attachmentId, token, { filename: "nope.txt" }).expect(403);
     });
   });
 

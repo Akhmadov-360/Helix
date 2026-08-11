@@ -76,6 +76,11 @@ export class AttachmentsRepository {
     await this.prisma.client.attachment.delete({ where: { id } });
   }
 
+  /** files.md §7 (пересмотрено) — filename редактируется, storageKey/S3-объект не трогаются. */
+  update(id: string, data: { filename: string }): Promise<AttachmentRow> {
+    return this.prisma.client.attachment.update({ where: { id }, data, select: ATTACHMENT_SELECT });
+  }
+
   /** §6 — storage keys дочерних вложений ДО каскадного удаления Project (внутри той же tx). */
   async listStorageKeysByProject(projectId: string, tx?: Prisma.TransactionClient): Promise<string[]> {
     const rows = await (tx ?? this.prisma.client).attachment.findMany({

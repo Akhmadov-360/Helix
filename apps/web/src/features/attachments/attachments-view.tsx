@@ -1,0 +1,306 @@
+import { useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { MAX_ATTACHMENT_SIZE_BYTES, type AttachmentResponse } from "@helix/api-schemas";
+import {
+  Attachment,
+  AttachmentAction,
+  AttachmentActions,
+  AttachmentContent,
+  AttachmentDescription,
+  AttachmentGroup,
+  AttachmentMedia,
+  AttachmentTitle,
+  AttachmentTrigger,
+  Button,
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+  Progress,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@helix/ui";
+import { Download, Pencil, Trash2, Upload } from "lucide-react";
+import { toast } from "sonner";
+import { useCan } from "../../shared/auth/ability";
+import { useLocaleStore, useT } from "../../shared/i18n";
+import { AttachmentIcon } from "./attachment-icon";
+import { AttachmentPreviewDialog } from "./attachment-preview-dialog";
+import { DeleteAttachmentDialog } from "./delete-attachment-dialog";
+import { formatFileSize } from "./format-file-size";
+import { fetchDownloadUrl, useUploadAttachment } from "./mutations";
+import { projectAttachmentsQueryOptions } from "./queries";
+import { RenameAttachmentDialog } from "./rename-attachment-dialog";
+
+interface UploadingItem {
+  key: string;
+  file: File;
+  progress: number; // 0-100 uploading; -1 = confirm в процессе
+}
+
+// Модульная функция, не инлайн в компоненте — react-compiler запрещает мутировать `window.location`
+// внутри рендер-функции (immutability-правило), а обычная навигация — единственный способ
+// заставить браузер уважать Content-Disposition: attachment без ручного fetch+blob (см. S3Service).
+function navigateToDownload(url: string): void {
+  window.location.href = url;
+}
+
+export function AttachmentsView({ orgId, projectId }: { orgId: string; projectId: string }) {
+  const t = useT();
+  const locale = useLocaleStore((state) => state.locale);
+  const attachments = useSuspenseQuery(projectAttachmentsQueryOptions(orgId, projectId)).data;
+  const upload = useUploadAttachment(orgId, projectId);
+  const canCreate = useCan("Attachment.create");
+  const canUpdate = useCan("Attachment.update");
+  const canDelete = useCan("Attachment.delete");
+
+  const [uploading, setUploading] = useState<UploadingItem[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; filename: string } | null>(null);
+  const [renameTarget, setRenameTarget] = useState<{ id: string; filename: string } | null>(null);
+  const [previewTarget, setPreviewTarget] = useState<{ id: string; filename: string; mimeType: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dateFormatter = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
+
+  function handleFiles(files: FileList | File[]) {
+    for (const file of Array.from(files)) {
+      if (file.size > MAX_ATTACHMENT_SIZE_BYTES) {
+        toast.error(t("attachments.error.tooLarge"));
+        continue;
+      }
+      const key = `${file.name}-${file.size}-${Date.now()}-${Math.random()}`;
+      setUploading((current) => [...current, { key, file, progress: 0 }]);
+
+      upload.mutate(
+        {
+          file,
+          onProgress: (percent) =>
+            setUploading((current) => current.map((u) => (u.key === key ? { ...u, progress: percent } : u))),
+        },
+        {
+          onSettled: () => setUploading((current) => current.filter((u) => u.key !== key)),
+        },
+      );
+    }
+  }
+
+  // Реальное скачивание (Save As), не превью — presigned URL несёт Content-Disposition: attachment
+  // (S3Service, files.md §5), поэтому обычная навигация браузера сама триггерит скачивание и не
+  // уводит со страницы (code-review: раньше window.open открывал файл в новом табе вместо скачивания).
+  async function handleRealDownload(attachmentId: string) {
+    try {
+      const url = await fetchDownloadUrl(projectId, attachmentId, "attachment");
+      navigateToDownload(url);
+    } catch {
+      toast.error(t("attachments.error.unexpected"));
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {canCreate && (
+        <div
+          onDragOver={(e: DragEvent) => {
+            e.preventDefault();
+            setIsDragging(true);
+          }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={(e: DragEvent) => {
+            e.preventDefault();
+            setIsDragging(false);
+            if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files);
+          }}
+          className={`flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed p-6 text-center transition-colors ${
+            isDragging ? "border-accent bg-accent/5" : "border-border"
+          }`}
+        >
+          <Upload className="h-6 w-6 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">{t("attachments.dropzone.hint")}</p>
+          <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+            {t("attachments.dropzone.browse")}
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={(e: ChangeEvent<HTMLInputElement>) => {
+              if (e.target.files && e.target.files.length > 0) handleFiles(e.target.files);
+              e.target.value = "";
+            }}
+          />
+        </div>
+      )}
+
+      {attachments.length === 0 && uploading.length === 0 && (
+        <p className="text-sm text-muted-foreground">{t("attachments.list.empty")}</p>
+      )}
+
+      <AttachmentGroup className="flex-col overflow-visible">
+        {uploading.map((item) => (
+          <Attachment key={item.key} state="uploading" size="sm" className="w-full">
+            <AttachmentMedia>
+              <AttachmentIcon mimeType={item.file.type} className="h-4 w-4" />
+            </AttachmentMedia>
+            <AttachmentContent>
+              <AttachmentTitle>{item.file.name}</AttachmentTitle>
+              <Progress value={item.progress} className="mt-1 h-1" />
+            </AttachmentContent>
+          </Attachment>
+        ))}
+
+        {attachments.map((attachment) => (
+          <AttachmentCard
+            key={attachment.id}
+            attachment={attachment}
+            canUpdate={canUpdate}
+            canDelete={canDelete}
+            dateFormatter={dateFormatter}
+            onPreview={() => setPreviewTarget(attachment)}
+            onDownload={() => void handleRealDownload(attachment.id)}
+            onRenameRequest={() => setRenameTarget({ id: attachment.id, filename: attachment.filename })}
+            onDeleteRequest={() => setDeleteTarget({ id: attachment.id, filename: attachment.filename })}
+          />
+        ))}
+      </AttachmentGroup>
+
+      <AttachmentPreviewDialog
+        projectId={projectId}
+        attachment={previewTarget}
+        open={previewTarget !== null}
+        onOpenChange={(open) => !open && setPreviewTarget(null)}
+        onDownload={(id) => void handleRealDownload(id)}
+      />
+
+      <RenameAttachmentDialog
+        orgId={orgId}
+        projectId={projectId}
+        attachment={renameTarget}
+        open={renameTarget !== null}
+        onOpenChange={(open) => !open && setRenameTarget(null)}
+      />
+
+      <DeleteAttachmentDialog
+        orgId={orgId}
+        projectId={projectId}
+        attachment={deleteTarget}
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+      />
+    </div>
+  );
+}
+
+function AttachmentCard({
+  attachment,
+  canUpdate,
+  canDelete,
+  dateFormatter,
+  onPreview,
+  onDownload,
+  onRenameRequest,
+  onDeleteRequest,
+}: {
+  attachment: AttachmentResponse;
+  canUpdate: boolean;
+  canDelete: boolean;
+  dateFormatter: Intl.DateTimeFormat;
+  onPreview: () => void;
+  onDownload: () => void;
+  onRenameRequest: () => void;
+  onDeleteRequest: () => void;
+}) {
+  const t = useT();
+  const description = [
+    formatFileSize(attachment.sizeBytes),
+    attachment.uploadedByName,
+    dateFormatter.format(new Date(attachment.createdAt)),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger>
+        <Attachment state="done" size="sm" className="w-full">
+          <AttachmentTrigger onClick={onPreview} aria-label={attachment.filename} />
+          <AttachmentMedia>
+            <AttachmentIcon mimeType={attachment.mimeType} className="h-4 w-4" />
+          </AttachmentMedia>
+          <AttachmentContent>
+            <AttachmentTitle>{attachment.filename}</AttachmentTitle>
+            <AttachmentDescription>{description}</AttachmentDescription>
+          </AttachmentContent>
+          <AttachmentActions>
+            {canUpdate && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <AttachmentAction
+                    aria-label={t("attachments.list.rename")}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRenameRequest();
+                    }}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </AttachmentAction>
+                </TooltipTrigger>
+                <TooltipContent>{t("attachments.list.rename")}</TooltipContent>
+              </Tooltip>
+            )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <AttachmentAction
+                  aria-label={t("attachments.list.download")}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDownload();
+                  }}
+                >
+                  <Download className="h-3.5 w-3.5" />
+                </AttachmentAction>
+              </TooltipTrigger>
+              <TooltipContent>{t("attachments.list.download")}</TooltipContent>
+            </Tooltip>
+            {canDelete && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <AttachmentAction
+                    aria-label={t("attachments.list.delete")}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteRequest();
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </AttachmentAction>
+                </TooltipTrigger>
+                <TooltipContent>{t("attachments.list.delete")}</TooltipContent>
+              </Tooltip>
+            )}
+          </AttachmentActions>
+        </Attachment>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem onClick={onPreview}>{t("attachments.preview.open")}</ContextMenuItem>
+        {canUpdate && (
+          <ContextMenuItem onClick={onRenameRequest}>
+            <Pencil className="mr-2 h-4 w-4" />
+            {t("attachments.list.rename")}
+          </ContextMenuItem>
+        )}
+        <ContextMenuItem onClick={onDownload}>
+          <Download className="mr-2 h-4 w-4" />
+          {t("attachments.list.download")}
+        </ContextMenuItem>
+        {canDelete && (
+          <ContextMenuItem variant="destructive" onClick={onDeleteRequest}>
+            <Trash2 className="mr-2 h-4 w-4" />
+            {t("attachments.list.delete")}
+          </ContextMenuItem>
+        )}
+      </ContextMenuContent>
+    </ContextMenu>
+  );
+}

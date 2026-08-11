@@ -38,3 +38,17 @@ export type AttachmentListResponse = z.infer<typeof attachmentListResponseSchema
 
 export const downloadUrlResponseSchema = z.object({ downloadUrl: z.string() });
 export type DownloadUrlResponse = z.infer<typeof downloadUrlResponseSchema>;
+
+// §5 — inline = предпросмотр в диалоге (рендерится в браузере), attachment = реальное скачивание
+// (Content-Disposition форсирует Save As на стороне S3, не клиентский download-атрибут).
+export const downloadUrlQuerySchema = z.object({
+  disposition: z.enum(["inline", "attachment"]).optional(),
+});
+export type DownloadUrlQuery = z.infer<typeof downloadUrlQuerySchema>;
+
+// §7 (пересмотрено) — filename редактируется: скриншоты/фото часто сохраняются с неосмысленными
+// именами, переименование через приложение дешевле, чем "удали и перезалей заново".
+export const updateAttachmentSchema = z.object({
+  filename: z.string().trim().min(1).max(255),
+});
+export type UpdateAttachmentInput = z.infer<typeof updateAttachmentSchema>;

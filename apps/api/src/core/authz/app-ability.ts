@@ -115,6 +115,7 @@ export function defineAbilityForRole(role: Role): AppAbility {
       // files.md §7: △ — capability allowed, scope=ORG до M6 (тот же принцип, что Task/ProjectContact выше).
       can("create", "Attachment");
       can("read", "Attachment");
+      can("update", "Attachment"); // files.md §7 (пересмотрено): переименование — тот же △-объём, что create/delete
       can("delete", "Attachment");
       // pages-kb.md §4: △ — Member редактирует Page (часть «edit pages»), создаёт/читает KB, но не удаляет чужое.
       can("create", "Page");

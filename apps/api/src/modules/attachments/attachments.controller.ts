@@ -1,10 +1,14 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import {
   createUploadUrlSchema,
+  downloadUrlQuerySchema,
+  updateAttachmentSchema,
   type AttachmentResponse,
   type CreateUploadUrlInput,
+  type DownloadUrlQuery,
   type DownloadUrlResponse,
+  type UpdateAttachmentInput,
   type UploadUrlResponse,
 } from "@helix/api-schemas";
 import { CurrentAuth, type AuthContext } from "../../core/auth-context";
@@ -58,8 +62,20 @@ export class AttachmentsController {
     @CurrentAuth() auth: AuthContext,
     @Param("projectId") projectId: string,
     @Param("attachmentId") attachmentId: string,
+    @Query(new ZodValidationPipe(downloadUrlQuerySchema)) query: DownloadUrlQuery,
   ): Promise<DownloadUrlResponse> {
-    return this.attachments.getDownloadUrl(auth.activeOrgId, projectId, attachmentId);
+    return this.attachments.getDownloadUrl(auth.activeOrgId, projectId, attachmentId, query.disposition);
+  }
+
+  @Patch(":attachmentId")
+  @CheckPolicy("update", "Attachment")
+  update(
+    @CurrentAuth() auth: AuthContext,
+    @Param("projectId") projectId: string,
+    @Param("attachmentId") attachmentId: string,
+    @Body(new ZodValidationPipe(updateAttachmentSchema)) dto: UpdateAttachmentInput,
+  ): Promise<AttachmentResponse> {
+    return this.attachments.update(auth.activeOrgId, projectId, attachmentId, dto);
   }
 
   @Delete(":attachmentId")

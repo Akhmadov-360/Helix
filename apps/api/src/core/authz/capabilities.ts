@@ -49,8 +49,9 @@ const SUBJECT_OPERATIONS = {
   // update — O/A only (Appendix B «Manage org settings»). create/delete нет: Organization.settings
   // всегда существует (default "{}" из схемы), отдельного create-эндпоинта не завели.
   Organization: ["read", "update"],
-  // files.md §7: нет "update" — вложение не редактируется, перезалить = удалить+создать заново.
-  Attachment: ["create", "read", "delete"],
+  // files.md §7 (пересмотрено): update = только filename (переименование), не содержимое —
+  // "перезалить = удалить+создать заново" остаётся верным для СОДЕРЖИМОГО, не для имени.
+  Attachment: ["create", "read", "update", "delete"],
   Page: ["create", "read", "update", "delete"],
   // pages-kb.md §4: живой документ, правят по мере устаревания — есть update (в отличие от Blueprint).
   KBArticle: ["create", "read", "update", "delete"],
