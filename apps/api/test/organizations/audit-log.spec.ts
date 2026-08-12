@@ -56,11 +56,12 @@ describe("GET /v1/organizations/audit-log (decisions.md D5)", () => {
       .set("Authorization", `Bearer ${owner.token}`)
       .expect(200);
 
-    const actions = res.body.data.map((e: { action: string }) => e.action);
+    const entries = res.body.data.entries;
+    const actions = entries.map((e: { action: string }) => e.action);
     expect(actions).toContain("membership.role_changed");
     expect(actions).toContain("membership.removed");
 
-    const roleChanged = res.body.data.find((e: { action: string }) => e.action === "membership.role_changed");
+    const roleChanged = entries.find((e: { action: string }) => e.action === "membership.role_changed");
     expect(roleChanged.actorId).toBe(owner.userId);
     expect(roleChanged.payload).toMatchObject({
       userId: member.userId,
@@ -68,11 +69,11 @@ describe("GET /v1/organizations/audit-log (decisions.md D5)", () => {
       toRole: "MANAGER",
     });
 
-    const removed = res.body.data.find((e: { action: string }) => e.action === "membership.removed");
+    const removed = entries.find((e: { action: string }) => e.action === "membership.removed");
     expect(removed.payload).toMatchObject({ userId: member.userId, role: "MANAGER" });
 
     // Свежие сверху.
-    expect(res.body.data.indexOf(removed)).toBeLessThan(res.body.data.indexOf(roleChanged));
+    expect(entries.indexOf(removed)).toBeLessThan(entries.indexOf(roleChanged));
   });
 
   it("organization.created пишется в аудит НОВОЙ орги", async () => {
@@ -118,6 +119,63 @@ describe("GET /v1/organizations/audit-log (decisions.md D5)", () => {
       .set("Authorization", `Bearer ${ownerB.token}`)
       .expect(200);
 
-    expect(resB.body.data).toEqual([]);
+    expect(resB.body.data).toEqual({ entries: [], hasMore: false });
+  });
+
+  it("фильтр по action отдаёт только совпадающие записи", async () => {
+    const owner = await signUpAs(app);
+    const member = await signUpAs(app);
+    await addToOrg(owner.orgId, member.userId, "MEMBER");
+
+    await request(app.getHttpServer())
+      .patch(`/v1/organizations/members/${member.userId}`)
+      .set("Authorization", `Bearer ${owner.token}`)
+      .send({ role: "MANAGER" })
+      .expect(200);
+    await request(app.getHttpServer())
+      .delete(`/v1/organizations/members/${member.userId}`)
+      .set("Authorization", `Bearer ${owner.token}`)
+      .expect(200);
+
+    const res = await request(app.getHttpServer())
+      .get("/v1/organizations/audit-log")
+      .query({ action: "membership.removed" })
+      .set("Authorization", `Bearer ${owner.token}`)
+      .expect(200);
+
+    expect(res.body.data.entries).toHaveLength(1);
+    expect(res.body.data.entries[0].action).toBe("membership.removed");
+  });
+
+  it("пагинация: limit ограничивает страницу, hasMore=true пока есть ещё, cursor листает дальше", async () => {
+    const owner = await signUpAs(app);
+    // 3 переименования орги-настроек → 3 organization.settings_updated записи (проще всего
+    // сгенерить N однотипных событий без лишних акторов).
+    for (let i = 0; i < 3; i++) {
+      await request(app.getHttpServer())
+        .patch("/v1/organizations/settings")
+        .set("Authorization", `Bearer ${owner.token}`)
+        .send({ currency: i % 2 === 0 ? "USD" : "EUR" })
+        .expect(200);
+    }
+
+    const page1 = await request(app.getHttpServer())
+      .get("/v1/organizations/audit-log")
+      .query({ limit: 2 })
+      .set("Authorization", `Bearer ${owner.token}`)
+      .expect(200);
+    expect(page1.body.data.entries).toHaveLength(2);
+    expect(page1.body.data.hasMore).toBe(true);
+
+    const lastId = page1.body.data.entries[1].id;
+    const page2 = await request(app.getHttpServer())
+      .get("/v1/organizations/audit-log")
+      .query({ limit: 2, cursor: lastId })
+      .set("Authorization", `Bearer ${owner.token}`)
+      .expect(200);
+    expect(page2.body.data.entries).toHaveLength(1);
+    expect(page2.body.data.hasMore).toBe(false);
+    // Страницы не пересекаются.
+    expect(page2.body.data.entries[0].id).not.toBe(lastId);
   });
 });

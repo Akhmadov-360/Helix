@@ -48,7 +48,9 @@ export function useChangeMemberRole(orgId: string) {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.orgMembers(orgId) });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.auditLog(orgId) });
+      // Префикс (без query-параметров) — инвалидирует все вариации фильтра/страницы разом,
+      // тот же приём, что invalidateKbLists (features/kb/mutations.ts).
+      void queryClient.invalidateQueries({ queryKey: ["org", orgId, "auditLog"] });
       toast.success(t("settings.members.roleChanged"));
     },
   });
@@ -68,7 +70,9 @@ export function useRemoveMember(orgId: string) {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.orgMembers(orgId) });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.auditLog(orgId) });
+      // Префикс (без query-параметров) — инвалидирует все вариации фильтра/страницы разом,
+      // тот же приём, что invalidateKbLists (features/kb/mutations.ts).
+      void queryClient.invalidateQueries({ queryKey: ["org", orgId, "auditLog"] });
       toast.success(t("settings.members.removed"));
     },
   });

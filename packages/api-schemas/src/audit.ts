@@ -158,11 +158,18 @@ export const auditLogEntryResponseSchema = z.object({
 });
 export type AuditLogEntryResponse = z.infer<typeof auditLogEntryResponseSchema>;
 
-export const auditLogListResponseSchema = z.array(auditLogEntryResponseSchema);
+// hasMore — тот же приём, что companyListResponseSchema: бэк берёт limit+1 строк, откусывает
+// последнюю, hasMore = была ли она. Курсор для следующей страницы — id последней ОТДАННОЙ строки
+// (её фронт уже знает из entries, отдельного поля под него не заводим).
+export const auditLogListResponseSchema = z.object({
+  entries: z.array(auditLogEntryResponseSchema),
+  hasMore: z.boolean(),
+});
 export type AuditLogListResponse = z.infer<typeof auditLogListResponseSchema>;
 
 export const auditLogQuerySchema = z.object({
   cursor: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(100).optional().default(50),
+  action: auditActionSchema.optional(),
 });
 export type AuditLogQuery = z.infer<typeof auditLogQuerySchema>;

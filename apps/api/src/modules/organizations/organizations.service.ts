@@ -163,15 +163,22 @@ export class OrganizationsService {
 
   /** Org-уровневый аудит (Appendix B, O/A only — см. CheckPolicy на контроллере). */
   async listAuditLog(orgId: string, query: AuditLogQuery): Promise<AuditLogListResponse> {
-    const rows = await this.auditLog.list(orgId, { cursor: query.cursor, limit: query.limit });
-    return rows.map((r) => ({
-      id: r.id,
-      actorId: r.actorId,
-      actorName: r.actorName,
-      actorEmail: r.actorEmail,
-      action: r.action as AuditLogListResponse[number]["action"],
-      payload: r.payload as Record<string, unknown>,
-      createdAt: r.createdAt.toISOString(),
-    }));
+    const { rows, hasMore } = await this.auditLog.list(orgId, {
+      cursor: query.cursor,
+      limit: query.limit,
+      action: query.action,
+    });
+    return {
+      hasMore,
+      entries: rows.map((r) => ({
+        id: r.id,
+        actorId: r.actorId,
+        actorName: r.actorName,
+        actorEmail: r.actorEmail,
+        action: r.action as AuditLogListResponse["entries"][number]["action"],
+        payload: r.payload as Record<string, unknown>,
+        createdAt: r.createdAt.toISOString(),
+      })),
+    };
   }
 }
