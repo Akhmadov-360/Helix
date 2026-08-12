@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { cn } from "@helix/ui";
 import { useT } from "../../shared/i18n";
 
-const TABS = ["contacts", "tasks", "files", "activity"] as const;
+const TABS = ["contacts", "tasks", "pages", "files", "activity"] as const;
 
 // Единственная tab-nav в приложении — Link'и, без отдельного примитива в packages/ui: один
 // потребитель (project detail), выносить незачем, пока не появится второй.
@@ -20,7 +20,9 @@ export function ProjectTabs({ projectId }: { projectId: string }) {
   return (
     <nav className="flex gap-5 border-b border-border">
       {TABS.map((tab) => {
-        const active = pathname.endsWith(`/${tab}`);
+        // includes, не endsWith — "pages" имеет подмаршрут детали (/pages/:pageId), таб должен
+        // оставаться активным и там, не только на списке.
+        const active = pathname.includes(`/${tab}`);
         return (
           <Link
             key={tab}

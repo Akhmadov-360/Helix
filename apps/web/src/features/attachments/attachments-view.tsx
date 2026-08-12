@@ -27,11 +27,14 @@ import { useCan } from "../../shared/auth/ability";
 import { useLocaleStore, useT } from "../../shared/i18n";
 import { AttachmentIcon } from "./attachment-icon";
 import { AttachmentPreviewDialog } from "./attachment-preview-dialog";
+import { categorizeAttachment, type AttachmentCategory } from "./attachment-category";
 import { DeleteAttachmentDialog } from "./delete-attachment-dialog";
 import { formatFileSize } from "./format-file-size";
 import { fetchDownloadUrl, useUploadAttachment } from "./mutations";
-import { projectAttachmentsQueryOptions } from "./queries";
+import { projectAttachmentsQueryOptions, projectStorageUsageQueryOptions } from "./queries";
 import { RenameAttachmentDialog } from "./rename-attachment-dialog";
+
+const CATEGORIES: AttachmentCategory[] = ["all", "image", "document", "other"];
 
 interface UploadingItem {
   key: string;
@@ -50,6 +53,7 @@ export function AttachmentsView({ orgId, projectId }: { orgId: string; projectId
   const t = useT();
   const locale = useLocaleStore((state) => state.locale);
   const attachments = useSuspenseQuery(projectAttachmentsQueryOptions(orgId, projectId)).data;
+  const usage = useSuspenseQuery(projectStorageUsageQueryOptions(orgId, projectId)).data;
   const upload = useUploadAttachment(orgId, projectId);
   const canCreate = useCan("Attachment.create");
   const canUpdate = useCan("Attachment.update");
@@ -57,11 +61,17 @@ export function AttachmentsView({ orgId, projectId }: { orgId: string; projectId
 
   const [uploading, setUploading] = useState<UploadingItem[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [category, setCategory] = useState<AttachmentCategory>("all");
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; filename: string } | null>(null);
   const [renameTarget, setRenameTarget] = useState<{ id: string; filename: string } | null>(null);
   const [previewTarget, setPreviewTarget] = useState<{ id: string; filename: string; mimeType: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dateFormatter = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
+
+  const filteredAttachments =
+    category === "all" ? attachments : attachments.filter((a) => categorizeAttachment(a.mimeType) === category);
+  const usagePercent = usage.quotaBytes > 0 ? Math.min(100, (usage.usedBytes / usage.quotaBytes) * 100) : 0;
+  const quotaExceeded = usage.usedBytes >= usage.quotaBytes;
 
   function handleFiles(files: FileList | File[]) {
     for (const file of Array.from(files)) {
@@ -99,31 +109,50 @@ export function AttachmentsView({ orgId, projectId }: { orgId: string; projectId
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+        <Progress value={usagePercent} className={`h-1.5 flex-1 ${quotaExceeded ? "[&>div]:bg-destructive" : ""}`} />
+        <span className="shrink-0 tabular-nums">
+          {t("attachments.storage.usage", {
+            used: formatFileSize(usage.usedBytes),
+            quota: formatFileSize(usage.quotaBytes),
+          })}
+        </span>
+      </div>
+
       {canCreate && (
         <div
           onDragOver={(e: DragEvent) => {
             e.preventDefault();
-            setIsDragging(true);
+            if (!quotaExceeded) setIsDragging(true);
           }}
           onDragLeave={() => setIsDragging(false)}
           onDrop={(e: DragEvent) => {
             e.preventDefault();
             setIsDragging(false);
-            if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files);
+            if (!quotaExceeded && e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files);
           }}
           className={`flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed p-6 text-center transition-colors ${
-            isDragging ? "border-accent bg-accent/5" : "border-border"
+            quotaExceeded
+              ? "cursor-not-allowed border-border opacity-50"
+              : isDragging
+                ? "border-accent bg-accent/5"
+                : "border-border"
           }`}
         >
           <Upload className="h-6 w-6 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">{t("attachments.dropzone.hint")}</p>
-          <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
-            {t("attachments.dropzone.browse")}
-          </Button>
+          <p className="text-sm text-muted-foreground">
+            {quotaExceeded ? t("attachments.storage.quotaExceeded") : t("attachments.dropzone.hint")}
+          </p>
+          {!quotaExceeded && (
+            <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+              {t("attachments.dropzone.browse")}
+            </Button>
+          )}
           <input
             ref={fileInputRef}
             type="file"
             multiple
+            disabled={quotaExceeded}
             className="hidden"
             onChange={(e: ChangeEvent<HTMLInputElement>) => {
               if (e.target.files && e.target.files.length > 0) handleFiles(e.target.files);
@@ -133,8 +162,26 @@ export function AttachmentsView({ orgId, projectId }: { orgId: string; projectId
         </div>
       )}
 
-      {attachments.length === 0 && uploading.length === 0 && (
-        <p className="text-sm text-muted-foreground">{t("attachments.list.empty")}</p>
+      {attachments.length > 0 && (
+        <div className="flex gap-1">
+          {CATEGORIES.map((c) => (
+            <Button
+              key={c}
+              type="button"
+              size="sm"
+              variant={category === c ? "secondary" : "ghost"}
+              onClick={() => setCategory(c)}
+            >
+              {t(`attachments.filter.${c}`)}
+            </Button>
+          ))}
+        </div>
+      )}
+
+      {filteredAttachments.length === 0 && uploading.length === 0 && (
+        <p className="text-sm text-muted-foreground">
+          {attachments.length === 0 ? t("attachments.list.empty") : t("attachments.filter.empty")}
+        </p>
       )}
 
       <AttachmentGroup className="flex-col overflow-visible">
@@ -150,7 +197,7 @@ export function AttachmentsView({ orgId, projectId }: { orgId: string; projectId
           </Attachment>
         ))}
 
-        {attachments.map((attachment) => (
+        {filteredAttachments.map((attachment) => (
           <AttachmentCard
             key={attachment.id}
             attachment={attachment}

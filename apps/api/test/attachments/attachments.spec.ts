@@ -274,6 +274,55 @@ describe("Attachments (files.md) — presigned upload/download на реальн
     });
   });
 
+  describe("Квота хранилища проекта (files.md §4 доп. — PROJECT_STORAGE_QUOTA_BYTES = 250 MB)", () => {
+    const getUsage = (pid: string, tok: string) =>
+      request(app.getHttpServer())
+        .get(`/v1/projects/${pid}/attachments/storage-usage`)
+        .set("Authorization", `Bearer ${tok}`);
+
+    it("storage-usage возвращает 0 на пустом проекте и растёт после подтверждённой загрузки", async () => {
+      const empty = await getUsage(projectId, token).expect(200);
+      expect(empty.body.data).toEqual({ usedBytes: 0, quotaBytes: 250 * 1024 * 1024 });
+
+      const bytes = Buffer.from("usage tracked");
+      const created = await createUploadUrl(projectId, token, {
+        filename: "usage.txt",
+        mimeType: "text/plain",
+        sizeBytes: bytes.length,
+      }).expect(201);
+      await uploadRealFile(created.body.data.uploadUrl, bytes, "text/plain");
+      await confirm(projectId, created.body.data.attachmentId, token).expect(201);
+
+      const after = await getUsage(projectId, token).expect(200);
+      expect(after.body.data.usedBytes).toBe(bytes.length);
+    });
+
+    it("upload-url с заявленным sizeBytes, который превысил бы квоту → 400, до похода в S3", async () => {
+      await createUploadUrl(projectId, token, {
+        filename: "huge.bin",
+        mimeType: "application/octet-stream",
+        sizeBytes: 251 * 1024 * 1024,
+      }).expect(400);
+    });
+
+    it("confirm с реальным размером, превышающим квоту → 400, объект удалён из S3, usage не растёт", async () => {
+      // sizeBytes заявлен маленьким (проходит upload-url), но реально льём больше квоты.
+      const bytes = Buffer.alloc(251 * 1024 * 1024, "x");
+      const created = await createUploadUrl(projectId, token, {
+        filename: "lied-about-size.bin",
+        mimeType: "application/octet-stream",
+        sizeBytes: 10,
+      }).expect(201);
+      await uploadRealFile(created.body.data.uploadUrl, bytes, "application/octet-stream");
+
+      await confirm(projectId, created.body.data.attachmentId, token).expect(400);
+
+      const usage = await getUsage(projectId, token).expect(200);
+      expect(usage.body.data.usedBytes).toBe(0);
+      await downloadUrl(projectId, created.body.data.attachmentId, token).expect(404);
+    });
+  });
+
   it("tenant: чужая орга → 404 на все эндпоинты", async () => {
     const stranger = await signUp(app);
     await createUploadUrl(projectId, stranger.token, { filename: "x.txt", mimeType: "text/plain", sizeBytes: 10 }).expect(404);

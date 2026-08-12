@@ -8,6 +8,7 @@ import {
   type CreateUploadUrlInput,
   type DownloadUrlQuery,
   type DownloadUrlResponse,
+  type StorageUsageResponse,
   type UpdateAttachmentInput,
   type UploadUrlResponse,
 } from "@helix/api-schemas";
@@ -54,6 +55,15 @@ export class AttachmentsController {
     @Param("projectId") projectId: string,
   ): Promise<AttachmentResponse[]> {
     return this.attachments.list(auth.activeOrgId, projectId);
+  }
+
+  @Get("storage-usage")
+  @CheckPolicy("read", "Attachment")
+  getStorageUsage(
+    @CurrentAuth() auth: AuthContext,
+    @Param("projectId") projectId: string,
+  ): Promise<StorageUsageResponse> {
+    return this.attachments.getStorageUsage(auth.activeOrgId, projectId);
   }
 
   @Get(":attachmentId/download-url")

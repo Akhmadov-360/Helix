@@ -2,14 +2,17 @@ import { randomUUID } from "node:crypto";
 import { Injectable } from "@nestjs/common";
 import {
   MAX_ATTACHMENT_SIZE_BYTES,
+  PROJECT_STORAGE_QUOTA_BYTES,
   type AttachmentResponse,
   type CreateUploadUrlInput,
+  type StorageUsageResponse,
   type UpdateAttachmentInput,
   type UploadUrlResponse,
 } from "@helix/api-schemas";
 import {
   AttachmentTooLargeError,
   AttachmentUploadNotConfirmedError,
+  ProjectStorageQuotaExceededError,
   ResourceNotFoundError,
 } from "../../core/errors/domain-error";
 import { S3Service } from "../../core/storage/s3.service";
@@ -32,6 +35,14 @@ export class AttachmentsService {
     dto: CreateUploadUrlInput,
   ): Promise<UploadUrlResponse> {
     await this.assertProjectInOrg(orgId, projectId);
+
+    // Ранний отказ по заявленному размеру — экономит клиенту бесполезный PUT в S3. Настоящая
+    // граница — повторная проверка в confirm() по реальному sizeBytes (тот же паттерн двойной
+    // проверки, что MAX_ATTACHMENT_SIZE_BYTES).
+    const used = await this.attachments.sumConfirmedSizeByProject(projectId, orgId);
+    if (used + dto.sizeBytes > PROJECT_STORAGE_QUOTA_BYTES) {
+      throw new ProjectStorageQuotaExceededError();
+    }
 
     const attachmentId = randomUUID();
     const storageKey = buildStorageKey(orgId, projectId, attachmentId, dto.filename);
@@ -70,8 +81,24 @@ export class AttachmentsService {
       throw new AttachmentTooLargeError();
     }
 
+    // Реальный размер может отличаться от заявленного на upload-url — сверяем квоту повторно
+    // (defense-in-depth); строка ещё не подтверждена, поэтому sum её не учитывает.
+    const used = await this.attachments.sumConfirmedSizeByProject(projectId, orgId);
+    if (used + head.sizeBytes > PROJECT_STORAGE_QUOTA_BYTES) {
+      await this.s3.deleteObject(row.storageKey);
+      await this.attachments.delete(attachmentId);
+      throw new ProjectStorageQuotaExceededError();
+    }
+
     await this.attachments.confirm(attachmentId);
     return toAttachmentResponse({ ...row, confirmedAt: new Date() });
+  }
+
+  /** files.md §4 (доп.) — для полоски прогресса на фронте. */
+  async getStorageUsage(orgId: string, projectId: string): Promise<StorageUsageResponse> {
+    await this.assertProjectInOrg(orgId, projectId);
+    const usedBytes = await this.attachments.sumConfirmedSizeByProject(projectId, orgId);
+    return { usedBytes, quotaBytes: PROJECT_STORAGE_QUOTA_BYTES };
   }
 
   async list(orgId: string, projectId: string): Promise<AttachmentResponse[]> {

@@ -388,3 +388,12 @@ export class AttachmentTooLargeError extends BadRequestError {
     super("File exceeds the maximum allowed size");
   }
 }
+
+/** files.md §4 (доп.): загрузка превысила бы PROJECT_STORAGE_QUOTA_BYTES проекта. */
+export class ProjectStorageQuotaExceededError extends BadRequestError {
+  readonly code = "PROJECT_STORAGE_QUOTA_EXCEEDED";
+
+  constructor() {
+    super("Project storage quota exceeded");
+  }
+}

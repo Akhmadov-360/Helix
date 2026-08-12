@@ -5,6 +5,12 @@ import { z } from "zod";
 // MAX_LOGO_FILE_BYTES в organizations.ts.
 export const MAX_ATTACHMENT_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
 
+// files.md §4 (доп.) — суммарный объём подтверждённых вложений одного проекта. Фиксированная
+// константа для этого прохода; когда появится тарификация аккаунта владельца, эта цифра станет
+// производной от плана организации (см. решение при обсуждении фичи) — сейчас нет ни одного поля
+// тарифа в домене, вводить его сейчас было бы спекулятивной структурой.
+export const PROJECT_STORAGE_QUOTA_BYTES = 250 * 1024 * 1024; // 250 MB
+
 // §3, шаг 1 — выдача presigned PUT URL. sizeBytes — заявленный клиентом, ранний UX-отказ (не
 // единственная граница размера, см. §3/§4 — реальный размер сверяется на confirm).
 export const createUploadUrlSchema = z.object({
@@ -52,3 +58,10 @@ export const updateAttachmentSchema = z.object({
   filename: z.string().trim().min(1).max(255),
 });
 export type UpdateAttachmentInput = z.infer<typeof updateAttachmentSchema>;
+
+// §4 (доп.) — использование квоты проекта, для полоски прогресса на фронте.
+export const storageUsageResponseSchema = z.object({
+  usedBytes: z.number(),
+  quotaBytes: z.number(),
+});
+export type StorageUsageResponse = z.infer<typeof storageUsageResponseSchema>;

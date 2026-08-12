@@ -12,7 +12,7 @@ import {
 import { queryKeys, request } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
 import { toAttachmentError } from "./attachment-error";
-import { projectAttachmentsQueryOptions } from "./queries";
+import { projectAttachmentsQueryOptions, projectStorageUsageQueryOptions } from "./queries";
 
 function attachmentErrorKey(kind: ReturnType<typeof toAttachmentError>): MessageKey {
   switch (kind) {
@@ -24,6 +24,8 @@ function attachmentErrorKey(kind: ReturnType<typeof toAttachmentError>): Message
       return "attachments.error.tooLarge";
     case "uploadNotConfirmed":
       return "attachments.error.uploadNotConfirmed";
+    case "quotaExceeded":
+      return "attachments.error.quotaExceeded";
     default:
       return "attachments.error.unexpected";
   }
@@ -85,6 +87,7 @@ export function useUploadAttachment(orgId: string, projectId: string) {
     },
     onSuccess: (attachment) => {
       queryClient.setQueryData<AttachmentResponse[]>(queryKey, (current) => [attachment, ...(current ?? [])]);
+      void queryClient.invalidateQueries({ queryKey: projectStorageUsageQueryOptions(orgId, projectId).queryKey });
       toast.success(t("attachments.upload.success", { filename: attachment.filename }));
     },
   });
@@ -118,6 +121,7 @@ export function useDeleteAttachment(orgId: string, projectId: string) {
       toast.error(t(attachmentErrorKey(kind)));
     },
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: projectStorageUsageQueryOptions(orgId, projectId).queryKey });
       toast.success(t("attachments.delete.success"));
     },
   });

@@ -102,4 +102,13 @@ export class AttachmentsRepository {
     const { count } = await this.prisma.client.attachment.deleteMany({ where: { id: { in: ids } } });
     return count;
   }
+
+  /** files.md §4 (доп.) — сумма подтверждённых вложений проекта, для квоты хранилища. */
+  async sumConfirmedSizeByProject(projectId: string, orgId: string): Promise<number> {
+    const { _sum } = await this.prisma.client.attachment.aggregate({
+      where: { projectId, orgId, confirmedAt: { not: null } },
+      _sum: { sizeBytes: true },
+    });
+    return _sum.sizeBytes ?? 0;
+  }
 }

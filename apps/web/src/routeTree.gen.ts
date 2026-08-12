@@ -34,6 +34,8 @@ import { Route as AuthenticatedProjectsProjectIdTasksRouteImport } from './route
 import { Route as AuthenticatedWorkspacesWorkspaceIdIndexRouteImport } from './routes/_authenticated/workspaces/$workspaceId/index'
 import { Route as AuthenticatedWorkspacesWorkspaceIdBoardRouteImport } from './routes/_authenticated/workspaces/$workspaceId/board'
 import { Route as AuthenticatedWorkspacesWorkspaceIdFieldsRouteImport } from './routes/_authenticated/workspaces/$workspaceId/fields'
+import { Route as AuthenticatedProjectsProjectIdPagesIndexRouteImport } from './routes/_authenticated/projects/$projectId/pages/index'
+import { Route as AuthenticatedProjectsProjectIdPagesPageIdRouteImport } from './routes/_authenticated/projects/$projectId/pages/$pageId'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/_auth',
@@ -175,6 +177,18 @@ const AuthenticatedWorkspacesWorkspaceIdFieldsRoute =
     path: '/workspaces/$workspaceId/fields',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedProjectsProjectIdPagesIndexRoute =
+  AuthenticatedProjectsProjectIdPagesIndexRouteImport.update({
+    id: '/pages/',
+    path: '/pages/',
+    getParentRoute: () => AuthenticatedProjectsProjectIdRoute,
+  } as any)
+const AuthenticatedProjectsProjectIdPagesPageIdRoute =
+  AuthenticatedProjectsProjectIdPagesPageIdRouteImport.update({
+    id: '/pages/$pageId',
+    path: '/pages/$pageId',
+    getParentRoute: () => AuthenticatedProjectsProjectIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -200,6 +214,8 @@ export interface FileRoutesByFullPath {
   '/workspaces/$workspaceId/fields': typeof AuthenticatedWorkspacesWorkspaceIdFieldsRoute
   '/projects/$projectId/': typeof AuthenticatedProjectsProjectIdIndexRoute
   '/workspaces/$workspaceId/': typeof AuthenticatedWorkspacesWorkspaceIdIndexRoute
+  '/projects/$projectId/pages/$pageId': typeof AuthenticatedProjectsProjectIdPagesPageIdRoute
+  '/projects/$projectId/pages/': typeof AuthenticatedProjectsProjectIdPagesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof AuthenticatedIndexRoute
@@ -224,6 +240,8 @@ export interface FileRoutesByTo {
   '/workspaces/$workspaceId/fields': typeof AuthenticatedWorkspacesWorkspaceIdFieldsRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdIndexRoute
   '/workspaces/$workspaceId': typeof AuthenticatedWorkspacesWorkspaceIdIndexRoute
+  '/projects/$projectId/pages/$pageId': typeof AuthenticatedProjectsProjectIdPagesPageIdRoute
+  '/projects/$projectId/pages': typeof AuthenticatedProjectsProjectIdPagesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -252,6 +270,8 @@ export interface FileRoutesById {
   '/_authenticated/workspaces/$workspaceId/fields': typeof AuthenticatedWorkspacesWorkspaceIdFieldsRoute
   '/_authenticated/projects/$projectId/': typeof AuthenticatedProjectsProjectIdIndexRoute
   '/_authenticated/workspaces/$workspaceId/': typeof AuthenticatedWorkspacesWorkspaceIdIndexRoute
+  '/_authenticated/projects/$projectId/pages/$pageId': typeof AuthenticatedProjectsProjectIdPagesPageIdRoute
+  '/_authenticated/projects/$projectId/pages/': typeof AuthenticatedProjectsProjectIdPagesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -279,6 +299,8 @@ export interface FileRouteTypes {
     | '/workspaces/$workspaceId/fields'
     | '/projects/$projectId/'
     | '/workspaces/$workspaceId/'
+    | '/projects/$projectId/pages/$pageId'
+    | '/projects/$projectId/pages/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -303,6 +325,8 @@ export interface FileRouteTypes {
     | '/workspaces/$workspaceId/fields'
     | '/projects/$projectId'
     | '/workspaces/$workspaceId'
+    | '/projects/$projectId/pages/$pageId'
+    | '/projects/$projectId/pages'
   id:
     | '__root__'
     | '/_auth'
@@ -330,6 +354,8 @@ export interface FileRouteTypes {
     | '/_authenticated/workspaces/$workspaceId/fields'
     | '/_authenticated/projects/$projectId/'
     | '/_authenticated/workspaces/$workspaceId/'
+    | '/_authenticated/projects/$projectId/pages/$pageId'
+    | '/_authenticated/projects/$projectId/pages/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -515,6 +541,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWorkspacesWorkspaceIdFieldsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/projects/$projectId/pages/': {
+      id: '/_authenticated/projects/$projectId/pages/'
+      path: '/pages'
+      fullPath: '/projects/$projectId/pages/'
+      preLoaderRoute: typeof AuthenticatedProjectsProjectIdPagesIndexRouteImport
+      parentRoute: typeof AuthenticatedProjectsProjectIdRoute
+    }
+    '/_authenticated/projects/$projectId/pages/$pageId': {
+      id: '/_authenticated/projects/$projectId/pages/$pageId'
+      path: '/pages/$pageId'
+      fullPath: '/projects/$projectId/pages/$pageId'
+      preLoaderRoute: typeof AuthenticatedProjectsProjectIdPagesPageIdRouteImport
+      parentRoute: typeof AuthenticatedProjectsProjectIdRoute
+    }
   }
 }
 
@@ -540,6 +580,8 @@ interface AuthenticatedProjectsProjectIdRouteChildren {
   AuthenticatedProjectsProjectIdFilesRoute: typeof AuthenticatedProjectsProjectIdFilesRoute
   AuthenticatedProjectsProjectIdTasksRoute: typeof AuthenticatedProjectsProjectIdTasksRoute
   AuthenticatedProjectsProjectIdIndexRoute: typeof AuthenticatedProjectsProjectIdIndexRoute
+  AuthenticatedProjectsProjectIdPagesPageIdRoute: typeof AuthenticatedProjectsProjectIdPagesPageIdRoute
+  AuthenticatedProjectsProjectIdPagesIndexRoute: typeof AuthenticatedProjectsProjectIdPagesIndexRoute
 }
 
 const AuthenticatedProjectsProjectIdRouteChildren: AuthenticatedProjectsProjectIdRouteChildren =
@@ -554,6 +596,10 @@ const AuthenticatedProjectsProjectIdRouteChildren: AuthenticatedProjectsProjectI
       AuthenticatedProjectsProjectIdTasksRoute,
     AuthenticatedProjectsProjectIdIndexRoute:
       AuthenticatedProjectsProjectIdIndexRoute,
+    AuthenticatedProjectsProjectIdPagesPageIdRoute:
+      AuthenticatedProjectsProjectIdPagesPageIdRoute,
+    AuthenticatedProjectsProjectIdPagesIndexRoute:
+      AuthenticatedProjectsProjectIdPagesIndexRoute,
   }
 
 const AuthenticatedProjectsProjectIdRouteWithChildren =
