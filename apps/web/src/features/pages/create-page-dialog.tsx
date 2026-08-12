@@ -31,7 +31,7 @@ export function CreatePageDialog({
         onSuccess: (page) => {
           setTitle("");
           onOpenChange(false);
-          void navigate({ to: "/projects/$projectId/pages/$pageId", params: { projectId, pageId: page.id } });
+          void navigate({ to: "/pages/$pageId", params: { pageId: page.id } });
         },
       },
     );

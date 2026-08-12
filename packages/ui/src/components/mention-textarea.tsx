@@ -12,7 +12,9 @@ import Mention from "@tiptap/extension-mention";
 import Placeholder from "@tiptap/extension-placeholder";
 import type { SuggestionKeyDownProps, SuggestionProps } from "@tiptap/suggestion";
 import StarterKit from "@tiptap/starter-kit";
+import { Send } from "lucide-react";
 import { cn } from "../lib/cn";
+import { Button } from "./button";
 
 export interface MentionCandidate {
   id: string;
@@ -32,6 +34,8 @@ export interface MentionTextareaProps {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  /** aria-label кнопки отправки — компонент без i18n, подпись приходит из вызывающего кода. */
+  sendLabel?: string;
 }
 
 // pages-kb.md §2 — PageComment.body: простой текст с "@Имя" как обычной подстрокой; бэкенд НЕ
@@ -41,7 +45,7 @@ export interface MentionTextareaProps {
 // @tiptap/extension-mention + @tiptap/suggestion; ручной трекинг курсора в <textarea> заново
 // изобретал бы то же самое куда более хрупким кодом.
 export const MentionTextarea = forwardRef<MentionTextareaHandle, MentionTextareaProps>(
-  function MentionTextarea({ candidates, onSubmit, placeholder, className, disabled }, ref) {
+  function MentionTextarea({ candidates, onSubmit, placeholder, className, disabled, sendLabel }, ref) {
     // Suggestion.items — не-реактивный колбэк TipTap-расширения (конфигурируется один раз при
     // создании editor); ref держит актуальный список кандидатов без пересоздания editor на каждый
     // рендер родителя.
@@ -52,6 +56,9 @@ export const MentionTextarea = forwardRef<MentionTextareaHandle, MentionTextarea
     const suggestionOpenRef = useRef(false);
 
     const submitRef = useRef<() => void>(() => {});
+    // Кнопка отправки должна реагировать на пустоту редактора — editor.isEmpty сам по себе не
+    // реактивен для React (меняется внутри ProseMirror, не через props/state).
+    const [isEmpty, setIsEmpty] = useState(true);
 
     const editor = useEditor({
       extensions: [
@@ -83,6 +90,7 @@ export const MentionTextarea = forwardRef<MentionTextareaHandle, MentionTextarea
       ],
       editable: !disabled,
       immediatelyRender: true,
+      onUpdate: ({ editor: e }) => setIsEmpty(e.isEmpty),
       editorProps: {
         attributes: { class: "tiptap-mention min-h-6 text-sm focus:outline-none" },
         handleKeyDown: (_view, event) => {
@@ -130,12 +138,23 @@ export const MentionTextarea = forwardRef<MentionTextareaHandle, MentionTextarea
       <div
         onKeyDown={onContainerKeyDown}
         className={cn(
-          "flex min-h-10 w-full rounded-md border border-input bg-background px-3 py-2 ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
+          "flex min-h-10 w-full items-end gap-2 rounded-md border border-input bg-background px-3 py-2 ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
           disabled && "cursor-not-allowed opacity-50",
           className,
         )}
       >
         <EditorContent editor={editor} className="w-full" />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="shrink-0"
+          aria-label={sendLabel ?? "Send"}
+          disabled={disabled || isEmpty}
+          onClick={() => submitRef.current()}
+        >
+          <Send className="h-4 w-4" />
+        </Button>
       </div>
     );
   },
@@ -233,11 +252,25 @@ function createSuggestionRenderer(suggestionOpenRef: { current: boolean }) {
     let component: ReactRenderer<MentionListHandle, MentionListProps>;
     let popup: HTMLDivElement;
 
+    // Список — до 8 кандидатов (см. items.slice(0,8) выше), ~36px строка + паддинг попапа —
+    // достаточная верхняя оценка высоты без ожидания реального layout попапа.
+    const POPUP_MAX_HEIGHT = 260;
+
     const position = (clientRect: (() => DOMRect | null) | null | undefined) => {
       const rect = clientRect?.();
       if (!rect || !popup) return;
-      popup.style.top = `${rect.bottom + 4}px`;
+      // Попап рядом с полем ввода внизу страницы (комментарии) упирался в низ вьюпорта —
+      // переворачиваем вверх, если снизу тесно, а сверху реально просторнее.
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const showAbove = spaceBelow < POPUP_MAX_HEIGHT + 8 && rect.top > spaceBelow;
       popup.style.left = `${rect.left}px`;
+      if (showAbove) {
+        popup.style.top = "";
+        popup.style.bottom = `${window.innerHeight - rect.top + 4}px`;
+      } else {
+        popup.style.bottom = "";
+        popup.style.top = `${rect.bottom + 4}px`;
+      }
     };
 
     return {

@@ -10,6 +10,7 @@ import {
   MessageGroup,
   MessageHeader,
   MentionTextarea,
+  ScrollArea,
   type MentionTextareaHandle,
 } from "@helix/ui";
 import { useMe } from "../../shared/auth/session";
@@ -73,49 +74,52 @@ export function PageComments({ orgId, pageId }: { orgId: string; pageId: string 
       {comments.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t("pages.comments.empty")}</p>
       ) : (
-        // max-h + overflow — длинная переписка не растягивает страницу до бесконечности; сама
-        // страница уже скроллится, второй независимый скролл-контейнер тут был бы лишним.
-        <MessageGroup className="max-h-[420px] overflow-y-auto pr-1">
-          {comments.map((comment) => {
-            const authorName = comment.authorName ?? t("pages.comments.deletedAuthor");
-            return (
-              <Message key={comment.id}>
-                <MessageAvatar>
-                  <Avatar name={authorName} size="sm" />
-                </MessageAvatar>
-                <MessageContent>
-                  <MessageHeader>
-                    <span>{authorName}</span>
-                    <span className="ml-2">{dateFormatter.format(new Date(comment.createdAt))}</span>
-                    {(canDelete || comment.authorId === me.id) && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-xs"
-                        aria-label={t("pages.comments.delete")}
-                        className="ml-auto"
-                        onClick={() => deleteComment.mutate({ commentId: comment.id })}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    )}
-                  </MessageHeader>
-                  <p className="whitespace-pre-wrap px-3 text-sm">
-                    {highlightMentions(comment.body, memberNames).map((part, i) => (
-                      <Fragment key={i}>{part}</Fragment>
-                    ))}
-                  </p>
-                </MessageContent>
-              </Message>
-            );
-          })}
-        </MessageGroup>
+        // Ограничение высоты — длинная переписка не растягивает страницу до бесконечности;
+        // ScrollArea (shadcn), а не голый overflow-y-auto — тонкий скроллбар в стиле остального UI.
+        <ScrollArea className="h-[420px] rounded-md border border-border">
+          <MessageGroup className="p-3">
+            {comments.map((comment) => {
+              const authorName = comment.authorName ?? t("pages.comments.deletedAuthor");
+              return (
+                <Message key={comment.id}>
+                  <MessageAvatar>
+                    <Avatar name={authorName} size="sm" />
+                  </MessageAvatar>
+                  <MessageContent>
+                    <MessageHeader>
+                      <span>{authorName}</span>
+                      <span className="ml-2">{dateFormatter.format(new Date(comment.createdAt))}</span>
+                      {(canDelete || comment.authorId === me.id) && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-xs"
+                          aria-label={t("pages.comments.delete")}
+                          className="ml-auto"
+                          onClick={() => deleteComment.mutate({ commentId: comment.id })}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </MessageHeader>
+                    <p className="whitespace-pre-wrap px-3 text-sm">
+                      {highlightMentions(comment.body, memberNames).map((part, i) => (
+                        <Fragment key={i}>{part}</Fragment>
+                      ))}
+                    </p>
+                  </MessageContent>
+                </Message>
+              );
+            })}
+          </MessageGroup>
+        </ScrollArea>
       )}
 
       <MentionTextarea
         ref={inputRef}
         candidates={candidates}
         placeholder={t("pages.comments.placeholder")}
+        sendLabel={t("pages.comments.send")}
         disabled={addComment.isPending}
         onSubmit={({ body, mentionedUserIds }) => addComment.mutate({ body, mentionedUserIds })}
       />

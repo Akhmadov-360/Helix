@@ -107,6 +107,7 @@ export {
   useMessageScrollerVisibility,
 } from "./components/message-scroller";
 export { Progress } from "./components/progress";
+export { ScrollArea, ScrollBar } from "./components/scroll-area";
 export { RichTextEditor, type RichTextEditorProps } from "./components/rich-text-editor";
 export {
   MentionTextarea,

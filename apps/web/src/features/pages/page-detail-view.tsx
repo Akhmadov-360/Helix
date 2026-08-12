@@ -1,9 +1,9 @@
 import { useRef, useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import type { PageResponse, UpdatePageInput } from "@helix/api-schemas";
 import { Button, RichTextEditor } from "@helix/ui";
-import { Check, Loader2, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, Loader2, Pencil, Trash2 } from "lucide-react";
 import { useCan } from "../../shared/auth/ability";
 import { useT } from "../../shared/i18n";
 import { DeletePageDialog } from "./delete-page-dialog";
@@ -14,40 +14,32 @@ import { pageQueryOptions } from "./queries";
 const AUTOSAVE_DELAY_MS = 1200;
 type SaveStatus = "idle" | "saving" | "saved";
 
-export function PageDetailView({ orgId, projectId, pageId }: { orgId: string; projectId: string; pageId: string }) {
+// Вне ProjectDetailShell (design review: "чтобы комментарии имели больше места") — своя,
+// отдельная от табов сделки страница; projectId для навигации назад берётся из самой PageResponse.
+export function PageDetailView({ orgId, pageId }: { orgId: string; pageId: string }) {
   const page = useSuspenseQuery(pageQueryOptions(orgId, pageId)).data;
   const canUpdate = useCan("Page.update");
   const canDelete = useCan("Page.delete");
 
   // key=page.id — переключение на другую страницу ремонтирует редактор с новым начальным
   // содержимым (RichTextEditor читает content один раз при монтировании, см. её комментарий).
-  return (
-    <PageEditor
-      key={page.id}
-      orgId={orgId}
-      projectId={projectId}
-      page={page}
-      canUpdate={canUpdate}
-      canDelete={canDelete}
-    />
-  );
+  return <PageEditor key={page.id} orgId={orgId} page={page} canUpdate={canUpdate} canDelete={canDelete} />;
 }
 
 function PageEditor({
   orgId,
-  projectId,
   page,
   canUpdate,
   canDelete,
 }: {
   orgId: string;
-  projectId: string;
   page: PageResponse;
   canUpdate: boolean;
   canDelete: boolean;
 }) {
   const t = useT();
   const navigate = useNavigate();
+  const projectId = page.projectId;
   const update = useUpdatePage(orgId, projectId, page.id);
 
   const [title, setTitle] = useState(page.title);
@@ -68,7 +60,16 @@ function PageEditor({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="mx-auto flex max-w-3xl flex-col gap-3">
+      <Link
+        to="/projects/$projectId/pages"
+        params={{ projectId }}
+        className="flex w-fit items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" />
+        {t("pages.detail.backToList")}
+      </Link>
+
       <div className="flex items-center gap-3">
         {canUpdate ? (
           <div className="group/title flex min-w-0 flex-1 items-center gap-1.5">

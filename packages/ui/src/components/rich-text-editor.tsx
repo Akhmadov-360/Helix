@@ -133,6 +133,10 @@ function ToolbarButton({
       size="icon-sm"
       aria-label={label}
       aria-pressed={active}
+      // variant="secondary" один был недостаточно заметен рядом с ghost-hover (design review:
+      // "непонятно, активно оно или нет") — кольцо добавляет однозначный "нажатый" контур,
+      // не завязанный на то, что hover случайно совпадёт по контрасту с активным фоном.
+      className={cn(active && "ring-1 ring-inset ring-primary/40")}
       onClick={onClick}
     >
       {children}

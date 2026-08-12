@@ -41,8 +41,8 @@ export function PagesListView({ orgId, projectId }: { orgId: string; projectId: 
           {pages.map((page) => (
             <li key={page.id} className="group flex items-center justify-between gap-2 px-3 py-2.5">
               <Link
-                to="/projects/$projectId/pages/$pageId"
-                params={{ projectId, pageId: page.id }}
+                to="/pages/$pageId"
+                params={{ pageId: page.id }}
                 className="flex min-w-0 flex-1 items-center gap-2 text-sm hover:underline"
               >
                 <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
