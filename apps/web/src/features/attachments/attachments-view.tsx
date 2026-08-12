@@ -21,7 +21,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@helix/ui";
-import { Download, Pencil, Trash2, Upload } from "lucide-react";
+import { Download, FolderSearch, Pencil, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { useCan } from "../../shared/auth/ability";
 import { useLocaleStore, useT } from "../../shared/i18n";
@@ -72,6 +72,16 @@ export function AttachmentsView({ orgId, projectId }: { orgId: string; projectId
     category === "all" ? attachments : attachments.filter((a) => categorizeAttachment(a.mimeType) === category);
   const usagePercent = usage.quotaBytes > 0 ? Math.min(100, (usage.usedBytes / usage.quotaBytes) * 100) : 0;
   const quotaExceeded = usage.usedBytes >= usage.quotaBytes;
+
+  // Счётчик на каждый чип фильтра — считаем один раз за рендер, не внутри .map (иначе O(n·4)
+  // проходов по attachments на каждый ререндер списка).
+  const categoryCounts: Record<AttachmentCategory, number> = {
+    all: attachments.length,
+    image: 0,
+    document: 0,
+    other: 0,
+  };
+  for (const a of attachments) categoryCounts[categorizeAttachment(a.mimeType)] += 1;
 
   function handleFiles(files: FileList | File[]) {
     for (const file of Array.from(files)) {
@@ -170,18 +180,29 @@ export function AttachmentsView({ orgId, projectId }: { orgId: string; projectId
               type="button"
               size="sm"
               variant={category === c ? "secondary" : "ghost"}
+              // Обнулённая категория остаётся кликабельной (не disabled) — выбрать её и увидеть
+              // пустое состояние с кнопкой сброса не хуже, чем не дать выбрать вовсе.
+              className={categoryCounts[c] === 0 ? "opacity-60" : undefined}
               onClick={() => setCategory(c)}
             >
-              {t(`attachments.filter.${c}`)}
+              {t(`attachments.filter.${c}`)} ({categoryCounts[c]})
             </Button>
           ))}
         </div>
       )}
 
-      {filteredAttachments.length === 0 && uploading.length === 0 && (
-        <p className="text-sm text-muted-foreground">
-          {attachments.length === 0 ? t("attachments.list.empty") : t("attachments.filter.empty")}
-        </p>
+      {attachments.length === 0 && uploading.length === 0 && (
+        <p className="text-sm text-muted-foreground">{t("attachments.list.empty")}</p>
+      )}
+
+      {attachments.length > 0 && filteredAttachments.length === 0 && uploading.length === 0 && (
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border py-10 text-center">
+          <FolderSearch className="h-8 w-8 text-muted-foreground" />
+          <p className="text-sm font-medium">{t("attachments.filter.emptyTitle")}</p>
+          <Button type="button" variant="outline" size="sm" onClick={() => setCategory("all")}>
+            {t("attachments.filter.reset")}
+          </Button>
+        </div>
       )}
 
       <AttachmentGroup className="flex-col overflow-visible">
@@ -270,8 +291,12 @@ function AttachmentCard({
   return (
     <ContextMenu>
       <ContextMenuTrigger>
-        <Attachment state="done" size="sm" className="w-full">
-          <AttachmentTrigger onClick={onPreview} aria-label={attachment.filename} />
+        {/* Клик по всей строке уже открывает превью — AttachmentTrigger примитива абсолютно
+            позиционирован на всю карточку (inset-0), кнопки действий поверх него (z-20) с
+            stopPropagation. cursor-pointer добавлен явно: <button> не наследует pointer от UA
+            stylesheet, в отличие от <a>. */}
+        <Attachment state="done" size="sm" className="w-full cursor-pointer transition-all">
+          <AttachmentTrigger onClick={onPreview} aria-label={attachment.filename} className="cursor-pointer" />
           <AttachmentMedia>
             <AttachmentIcon mimeType={attachment.mimeType} className="h-4 w-4" />
           </AttachmentMedia>
