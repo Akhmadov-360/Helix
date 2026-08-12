@@ -3,14 +3,14 @@ import { useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import type { KbArticleResponse, UpdateKbArticleInput } from "@helix/api-schemas";
 import { Button, Input, RichTextEditor } from "@helix/ui";
-import { Trash2 } from "lucide-react";
+import { Check, Loader2, Pencil, Trash2 } from "lucide-react";
 import { useCan } from "../../shared/auth/ability";
 import { useT } from "../../shared/i18n";
 import { DeleteKbArticleDialog } from "./delete-kb-article-dialog";
 import { useUpdateKbArticle } from "./mutations";
 import { kbArticleQueryOptions } from "./queries";
 
-const AUTOSAVE_DELAY_MS = 1500;
+const AUTOSAVE_DELAY_MS = 1200;
 type SaveStatus = "idle" | "saving" | "saved";
 
 export function KbDetailView({ orgId, articleId }: { orgId: string; articleId: string }) {
@@ -64,22 +64,36 @@ function ArticleEditor({
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-3">
         {canUpdate ? (
-          <input
-            value={title}
-            onChange={(e) => {
-              setTitle(e.target.value);
-              scheduleSave({ title: e.target.value });
-            }}
-            aria-label={t("kb.create.label")}
-            className="min-w-0 flex-1 bg-transparent text-xl font-semibold outline-none"
-          />
+          <div className="group/title flex min-w-0 flex-1 items-center gap-1.5">
+            <input
+              value={title}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                scheduleSave({ title: e.target.value });
+              }}
+              placeholder={t("pages.title.placeholder")}
+              aria-label={t("kb.create.label")}
+              className="min-w-0 flex-1 rounded-sm border-b border-dashed border-transparent bg-transparent px-0.5 -mx-0.5 text-xl font-semibold outline-none transition-colors placeholder:font-normal placeholder:text-muted-foreground group-hover/title:border-border focus-visible:border-border focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            />
+            <Pencil className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/title:opacity-100" />
+          </div>
         ) : (
-          <h1 className="min-w-0 flex-1 truncate text-xl font-semibold">{title}</h1>
+          <h1 className="min-w-0 flex-1 truncate text-xl font-semibold">{title || t("pages.title.placeholder")}</h1>
         )}
 
         {status !== "idle" && (
-          <span className="shrink-0 text-xs text-muted-foreground">
-            {status === "saving" ? t("pages.autosave.saving") : t("pages.autosave.saved")}
+          <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+            {status === "saving" ? (
+              <>
+                <Loader2 className="h-3 w-3 animate-spin" />
+                {t("pages.autosave.saving")}
+              </>
+            ) : (
+              <>
+                <Check className="h-3 w-3" />
+                {t("pages.autosave.saved")}
+              </>
+            )}
           </span>
         )}
 

@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { EditorContent, useEditor, type Editor, type JSONContent } from "@tiptap/react";
 import { TableKit } from "@tiptap/extension-table";
+import Placeholder from "@tiptap/extension-placeholder";
 import StarterKit from "@tiptap/starter-kit";
 import { Bold, Heading2, Italic, List, ListOrdered, Table as TableIcon } from "lucide-react";
 import { cn } from "../lib/cn";
@@ -32,6 +33,10 @@ export function RichTextEditor({ content, onChange, editable = true, placeholder
         horizontalRule: false,
       }),
       TableKit.configure({ table: { resizable: false } }),
+      // Плейсхолдер на пустом документе (не на каждом пустом параграфе — showOnlyWhenEditable
+      // + дефолтный emptyNodeClass достаточно для "первая строка пуста", того же приёма, что уже
+      // работает в mention-textarea.tsx, CSS уже есть в globals.css).
+      Placeholder.configure({ placeholder: placeholder ?? "" }),
     ],
     content: content as JSONContent | undefined,
     editable,
@@ -43,7 +48,6 @@ export function RichTextEditor({ content, onChange, editable = true, placeholder
           "tiptap min-h-[240px] rounded-md px-3 py-2 text-sm focus:outline-none",
           !editable && "px-0 py-0",
         ),
-        "data-placeholder": placeholder ?? "",
       },
     },
   });
