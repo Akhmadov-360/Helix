@@ -6,6 +6,7 @@ type SidebarRoute =
   | "/workspaces/$workspaceId/board"
   | "/contacts"
   | "/companies"
+  | "/kb"
   | "/settings/general"
   | "/settings/members"
   | "/settings/audit-log";

@@ -46,7 +46,7 @@ export function PagesListView({ orgId, projectId }: { orgId: string; projectId: 
                 className="flex min-w-0 flex-1 items-center gap-2 text-sm hover:underline"
               >
                 <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <span className="truncate">{page.title}</span>
+                <span className="min-w-0 flex-1 truncate">{page.title}</span>
                 <span className="shrink-0 text-xs text-muted-foreground">
                   {dateFormatter.format(new Date(page.updatedAt))}
                 </span>

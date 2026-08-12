@@ -36,6 +36,9 @@ export const queryKeys = {
   projectPages: (orgId: string, projectId: string) => ["org", orgId, "project", projectId, "pages"] as const,
   page: (orgId: string, pageId: string) => ["org", orgId, "page", pageId] as const,
   pageComments: (orgId: string, pageId: string) => ["org", orgId, "page", pageId, "comments"] as const,
+  kbArticles: (orgId: string, query: { workspaceId?: string; tag?: string; q?: string }) =>
+    ["org", orgId, "kbArticles", query] as const,
+  kbArticle: (orgId: string, articleId: string) => ["org", orgId, "kbArticle", articleId] as const,
   // Глобальная адресная книга (org-scoped, не workspace-scoped) — отдельная "list"-ветка от
   // contactSearch ("search"), чтобы инвалидация одного не путалась с другим, но оба под общим
   // ["org", orgId, "contacts"] — мутация контакта инвалидирует и то, и другое разом.

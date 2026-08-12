@@ -1,5 +1,5 @@
 import { useParams } from "@tanstack/react-router";
-import { Building2, KanbanSquare, ScrollText, Settings, Users, UsersRound } from "lucide-react";
+import { BookOpen, Building2, KanbanSquare, ScrollText, Settings, Users, UsersRound } from "lucide-react";
 import { LocaleSwitcher, useT } from "../../shared/i18n";
 import { getLastWorkspaceId } from "../../shared/lib/last-workspace";
 import { ThemeToggle } from "../../shared/theme";
@@ -12,10 +12,11 @@ import { WorkspacesSection } from "./workspaces-section";
 // управление фазами переехало на саму доску (trailing "+ колонка", rename/delete через меню
 // колонки) — отдельная страница /settings/phases удалена, дублировать функционал незачем.
 //
-// Контакты/Компании — org-scoped (не workspace-scoped): Contact/Company живут на уровне орги, не
-// воркспейса (docs/decisions.md — "org-scoped SHARED resource"), поэтому не гейтятся на
-// workspaceId и рендерятся рядом с "Доской" в ОДНОМ постоянном списке, а не внутри аккордеона —
-// этап 3 редизайна: permanent-links отделены от collapsible workspaces-секции ниже.
+// Контакты/Компании/База знаний — org-scoped (не workspace-scoped): Contact/Company живут на
+// уровне орги, не воркспейса (docs/decisions.md — "org-scoped SHARED resource"); KBArticle —
+// аналогично (workspaceId опционален, статья может быть org-wide, pages-kb.md §1). Поэтому не
+// гейтятся на workspaceId и рендерятся рядом с "Доской" в ОДНОМ постоянном списке, а не внутри
+// аккордеона — этап 3 редизайна: permanent-links отделены от collapsible workspaces-секции ниже.
 export function Sidebar({ orgId }: { orgId: string }) {
   const t = useT();
   // useParams({strict:false}) реактивен на текущий матч роута — если на нём есть :workspaceId
@@ -41,6 +42,7 @@ export function Sidebar({ orgId }: { orgId: string }) {
           )}
           <SidebarNavItem to="/contacts" icon={Users} label={t("sidebar.nav.contacts")} />
           <SidebarNavItem to="/companies" icon={Building2} label={t("sidebar.nav.companies")} />
+          <SidebarNavItem to="/kb" icon={BookOpen} label={t("sidebar.nav.kb")} />
         </div>
 
         <WorkspacesSection orgId={orgId} currentWorkspaceId={workspaceId} />

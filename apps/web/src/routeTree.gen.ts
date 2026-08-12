@@ -21,6 +21,8 @@ import { Route as AuthenticatedCompaniesIndexRouteImport } from './routes/_authe
 import { Route as AuthenticatedCompaniesCompanyIdRouteImport } from './routes/_authenticated/companies/$companyId'
 import { Route as AuthenticatedContactsIndexRouteImport } from './routes/_authenticated/contacts/index'
 import { Route as AuthenticatedContactsContactIdRouteImport } from './routes/_authenticated/contacts/$contactId'
+import { Route as AuthenticatedKbIndexRouteImport } from './routes/_authenticated/kb/index'
+import { Route as AuthenticatedKbArticleIdRouteImport } from './routes/_authenticated/kb/$articleId'
 import { Route as AuthenticatedProjectsProjectIdRouteImport } from './routes/_authenticated/projects/$projectId'
 import { Route as AuthenticatedSettingsAuditLogRouteImport } from './routes/_authenticated/settings/audit-log'
 import { Route as AuthenticatedSettingsGeneralRouteImport } from './routes/_authenticated/settings/general'
@@ -97,6 +99,17 @@ const AuthenticatedContactsContactIdRoute =
   AuthenticatedContactsContactIdRouteImport.update({
     id: '/contacts/$contactId',
     path: '/contacts/$contactId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedKbIndexRoute = AuthenticatedKbIndexRouteImport.update({
+  id: '/kb/',
+  path: '/kb/',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedKbArticleIdRoute =
+  AuthenticatedKbArticleIdRouteImport.update({
+    id: '/kb/$articleId',
+    path: '/kb/$articleId',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedProjectsProjectIdRoute =
@@ -199,12 +212,14 @@ export interface FileRoutesByFullPath {
   '/invite/accept': typeof InviteAcceptRoute
   '/companies/$companyId': typeof AuthenticatedCompaniesCompanyIdRoute
   '/contacts/$contactId': typeof AuthenticatedContactsContactIdRoute
+  '/kb/$articleId': typeof AuthenticatedKbArticleIdRoute
   '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRouteWithChildren
   '/settings/audit-log': typeof AuthenticatedSettingsAuditLogRoute
   '/settings/general': typeof AuthenticatedSettingsGeneralRoute
   '/settings/members': typeof AuthenticatedSettingsMembersRoute
   '/companies/': typeof AuthenticatedCompaniesIndexRoute
   '/contacts/': typeof AuthenticatedContactsIndexRoute
+  '/kb/': typeof AuthenticatedKbIndexRoute
   '/workspaces/': typeof AuthenticatedWorkspacesIndexRoute
   '/projects/$projectId/activity': typeof AuthenticatedProjectsProjectIdActivityRoute
   '/projects/$projectId/contacts': typeof AuthenticatedProjectsProjectIdContactsRoute
@@ -226,11 +241,13 @@ export interface FileRoutesByTo {
   '/invite/accept': typeof InviteAcceptRoute
   '/companies/$companyId': typeof AuthenticatedCompaniesCompanyIdRoute
   '/contacts/$contactId': typeof AuthenticatedContactsContactIdRoute
+  '/kb/$articleId': typeof AuthenticatedKbArticleIdRoute
   '/settings/audit-log': typeof AuthenticatedSettingsAuditLogRoute
   '/settings/general': typeof AuthenticatedSettingsGeneralRoute
   '/settings/members': typeof AuthenticatedSettingsMembersRoute
   '/companies': typeof AuthenticatedCompaniesIndexRoute
   '/contacts': typeof AuthenticatedContactsIndexRoute
+  '/kb': typeof AuthenticatedKbIndexRoute
   '/workspaces': typeof AuthenticatedWorkspacesIndexRoute
   '/projects/$projectId/activity': typeof AuthenticatedProjectsProjectIdActivityRoute
   '/projects/$projectId/contacts': typeof AuthenticatedProjectsProjectIdContactsRoute
@@ -255,12 +272,14 @@ export interface FileRoutesById {
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/companies/$companyId': typeof AuthenticatedCompaniesCompanyIdRoute
   '/_authenticated/contacts/$contactId': typeof AuthenticatedContactsContactIdRoute
+  '/_authenticated/kb/$articleId': typeof AuthenticatedKbArticleIdRoute
   '/_authenticated/projects/$projectId': typeof AuthenticatedProjectsProjectIdRouteWithChildren
   '/_authenticated/settings/audit-log': typeof AuthenticatedSettingsAuditLogRoute
   '/_authenticated/settings/general': typeof AuthenticatedSettingsGeneralRoute
   '/_authenticated/settings/members': typeof AuthenticatedSettingsMembersRoute
   '/_authenticated/companies/': typeof AuthenticatedCompaniesIndexRoute
   '/_authenticated/contacts/': typeof AuthenticatedContactsIndexRoute
+  '/_authenticated/kb/': typeof AuthenticatedKbIndexRoute
   '/_authenticated/workspaces/': typeof AuthenticatedWorkspacesIndexRoute
   '/_authenticated/projects/$projectId/activity': typeof AuthenticatedProjectsProjectIdActivityRoute
   '/_authenticated/projects/$projectId/contacts': typeof AuthenticatedProjectsProjectIdContactsRoute
@@ -284,12 +303,14 @@ export interface FileRouteTypes {
     | '/invite/accept'
     | '/companies/$companyId'
     | '/contacts/$contactId'
+    | '/kb/$articleId'
     | '/projects/$projectId'
     | '/settings/audit-log'
     | '/settings/general'
     | '/settings/members'
     | '/companies/'
     | '/contacts/'
+    | '/kb/'
     | '/workspaces/'
     | '/projects/$projectId/activity'
     | '/projects/$projectId/contacts'
@@ -311,11 +332,13 @@ export interface FileRouteTypes {
     | '/invite/accept'
     | '/companies/$companyId'
     | '/contacts/$contactId'
+    | '/kb/$articleId'
     | '/settings/audit-log'
     | '/settings/general'
     | '/settings/members'
     | '/companies'
     | '/contacts'
+    | '/kb'
     | '/workspaces'
     | '/projects/$projectId/activity'
     | '/projects/$projectId/contacts'
@@ -339,12 +362,14 @@ export interface FileRouteTypes {
     | '/_authenticated/'
     | '/_authenticated/companies/$companyId'
     | '/_authenticated/contacts/$contactId'
+    | '/_authenticated/kb/$articleId'
     | '/_authenticated/projects/$projectId'
     | '/_authenticated/settings/audit-log'
     | '/_authenticated/settings/general'
     | '/_authenticated/settings/members'
     | '/_authenticated/companies/'
     | '/_authenticated/contacts/'
+    | '/_authenticated/kb/'
     | '/_authenticated/workspaces/'
     | '/_authenticated/projects/$projectId/activity'
     | '/_authenticated/projects/$projectId/contacts'
@@ -448,6 +473,20 @@ declare module '@tanstack/react-router' {
       path: '/contacts/$contactId'
       fullPath: '/contacts/$contactId'
       preLoaderRoute: typeof AuthenticatedContactsContactIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/kb/': {
+      id: '/_authenticated/kb/'
+      path: '/kb'
+      fullPath: '/kb/'
+      preLoaderRoute: typeof AuthenticatedKbIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/kb/$articleId': {
+      id: '/_authenticated/kb/$articleId'
+      path: '/kb/$articleId'
+      fullPath: '/kb/$articleId'
+      preLoaderRoute: typeof AuthenticatedKbArticleIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/projects/$projectId': {
@@ -611,12 +650,14 @@ interface AuthenticatedRouteChildren {
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedCompaniesCompanyIdRoute: typeof AuthenticatedCompaniesCompanyIdRoute
   AuthenticatedContactsContactIdRoute: typeof AuthenticatedContactsContactIdRoute
+  AuthenticatedKbArticleIdRoute: typeof AuthenticatedKbArticleIdRoute
   AuthenticatedProjectsProjectIdRoute: typeof AuthenticatedProjectsProjectIdRouteWithChildren
   AuthenticatedSettingsAuditLogRoute: typeof AuthenticatedSettingsAuditLogRoute
   AuthenticatedSettingsGeneralRoute: typeof AuthenticatedSettingsGeneralRoute
   AuthenticatedSettingsMembersRoute: typeof AuthenticatedSettingsMembersRoute
   AuthenticatedCompaniesIndexRoute: typeof AuthenticatedCompaniesIndexRoute
   AuthenticatedContactsIndexRoute: typeof AuthenticatedContactsIndexRoute
+  AuthenticatedKbIndexRoute: typeof AuthenticatedKbIndexRoute
   AuthenticatedWorkspacesIndexRoute: typeof AuthenticatedWorkspacesIndexRoute
   AuthenticatedWorkspacesWorkspaceIdBoardRoute: typeof AuthenticatedWorkspacesWorkspaceIdBoardRoute
   AuthenticatedWorkspacesWorkspaceIdFieldsRoute: typeof AuthenticatedWorkspacesWorkspaceIdFieldsRoute
@@ -627,6 +668,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedCompaniesCompanyIdRoute: AuthenticatedCompaniesCompanyIdRoute,
   AuthenticatedContactsContactIdRoute: AuthenticatedContactsContactIdRoute,
+  AuthenticatedKbArticleIdRoute: AuthenticatedKbArticleIdRoute,
   AuthenticatedProjectsProjectIdRoute:
     AuthenticatedProjectsProjectIdRouteWithChildren,
   AuthenticatedSettingsAuditLogRoute: AuthenticatedSettingsAuditLogRoute,
@@ -634,6 +676,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedSettingsMembersRoute: AuthenticatedSettingsMembersRoute,
   AuthenticatedCompaniesIndexRoute: AuthenticatedCompaniesIndexRoute,
   AuthenticatedContactsIndexRoute: AuthenticatedContactsIndexRoute,
+  AuthenticatedKbIndexRoute: AuthenticatedKbIndexRoute,
   AuthenticatedWorkspacesIndexRoute: AuthenticatedWorkspacesIndexRoute,
   AuthenticatedWorkspacesWorkspaceIdBoardRoute:
     AuthenticatedWorkspacesWorkspaceIdBoardRoute,
