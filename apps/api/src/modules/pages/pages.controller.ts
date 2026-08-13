@@ -1,11 +1,13 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import {
   createPageCommentSchema,
   createPageSchema,
+  listPagesQuerySchema,
   updatePageSchema,
   type CreatePageCommentInput,
   type CreatePageInput,
+  type ListPagesQuery,
   type PageCommentResponse,
   type PageResponse,
   type UpdatePageInput,
@@ -32,13 +34,17 @@ export class PagesController {
     @Param("projectId") projectId: string,
     @Body(new ZodValidationPipe(createPageSchema)) dto: CreatePageInput,
   ): Promise<PageResponse> {
-    return this.pages.create(auth.activeOrgId, projectId, dto);
+    return this.pages.create(auth.activeOrgId, projectId, auth.userId, dto);
   }
 
   @Get("projects/:projectId/pages")
   @CheckPolicy("read", "Page")
-  list(@CurrentAuth() auth: AuthContext, @Param("projectId") projectId: string): Promise<PageResponse[]> {
-    return this.pages.list(auth.activeOrgId, projectId);
+  list(
+    @CurrentAuth() auth: AuthContext,
+    @Param("projectId") projectId: string,
+    @Query(new ZodValidationPipe(listPagesQuerySchema)) query: ListPagesQuery,
+  ): Promise<PageResponse[]> {
+    return this.pages.list(auth.activeOrgId, projectId, query.q);
   }
 
   @Get("pages/:id")
@@ -61,7 +67,7 @@ export class PagesController {
   @HttpCode(HttpStatus.OK)
   @CheckPolicy("delete", "Page")
   async remove(@CurrentAuth() auth: AuthContext, @Param("id") id: string): Promise<null> {
-    await this.pages.remove(auth.activeOrgId, id);
+    await this.pages.remove(auth.activeOrgId, id, auth.userId);
     return null;
   }
 

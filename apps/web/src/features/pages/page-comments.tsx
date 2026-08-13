@@ -68,15 +68,34 @@ export function PageComments({ orgId, pageId }: { orgId: string; pageId: string 
   const canDelete = MANAGER_PLUS_ROLES.has(me.role);
 
   return (
-    <div className="flex flex-col gap-4 border-t border-border pt-4">
-      <h2 className="text-sm font-medium text-muted-foreground">{t("pages.comments.title")}</h2>
+    // flex-1 min-h-0 — тянется вместе с окном и схлопывается со скроллом внутри, а не наружу
+    // (design review: "как таблица, которая используется по проекту" — тот же containerClassName
+    // паттерн, что Table: родитель (PageDetailView) даёт h-full min-h-0, эта секция забирает
+    // остаток высоты, ScrollArea ниже скроллится сама, не раздувая всю страницу).
+    // border-t (стек < lg) → border-l (сайдбар >= lg, design review: комментарии справа, фикс. ширина,
+    // своя высота) — разделитель следует направлению, в котором реально стоит блок относительно редактора.
+    <div className="flex min-h-0 flex-1 flex-col gap-3 border-t border-border pt-4 lg:border-t-0 lg:border-l lg:pl-4 lg:pt-0">
+      <h2 className="shrink-0 text-sm font-medium text-muted-foreground">{t("pages.comments.title")}</h2>
+
+      <MentionTextarea
+        ref={inputRef}
+        candidates={candidates}
+        placeholder={t("pages.comments.placeholder")}
+        sendLabel={t("pages.comments.send")}
+        disabled={addComment.isPending}
+        className="shrink-0"
+        onSubmit={({ body, mentionedUserIds }) => addComment.mutate({ body, mentionedUserIds })}
+      />
+      {/* Подсказка про @-упоминание — отдельной строкой, не частью placeholder: длинный placeholder
+          в узком сайдбаре (360px) переносился на 2 строки и ломал высоту инпута рядом с кнопкой
+          отправки (bug report); текст здесь не зависит от ширины contentEditable-плейсхолдера. */}
+      <p className="-mt-1 shrink-0 text-xs text-muted-foreground">{t("pages.comments.mentionHint")}</p>
 
       {comments.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t("pages.comments.empty")}</p>
       ) : (
-        // Ограничение высоты — длинная переписка не растягивает страницу до бесконечности;
-        // ScrollArea (shadcn), а не голый overflow-y-auto — тонкий скроллбар в стиле остального UI.
-        <ScrollArea className="h-[420px] rounded-md border border-border">
+        // ScrollArea (shadcn) вместо голого overflow-y-auto — тонкий скроллбар в стиле остального UI.
+        <ScrollArea className="min-h-[160px] flex-1 rounded-md border border-border">
           <MessageGroup className="p-3">
             {comments.map((comment) => {
               const authorName = comment.authorName ?? t("pages.comments.deletedAuthor");
@@ -114,15 +133,6 @@ export function PageComments({ orgId, pageId }: { orgId: string; pageId: string 
           </MessageGroup>
         </ScrollArea>
       )}
-
-      <MentionTextarea
-        ref={inputRef}
-        candidates={candidates}
-        placeholder={t("pages.comments.placeholder")}
-        sendLabel={t("pages.comments.send")}
-        disabled={addComment.isPending}
-        onSubmit={({ body, mentionedUserIds }) => addComment.mutate({ body, mentionedUserIds })}
-      />
     </div>
   );
 }

@@ -320,10 +320,25 @@
      пустой блочный узел (<p>), не на контейнер .tiptap/.tiptap-mention (это ProseMirror-root, у
      него своих классов is-empty никогда не бывает) — раньше селектор требовал оба класса на одном
      элементе и никогда не матчился, плейсхолдер не показывался нигде (найдено в браузере). */
-  .tiptap p.is-editor-empty:first-child::before,
-  .tiptap-mention p.is-editor-empty:first-child::before {
+  .tiptap p.is-editor-empty:first-child::before {
     float: left;
     height: 0;
+    color: var(--muted-foreground);
+    content: attr(data-placeholder);
+    pointer-events: none;
+  }
+  /* .tiptap-mention (однострочный инпут комментария, напр. узкий сайдбар 360px) — не float, длинный
+     плейсхолдер там переносился на 2 строки и ломал высоту строки с кнопкой отправки (bug report);
+     здесь абсолютное позиционирование + ellipsis, а не перенос. */
+  .tiptap-mention p.is-editor-empty:first-child {
+    position: relative;
+  }
+  .tiptap-mention p.is-editor-empty:first-child::before {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
     color: var(--muted-foreground);
     content: attr(data-placeholder);
     pointer-events: none;
@@ -334,5 +349,18 @@
     background: var(--secondary);
     color: var(--secondary-foreground);
     font-weight: 500;
+  }
+  /* Wiki-ссылка на другую Page — отдельный цвет (не .mention-серый), подчёркивание + курсор
+     сигнализируют кликабельность (handleClick в rich-text-editor.tsx делает переход). */
+  .page-link {
+    border-radius: 0.25rem;
+    padding: 0 0.25em;
+    background: color-mix(in srgb, var(--primary) 12%, transparent);
+    color: var(--primary);
+    font-weight: 500;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 2px;
+    cursor: pointer;
   }
 }

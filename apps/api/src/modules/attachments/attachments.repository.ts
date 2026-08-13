@@ -11,6 +11,7 @@ export interface AttachmentRow {
   scanStatus: "SKIPPED" | "CLEAN" | "INFECTED";
   confirmedAt: Date | null;
   createdAt: Date;
+  uploadedById: string | null;
   uploadedBy: { name: string } | null;
 }
 
@@ -23,6 +24,7 @@ const ATTACHMENT_SELECT = {
   scanStatus: true,
   confirmedAt: true,
   createdAt: true,
+  uploadedById: true,
   uploadedBy: { select: { name: true } },
 } satisfies Prisma.AttachmentSelect;
 
@@ -55,8 +57,8 @@ export class AttachmentsRepository {
    * Compare-and-set (files.md §3) — тот же паттерн, что markUsed/markAccepted: WHERE confirmedAt
    * IS NULL защищает от гонки и делает повторный confirm безопасным (count=0, не ошибка).
    */
-  async confirm(id: string): Promise<number> {
-    const { count } = await this.prisma.client.attachment.updateMany({
+  async confirm(id: string, tx?: Prisma.TransactionClient): Promise<number> {
+    const { count } = await (tx ?? this.prisma.client).attachment.updateMany({
       where: { id, confirmedAt: null },
       data: { confirmedAt: new Date() },
     });
@@ -72,8 +74,8 @@ export class AttachmentsRepository {
     });
   }
 
-  async delete(id: string): Promise<void> {
-    await this.prisma.client.attachment.delete({ where: { id } });
+  async delete(id: string, tx?: Prisma.TransactionClient): Promise<void> {
+    await (tx ?? this.prisma.client).attachment.delete({ where: { id } });
   }
 
   /** files.md §7 (пересмотрено) — filename редактируется, storageKey/S3-объект не трогаются. */

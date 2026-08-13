@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { Prisma } from "@helix/db";
+import { toPrefixTsQuery } from "../../core/lib/full-text-search";
 import { PrismaService } from "../../core/prisma/prisma.service";
 
 export interface KbArticleRow {
@@ -8,8 +9,11 @@ export interface KbArticleRow {
   title: string;
   content: unknown;
   tags: string[];
+  icon: string | null;
+  authorId: string | null;
   createdAt: Date;
   updatedAt: Date;
+  author: { name: string } | null;
 }
 
 const KB_ARTICLE_SELECT = {
@@ -18,8 +22,11 @@ const KB_ARTICLE_SELECT = {
   title: true,
   content: true,
   tags: true,
+  icon: true,
+  authorId: true,
   createdAt: true,
   updatedAt: true,
+  author: { select: { name: true } },
 } satisfies Prisma.KBArticleSelect;
 
 export interface KbArticleFilters {
@@ -39,6 +46,9 @@ export class KbRepository {
       title: string;
       content?: Prisma.InputJsonValue;
       tags?: string[];
+      icon?: string;
+      authorId: string | null;
+      searchText: string;
     },
     tx?: Prisma.TransactionClient,
   ): Promise<KbArticleRow> {
@@ -51,7 +61,7 @@ export class KbRepository {
 
   update(
     id: string,
-    data: { title?: string; content?: Prisma.InputJsonValue; tags?: string[] },
+    data: { title?: string; content?: Prisma.InputJsonValue; tags?: string[]; icon?: string | null; searchText?: string },
   ): Promise<KbArticleRow> {
     return this.prisma.client.kBArticle.update({ where: { id }, data, select: KB_ARTICLE_SELECT });
   }
@@ -61,11 +71,12 @@ export class KbRepository {
   }
 
   /**
-   * pages-kb.md §7 — raw SQL, не Prisma-фильтры: `tag` должен компилироваться в `tags @>
-   * ARRAY[...]`, чтобы реально использовать GIN-индекс (§1/§10 — тест проверяет EXPLAIN).
-   * Prisma-эквивалент `tags: { has: tag }` компилируется в `= ANY(tags)`, который GIN
-   * (array_ops, поддерживает `@>`/`<@`/`&&`) не использует — тот же класс решения, что
-   * boardRows/columnPage в projects.repository.ts (ORM не выражает нужный оператор).
+   * pages-kb.md §7 (пересмотрено по запросу — изначально ILIKE-only, расширено до полнотекстового
+   * поиска title+content, как у Pages: CLAUDE.md manual-migration point #7, GIN по
+   * to_tsvector(searchText)). `tag` остаётся raw SQL `tags @> ARRAY[...]`, чтобы реально
+   * использовать GIN-индекс по тегам (Prisma `tags: { has: tag }` компилируется в `= ANY(tags)`,
+   * который этот индекс не использует). `q` — префиксный tsquery (см. toPrefixTsQuery), тот же
+   * приём, что pages.repository.ts.
    */
   async search(orgId: string, filters: KbArticleFilters): Promise<KbArticleRow[]> {
     const conditions: Prisma.Sql[] = [Prisma.sql`"orgId" = ${orgId}`];
@@ -76,15 +87,21 @@ export class KbRepository {
     if (filters.tag) {
       conditions.push(Prisma.sql`"tags" @> ARRAY[${filters.tag}]::text[]`);
     }
+    let orderBy = Prisma.sql`"createdAt" DESC`;
     if (filters.q) {
-      conditions.push(Prisma.sql`"title" ILIKE ${`%${filters.q}%`}`);
+      const tsQuery = toPrefixTsQuery(filters.q);
+      if (!tsQuery) return [];
+      conditions.push(Prisma.sql`to_tsvector('simple', "searchText") @@ to_tsquery('simple', ${tsQuery})`);
+      orderBy = Prisma.sql`ts_rank(to_tsvector('simple', "searchText"), to_tsquery('simple', ${tsQuery})) DESC`;
     }
 
     return this.prisma.client.$queryRaw<KbArticleRow[]>`
-      SELECT id, "workspaceId", title, content, tags, "createdAt", "updatedAt"
-      FROM "KBArticle"
+      SELECT a.id, a."workspaceId", a.title, a.content, a.tags, a.icon, a."authorId", a."createdAt", a."updatedAt",
+             CASE WHEN u.name IS NOT NULL THEN jsonb_build_object('name', u.name) ELSE NULL END AS author
+      FROM "KBArticle" a
+      LEFT JOIN "User" u ON u.id = a."authorId"
       WHERE ${Prisma.join(conditions, " AND ")}
-      ORDER BY "createdAt" DESC
+      ORDER BY ${orderBy}
     `;
   }
 }

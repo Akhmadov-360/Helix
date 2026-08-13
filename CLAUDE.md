@@ -105,6 +105,10 @@ manual-migration-инварианты (ниже) обязательны — па
 4. `Project.rank` **COLLATE "C"** — байтовая коллация под fractional-indexing.
 5. `Contact.company` composite-FK **`ON DELETE SET NULL ("companyId")`** (partial, PG15+) — полный
    SET NULL уронил бы `orgId` NOT NULL. Подробности — `decisions.md`.
+6. `Page.searchText` — функциональный GIN-индекс `to_tsvector('simple', "searchText")` под
+   полнотекстовый поиск (M3, Pages). Сам столбец обычный (Prisma-колонка), индекс — raw SQL.
+7. `KBArticle.searchText` — тот же приём, что #6, для полнотекстового поиска KB (пересмотр §7
+   pages-kb.md: изначально было ILIKE-only, расширено по запросу до full-text, как у Pages).
 
 > Каждый `migrate dev` попутно генерит `DROP INDEX "phase_ws_order_unique"` (#1) — **вырезать вручную**
 > из миграции перед применением (см. decisions.md, gotcha #4).

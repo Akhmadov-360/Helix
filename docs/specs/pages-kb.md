@@ -37,7 +37,16 @@ workspace-scoped) · `PageComment` (+ `@mention` → email) · инстанци�
 сущность (embed — просто `attachmentId`-ссылка в JSON-контенте, см. §1; не нужен отдельный
 join-table) · real-time совместное редактирование (TipTap поддерживает, но Yjs/collab-сервер —
 инфраструктура, которой физически нет, тот же класс решения, что virus scan в `files.md`) ·
-экспорт Page/KB в PDF/Markdown (не запрошено, не в PRD).
+экспорт Page/KB в PDF (Markdown — см. ревизию ниже).
+
+> **Ревизия после первого прохода (пользовательский запрос, вне PRD на момент написания):**
+> и `Page`, и `KBArticle` получили (1) полнотекстовый поиск title+content — `searchText`-колонка
+> + функциональный GIN по `to_tsvector('simple', searchText)`, префиксный `tsquery` (`word:*`,
+> находит по неполному слову при вводе), вместо `ILIKE`/`title`-only (замена §7 KB ниже, "простой
+> поиск" в скоупе выше устарел); (2) клиентский экспорт в **Markdown** (не PDF — не запрошено) —
+> без похода на бэкенд, весь content уже на клиенте. `KBArticle` дополнительно получил `icon`
+> (emoji, Notion-style) и `authorId` (создатель, `SetNull`, тот же паттерн, что
+> `Attachment.uploadedById`). См. CLAUDE.md manual-migration points #6/#7.
 
 ---
 

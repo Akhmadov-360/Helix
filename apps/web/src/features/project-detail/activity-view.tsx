@@ -3,10 +3,14 @@ import {
   Archive,
   ArrowRightLeft,
   CheckCircle2,
+  FilePlus2,
+  FileX2,
   ListPlus,
   Pencil,
   PlusCircle,
   RotateCcw,
+  Trash2,
+  Upload,
   UserCog,
   type LucideIcon,
 } from "lucide-react";
@@ -25,6 +29,10 @@ const EVENT_ICONS: Record<ProjectEvent["type"], LucideIcon> = {
   "project.restored": RotateCcw,
   "task.created": ListPlus,
   "task.completed": CheckCircle2,
+  "attachment.uploaded": Upload,
+  "attachment.deleted": Trash2,
+  "page.created": FilePlus2,
+  "page.deleted": FileX2,
 };
 
 // Вертикальная лента (redesign): guide-линия + узел-иконка по типу события + относительное время.
@@ -104,5 +112,13 @@ function describeEvent(event: ProjectEvent, t: TFunction, localize: ReturnType<t
       return t("projectDetail.activity.taskCreated", { actor, title: event.payload.taskTitle });
     case "task.completed":
       return t("projectDetail.activity.taskCompleted", { actor, title: event.payload.taskTitle });
+    case "attachment.uploaded":
+      return t("projectDetail.activity.attachmentUploaded", { actor, filename: event.payload.filename });
+    case "attachment.deleted":
+      return t("projectDetail.activity.attachmentDeleted", { actor, filename: event.payload.filename });
+    case "page.created":
+      return t("projectDetail.activity.pageCreated", { actor, title: event.payload.pageTitle });
+    case "page.deleted":
+      return t("projectDetail.activity.pageDeleted", { actor, title: event.payload.pageTitle });
   }
 }

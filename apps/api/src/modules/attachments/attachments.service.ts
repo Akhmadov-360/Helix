@@ -15,16 +15,22 @@ import {
   ProjectStorageQuotaExceededError,
   ResourceNotFoundError,
 } from "../../core/errors/domain-error";
+import { PrismaService } from "../../core/prisma/prisma.service";
 import { S3Service } from "../../core/storage/s3.service";
+import { ActivityRecorder } from "../activity/activity-recorder";
 import { ProjectsRepository } from "../projects/projects.repository";
+import { UsersRepository } from "../users/users.repository";
 import { AttachmentsRepository, type AttachmentRow } from "./attachments.repository";
 
 @Injectable()
 export class AttachmentsService {
   constructor(
+    private readonly prisma: PrismaService,
     private readonly attachments: AttachmentsRepository,
     private readonly projects: ProjectsRepository,
     private readonly s3: S3Service,
+    private readonly activity: ActivityRecorder,
+    private readonly users: UsersRepository,
   ) {}
 
   /** files.md §3, шаг 1. */
@@ -90,7 +96,22 @@ export class AttachmentsService {
       throw new ProjectStorageQuotaExceededError();
     }
 
-    await this.attachments.confirm(attachmentId);
+    // attachment.uploaded — только на РЕАЛЬНОМ первом confirm (CAS won=true): повторный вызов на
+    // уже подтверждённую строку — идемпотентный успех (см. комментарий выше), не второе событие.
+    await this.prisma.client.$transaction(async (tx) => {
+      const won = (await this.attachments.confirm(attachmentId, tx)) === 1;
+      if (!won) return;
+      await this.activity.record(tx, {
+        orgId,
+        projectId,
+        actorId: row.uploadedById,
+        event: {
+          type: "attachment.uploaded",
+          schemaVersion: 1,
+          payload: { attachmentId: row.id, filename: row.filename, actorName: row.uploadedBy?.name ?? null },
+        },
+      });
+    });
     return toAttachmentResponse({ ...row, confirmedAt: new Date() });
   }
 
@@ -129,12 +150,25 @@ export class AttachmentsService {
   }
 
   /** files.md §6 — удаление одного вложения, синхронно (объект + строка). */
-  async delete(orgId: string, projectId: string, attachmentId: string): Promise<void> {
+  async delete(orgId: string, projectId: string, attachmentId: string, actorId: string): Promise<void> {
     const row = await this.attachments.findById(attachmentId, orgId, projectId);
     if (!row) throw new ResourceNotFoundError("Attachment not found");
 
     await this.s3.deleteObject(row.storageKey);
-    await this.attachments.delete(attachmentId);
+    await this.prisma.client.$transaction(async (tx) => {
+      await this.attachments.delete(attachmentId, tx);
+      const actor = await this.users.findProfileById(actorId, tx);
+      await this.activity.record(tx, {
+        orgId,
+        projectId,
+        actorId,
+        event: {
+          type: "attachment.deleted",
+          schemaVersion: 1,
+          payload: { attachmentId: row.id, filename: row.filename, actorName: actor?.name ?? null },
+        },
+      });
+    });
   }
 
   private async findConfirmed(orgId: string, projectId: string, attachmentId: string): Promise<AttachmentRow> {

@@ -33,7 +33,8 @@ export const queryKeys = {
     ["org", orgId, "project", projectId, "attachments"] as const,
   projectStorageUsage: (orgId: string, projectId: string) =>
     ["org", orgId, "project", projectId, "attachments", "storage-usage"] as const,
-  projectPages: (orgId: string, projectId: string) => ["org", orgId, "project", projectId, "pages"] as const,
+  projectPages: (orgId: string, projectId: string, q?: string) =>
+    ["org", orgId, "project", projectId, "pages", { q }] as const,
   page: (orgId: string, pageId: string) => ["org", orgId, "page", pageId] as const,
   pageComments: (orgId: string, pageId: string) => ["org", orgId, "page", pageId, "comments"] as const,
   kbArticles: (orgId: string, query: { workspaceId?: string; tag?: string; q?: string }) =>

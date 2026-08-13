@@ -14,6 +14,7 @@ import {
   ResourceNotFoundError,
   WorkspaceVersionConflictError,
 } from "../../core/errors/domain-error";
+import { extractPlainText } from "../../core/lib/full-text-search";
 import { PrismaService } from "../../core/prisma/prisma.service";
 import { BlueprintsRepository } from "../blueprints/blueprints.repository";
 import { parseTemplateItems } from "../blueprints/template-content";
@@ -118,7 +119,14 @@ export class WorkspacesService {
         const items = parseTemplateItems(definition.kbSeed, this.logger, `Blueprint kbSeed (workspace ${ws.id})`);
         for (const item of items) {
           await this.kb.create(
-            { orgId, workspaceId: ws.id, title: item.title, content: item.contentJson as Prisma.InputJsonValue | undefined },
+            {
+              orgId,
+              workspaceId: ws.id,
+              title: item.title,
+              content: item.contentJson as Prisma.InputJsonValue | undefined,
+              authorId: null, // системный сид из блюпринта — нет актора-человека (тот же null, что ActivityEvent.actorId "система")
+              searchText: extractPlainText(item.title, item.contentJson ?? {}),
+            },
             tx,
           );
         }

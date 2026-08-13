@@ -80,6 +80,8 @@ describe("Attachments (files.md) — presigned upload/download на реальн
       .patch(`/v1/projects/${pid}/attachments/${aid}`)
       .set("Authorization", `Bearer ${tok}`)
       .send(body);
+  const activity = (pid: string, tok: string) =>
+    request(app.getHttpServer()).get(`/v1/projects/${pid}/activity`).set("Authorization", `Bearer ${tok}`);
 
   async function uploadRealFile(uploadUrl: string, bytes: Buffer, contentType: string): Promise<void> {
     const res = await fetch(uploadUrl, { method: "PUT", body: bytes, headers: { "Content-Type": contentType } });
@@ -105,6 +107,24 @@ describe("Attachments (files.md) — presigned upload/download на реальн
     const listed = await list(projectId, token).expect(200);
     expect(listed.body.data).toHaveLength(1);
     expect(listed.body.data[0].id).toBe(attachmentId);
+  });
+
+  it("confirm пишет attachment.uploaded в ленту лида; повторный confirm НЕ дублирует событие (P4, идемпотентность)", async () => {
+    const bytes = Buffer.from("hi");
+    const created = await createUploadUrl(projectId, token, {
+      filename: "notes.txt",
+      mimeType: "text/plain",
+      sizeBytes: bytes.length,
+    }).expect(201);
+    await uploadRealFile(created.body.data.uploadUrl, bytes, "text/plain");
+    await confirm(projectId, created.body.data.attachmentId, token).expect(201);
+    await confirm(projectId, created.body.data.attachmentId, token).expect(201); // повтор — идемпотентный успех
+
+    const res = await activity(projectId, token).expect(200);
+    const uploaded = res.body.data.filter((e: { type: string }) => e.type === "attachment.uploaded");
+    expect(uploaded).toHaveLength(1);
+    expect(uploaded[0].payload.filename).toBe("notes.txt");
+    expect(uploaded[0].actorId).toBe(userId);
   });
 
   it("confirm без реальной загрузки → 400, строка не появляется в списке", async () => {
@@ -206,6 +226,24 @@ describe("Attachments (files.md) — presigned upload/download на реальн
 
     expect((await list(projectId, token).expect(200)).body.data).toHaveLength(0);
     await downloadUrl(projectId, created.body.data.attachmentId, token).expect(404);
+  });
+
+  it("delete пишет attachment.deleted в ленту лида (P4)", async () => {
+    const bytes = Buffer.from("to be deleted");
+    const created = await createUploadUrl(projectId, token, {
+      filename: "del.txt",
+      mimeType: "text/plain",
+      sizeBytes: bytes.length,
+    }).expect(201);
+    await uploadRealFile(created.body.data.uploadUrl, bytes, "text/plain");
+    await confirm(projectId, created.body.data.attachmentId, token).expect(201);
+
+    await del(projectId, created.body.data.attachmentId, token).expect(200);
+
+    const res = await activity(projectId, token).expect(200);
+    const deleted = res.body.data.find((e: { type: string }) => e.type === "attachment.deleted");
+    expect(deleted).toBeDefined();
+    expect(deleted.payload.filename).toBe("del.txt");
   });
 
   describe("RBAC (files.md §7: Appendix B «Upload files» — O/A/M full, Member △ scope=ORG, Viewer read-only)", () => {

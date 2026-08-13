@@ -137,13 +137,48 @@ describe("KBArticle (pages-kb.md)", () => {
     });
   });
 
-  describe("Поиск (§7)", () => {
-    it("q= матчит по подстроке title регистронезависимо", async () => {
+  describe("Полнотекстовый поиск (§7 пересмотрено — KBArticle.searchText, GIN по to_tsvector, тот же приём, что Pages)", () => {
+    it("q= находит по совпадению в title", async () => {
       await create(token, { title: "Refund Policy" }).expect(201);
       await create(token, { title: "Shipping Guide" }).expect(201);
 
       const res = await list(token, "?q=refund").expect(200);
       expect(res.body.data.map((a: { title: string }) => a.title)).toEqual(["Refund Policy"]);
+    });
+
+    it("q= находит по совпадению внутри content, не только title", async () => {
+      await create(token, {
+        title: "Meeting notes",
+        content: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "budget approval process" }] }] },
+      }).expect(201);
+      await create(token, { title: "Другая статья" }).expect(201);
+
+      const res = await list(token, "?q=budget").expect(200);
+      expect(res.body.data.map((a: { title: string }) => a.title)).toEqual(["Meeting notes"]);
+    });
+
+    it("q= находит по неполному слову (префиксный поиск, не строгое совпадение)", async () => {
+      await create(token, { title: "Тест жирного текста" }).expect(201);
+      await create(token, { title: "Другая статья" }).expect(201);
+
+      const res = await list(token, `?q=${encodeURIComponent("жирн")}`).expect(200);
+      expect(res.body.data.map((a: { title: string }) => a.title)).toEqual(["Тест жирного текста"]);
+    });
+
+    it("обновление content пересчитывает searchText — старый текст больше не находится, новый находится", async () => {
+      const created = await create(token, {
+        title: "Doc",
+        content: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "oldword" }] }] },
+      }).expect(201);
+
+      expect((await list(token, "?q=oldword").expect(200)).body.data).toHaveLength(1);
+
+      await update(created.body.data.id, token, {
+        content: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "newword" }] }] },
+      }).expect(200);
+
+      expect((await list(token, "?q=oldword").expect(200)).body.data).toHaveLength(0);
+      expect((await list(token, "?q=newword").expect(200)).body.data).toHaveLength(1);
     });
 
     it("tag= матчит только точное вхождение тега", async () => {
@@ -152,6 +187,17 @@ describe("KBArticle (pages-kb.md)", () => {
 
       const res = await list(token, "?tag=billing").expect(200);
       expect(res.body.data.map((a: { title: string }) => a.title)).toEqual(["Tagged A"]);
+    });
+  });
+
+  describe("icon + authorName", () => {
+    it("icon сохраняется и обновляется; authorName — имя создателя (live join, не снапшот)", async () => {
+      const created = await create(token, { title: "With icon", icon: "📚" }).expect(201);
+      expect(created.body.data.icon).toBe("📚");
+      expect(created.body.data.authorName).toBe("KB Author");
+
+      const cleared = await update(created.body.data.id, token, { icon: null }).expect(200);
+      expect(cleared.body.data.icon).toBeNull();
     });
   });
 

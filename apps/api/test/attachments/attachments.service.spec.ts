@@ -1,9 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { AttachmentTooLargeError, AttachmentUploadNotConfirmedError, ResourceNotFoundError } from "../../src/core/errors/domain-error";
+import type { PrismaService } from "../../src/core/prisma/prisma.service";
 import type { S3Service } from "../../src/core/storage/s3.service";
+import type { ActivityRecorder } from "../../src/modules/activity/activity-recorder";
 import { AttachmentsService } from "../../src/modules/attachments/attachments.service";
 import type { AttachmentsRepository, AttachmentRow } from "../../src/modules/attachments/attachments.repository";
 import type { ProjectsRepository } from "../../src/modules/projects/projects.repository";
+import type { UsersRepository } from "../../src/modules/users/users.repository";
 
 // files.md §3/§4: реальный размер объекта — единственная настоящая граница (presigned PUT не
 // ограничивает размер в подписи). Тест на 50MB реальной загрузки был бы медленным и не нужен —
@@ -18,6 +21,7 @@ function makeRow(overrides?: Partial<AttachmentRow>): AttachmentRow {
     scanStatus: "SKIPPED",
     confirmedAt: null,
     createdAt: new Date(),
+    uploadedById: null,
     uploadedBy: null,
     ...overrides,
   };
@@ -38,10 +42,18 @@ describe("AttachmentsService.confirm — реальный размер как е
       headObject: overrides?.headObject ?? vi.fn().mockResolvedValue({ sizeBytes: 100 }),
       deleteObject: overrides?.deleteObject ?? vi.fn().mockResolvedValue(undefined),
     };
+    // $transaction зовёт callback с фиктивным tx — моки репозитория/activity его игнорируют,
+    // как и реальные (tx?: Prisma.TransactionClient — опциональный параметр).
+    const prisma = { client: { $transaction: vi.fn((fn: (tx: unknown) => unknown) => fn({})) } };
+    const activity = { record: vi.fn().mockResolvedValue(undefined) };
+    const users = { findProfileById: vi.fn().mockResolvedValue(null) };
     const service = new AttachmentsService(
+      prisma as unknown as PrismaService,
       attachments as unknown as AttachmentsRepository,
       {} as unknown as ProjectsRepository,
       s3 as unknown as S3Service,
+      activity as unknown as ActivityRecorder,
+      users as unknown as UsersRepository,
     );
     return { service, attachments, s3 };
   }

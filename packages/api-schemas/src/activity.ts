@@ -12,6 +12,10 @@ export const projectEventTypeSchema = z.enum([
   "project.reassigned",
   "task.created",
   "task.completed",
+  "attachment.uploaded",
+  "attachment.deleted",
+  "page.created",
+  "page.deleted",
 ]);
 export type ProjectEventType = z.infer<typeof projectEventTypeSchema>;
 
@@ -50,6 +54,23 @@ const taskEventPayload = z.object({
   actorName: z.string().nullable(),
 });
 
+// attachment.uploaded/deleted (files.md) — только "структурные" события (загрузка/удаление файла),
+// не rename/переименование: тот же порог, что у задач ("веха", не каждое поле-изменение). Снапшот
+// filename (P2/P3) — переживает удаление Attachment-строки при cascade-очистке проекта.
+const attachmentEventPayload = z.object({
+  attachmentId: z.string(),
+  filename: z.string(),
+  actorName: z.string().nullable(),
+});
+
+// page.created/deleted (pages-kb.md) — тот же принцип: создание/удаление документа веха, правки
+// контента/автосейв — нет (иначе лента захлебнётся). Снапшот pageTitle — переживает удаление Page.
+const pageEventPayload = z.object({
+  pageId: z.string(),
+  pageTitle: z.string(),
+  actorName: z.string().nullable(),
+});
+
 // Discriminated union по (type, schemaVersion) — писательский контракт ActivityRecorder.
 export const projectEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("project.created"), schemaVersion: z.literal(1), payload: actorOnlyPayload }),
@@ -60,6 +81,10 @@ export const projectEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("project.reassigned"), schemaVersion: z.literal(1), payload: reassignedPayload }),
   z.object({ type: z.literal("task.created"), schemaVersion: z.literal(1), payload: taskEventPayload }),
   z.object({ type: z.literal("task.completed"), schemaVersion: z.literal(1), payload: taskEventPayload }),
+  z.object({ type: z.literal("attachment.uploaded"), schemaVersion: z.literal(1), payload: attachmentEventPayload }),
+  z.object({ type: z.literal("attachment.deleted"), schemaVersion: z.literal(1), payload: attachmentEventPayload }),
+  z.object({ type: z.literal("page.created"), schemaVersion: z.literal(1), payload: pageEventPayload }),
+  z.object({ type: z.literal("page.deleted"), schemaVersion: z.literal(1), payload: pageEventPayload }),
 ]);
 export type ProjectEvent = z.infer<typeof projectEventSchema>;
 

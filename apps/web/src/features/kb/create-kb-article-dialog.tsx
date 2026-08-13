@@ -41,16 +41,22 @@ export function CreateKbArticleDialog({
   const create = useCreateKbArticle(orgId);
 
   const [title, setTitle] = useState("");
+  const [icon, setIcon] = useState("");
   const [workspaceId, setWorkspaceId] = useState<string>(ORG_WIDE);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
     create.mutate(
-      { title: title.trim(), workspaceId: workspaceId === ORG_WIDE ? undefined : workspaceId },
+      {
+        title: title.trim(),
+        workspaceId: workspaceId === ORG_WIDE ? undefined : workspaceId,
+        icon: icon.trim() || undefined,
+      },
       {
         onSuccess: (article) => {
           setTitle("");
+          setIcon("");
           setWorkspaceId(ORG_WIDE);
           onOpenChange(false);
           void navigate({ to: "/kb/$articleId", params: { articleId: article.id } });
@@ -66,18 +72,32 @@ export function CreateKbArticleDialog({
           <DialogTitle>{t("kb.create.title")}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="kb-title" required>
-              {t("kb.create.label")}
-            </Label>
-            <Input
-              id="kb-title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              disabled={create.isPending}
-              autoFocus
-              required
-            />
+          <div className="flex gap-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="kb-icon">{t("kb.create.icon")}</Label>
+              <Input
+                id="kb-icon"
+                value={icon}
+                onChange={(e) => setIcon(e.target.value)}
+                disabled={create.isPending}
+                placeholder="📚"
+                maxLength={16}
+                className="w-14 text-center"
+              />
+            </div>
+            <div className="flex flex-1 flex-col gap-1.5">
+              <Label htmlFor="kb-title" required>
+                {t("kb.create.label")}
+              </Label>
+              <Input
+                id="kb-title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                disabled={create.isPending}
+                autoFocus
+                required
+              />
+            </div>
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="kb-workspace">{t("kb.create.workspace")}</Label>

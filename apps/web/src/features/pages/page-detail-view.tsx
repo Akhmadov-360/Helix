@@ -1,15 +1,16 @@
 import { useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import type { PageResponse, UpdatePageInput } from "@helix/api-schemas";
 import { Button, RichTextEditor } from "@helix/ui";
-import { ArrowLeft, Check, Loader2, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, Download, Loader2, Pencil, Trash2 } from "lucide-react";
 import { useCan } from "../../shared/auth/ability";
 import { useT } from "../../shared/i18n";
+import { downloadMarkdown } from "../../shared/lib/content-to-markdown";
 import { DeletePageDialog } from "./delete-page-dialog";
 import { useUpdatePage } from "./mutations";
 import { PageComments } from "./page-comments";
-import { pageQueryOptions } from "./queries";
+import { pageQueryOptions, projectPagesQueryOptions } from "./queries";
 
 const AUTOSAVE_DELAY_MS = 1200;
 type SaveStatus = "idle" | "saving" | "saved";
@@ -41,6 +42,12 @@ function PageEditor({
   const navigate = useNavigate();
   const projectId = page.projectId;
   const update = useUpdatePage(orgId, projectId, page.id);
+  // Кандидаты для wiki-ссылок ("[[") — все страницы ЭТОГО проекта; не suspense — автокомплит
+  // работает по факту загрузки, редактор не должен ждать этот запрос, чтобы отрендериться.
+  const projectPages = useQuery(projectPagesQueryOptions(orgId, projectId)).data ?? [];
+  const pageLinkCandidates = projectPages
+    .filter((p) => p.id !== page.id)
+    .map((p) => ({ id: p.id, title: p.title }));
 
   const [title, setTitle] = useState(page.title);
   const [status, setStatus] = useState<SaveStatus>("idle");
@@ -59,73 +66,107 @@ function PageEditor({
     }, AUTOSAVE_DELAY_MS);
   }
 
+
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-3">
-      <Link
-        to="/projects/$projectId/pages"
-        params={{ projectId }}
-        className="flex w-fit items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="h-3.5 w-3.5" />
-        {t("pages.detail.backToList")}
-      </Link>
-
-      <div className="flex items-center gap-3">
-        {canUpdate ? (
-          <div className="group/title flex min-w-0 flex-1 items-center gap-1.5">
-            <input
-              value={title}
-              onChange={(e) => {
-                setTitle(e.target.value);
-                scheduleSave({ title: e.target.value });
-              }}
-              placeholder={t("pages.title.placeholder")}
-              aria-label={t("pages.title.ariaLabel")}
-              className="min-w-0 flex-1 rounded-sm border-b border-dashed border-transparent bg-transparent px-0.5 -mx-0.5 text-xl font-semibold outline-none transition-colors placeholder:font-normal placeholder:text-muted-foreground group-hover/title:border-border focus-visible:border-border focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            />
-            <Pencil className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/title:opacity-100" />
-          </div>
-        ) : (
-          <h1 className="min-w-0 flex-1 truncate text-xl font-semibold">{title || t("pages.title.placeholder")}</h1>
-        )}
-
-        {status !== "idle" && (
-          <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-            {status === "saving" ? (
-              <>
-                <Loader2 className="h-3 w-3 animate-spin" />
-                {t("pages.autosave.saving")}
-              </>
-            ) : (
-              <>
-                <Check className="h-3 w-3" />
-                {t("pages.autosave.saved")}
-              </>
-            )}
-          </span>
-        )}
-
-        {canDelete && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label={t("pages.list.delete")}
-            onClick={() => setDeleteOpen(true)}
+    // h-full min-h-0 — тот же containerClassName-приём, что Table по проекту: страница получает
+    // реальную высоту от AppShell (main — flex-1 внутри h-dvh). < lg: колонка как раньше (шапка+
+    // редактор естественной высоты, комментарии забирают остаток и скроллятся сами). >= lg (design
+    // review): двухколоночный layout — редактор слева (растягивается, скроллится сам при длинном
+    // документе), комментарии — сайдбар фиксированной ширины справа на всю высоту страницы.
+    <div className="flex h-full min-h-0 w-full flex-col gap-3 lg:flex-row lg:items-stretch lg:gap-6">
+      <div className="flex shrink-0 flex-col gap-3 lg:min-h-0 lg:flex-1 lg:shrink lg:overflow-y-auto lg:pr-1">
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
+          <Link
+            to="/projects/$projectId/pages"
+            params={{ projectId }}
+            className="flex w-fit items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
           >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        )}
+            <ArrowLeft className="h-3.5 w-3.5" />
+            {t("pages.detail.backToList")}
+          </Link>
+
+          <div className="flex items-center gap-3">
+            {canUpdate ? (
+              <div className="group/title flex min-w-0 flex-1 items-center gap-1.5">
+                <input
+                  value={title}
+                  onChange={(e) => {
+                    setTitle(e.target.value);
+                    scheduleSave({ title: e.target.value });
+                  }}
+                  placeholder={t("pages.title.placeholder")}
+                  aria-label={t("pages.title.ariaLabel")}
+                  className="min-w-0 flex-1 rounded-sm border-b border-dashed border-transparent bg-transparent px-0.5 -mx-0.5 text-xl font-semibold outline-none transition-colors placeholder:font-normal placeholder:text-muted-foreground group-hover/title:border-border focus-visible:border-border focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                />
+                <Pencil className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/title:opacity-100" />
+              </div>
+            ) : (
+              <h1 className="min-w-0 flex-1 truncate text-xl font-semibold">{title || t("pages.title.placeholder")}</h1>
+            )}
+
+            {status !== "idle" && (
+              <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                {status === "saving" ? (
+                  <>
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    {t("pages.autosave.saving")}
+                  </>
+                ) : (
+                  <>
+                    <Check className="h-3 w-3" />
+                    {t("pages.autosave.saved")}
+                  </>
+                )}
+              </span>
+            )}
+
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label={t("pages.detail.download")}
+              onClick={() => downloadMarkdown(title.trim() || t("pages.title.placeholder"), page.content)}
+            >
+              <Download className="h-4 w-4" />
+            </Button>
+
+            {canDelete && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label={t("pages.list.delete")}
+                onClick={() => setDeleteOpen(true)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+
+          <RichTextEditor
+            content={page.content}
+            editable={canUpdate}
+            onChange={(content) => scheduleSave({ content })}
+            placeholder={t("pages.editor.placeholder")}
+            pageLinkCandidates={pageLinkCandidates}
+            onNavigateToPage={(id) => void navigate({ to: "/pages/$pageId", params: { pageId: id } })}
+            toolbarLabels={{
+              heading: t("pages.editor.toolbar.heading"),
+              bold: t("pages.editor.toolbar.bold"),
+              italic: t("pages.editor.toolbar.italic"),
+              bulletList: t("pages.editor.toolbar.bulletList"),
+              orderedList: t("pages.editor.toolbar.orderedList"),
+              table: t("pages.editor.toolbar.table"),
+              pageLink: t("pages.editor.toolbar.pageLink"),
+              pageLinkTooltip: t("pages.editor.toolbar.pageLinkTooltip"),
+            }}
+          />
+        </div>
       </div>
 
-      <RichTextEditor
-        content={page.content}
-        editable={canUpdate}
-        onChange={(content) => scheduleSave({ content })}
-        placeholder={t("pages.editor.placeholder")}
-      />
-
-      <PageComments orgId={orgId} pageId={page.id} />
+      <div className="flex min-h-0 flex-1 flex-col lg:w-[360px] lg:flex-none lg:shrink-0">
+        <PageComments orgId={orgId} pageId={page.id} />
+      </div>
 
       <DeletePageDialog
         orgId={orgId}

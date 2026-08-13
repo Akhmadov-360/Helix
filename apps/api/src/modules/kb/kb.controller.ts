@@ -30,7 +30,7 @@ export class KbController {
     @CurrentAuth() auth: AuthContext,
     @Body(new ZodValidationPipe(createKbArticleSchema)) dto: CreateKbArticleInput,
   ): Promise<KbArticleResponse> {
-    return this.kb.create(auth.activeOrgId, dto);
+    return this.kb.create(auth.activeOrgId, auth.userId, dto);
   }
 
   @Get()

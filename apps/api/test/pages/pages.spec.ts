@@ -93,6 +93,31 @@ describe("Pages + PageComment (pages-kb.md)", () => {
     request(app.getHttpServer()).patch(`/v1/pages/${id}`).set("Authorization", `Bearer ${tok}`).send(body);
   const del = (id: string, tok: string) =>
     request(app.getHttpServer()).delete(`/v1/pages/${id}`).set("Authorization", `Bearer ${tok}`);
+  const activity = (pid: string, tok: string) =>
+    request(app.getHttpServer()).get(`/v1/projects/${pid}/activity`).set("Authorization", `Bearer ${tok}`);
+
+  describe("Активность лида (P4) — page.created/page.deleted", () => {
+    it("create пишет page.created в ленту лида", async () => {
+      const created = await create(projectId, token, { title: "Onboarding checklist" }).expect(201);
+
+      const res = await activity(projectId, token).expect(200);
+      const event = res.body.data.find((e: { type: string }) => e.type === "page.created");
+      expect(event).toBeDefined();
+      expect(event.payload.pageId).toBe(created.body.data.id);
+      expect(event.payload.pageTitle).toBe("Onboarding checklist");
+      expect(event.actorId).toBe(userId);
+    });
+
+    it("delete пишет page.deleted в ленту лида", async () => {
+      const created = await create(projectId, token, { title: "Temp notes" }).expect(201);
+      await del(created.body.data.id, token).expect(200);
+
+      const res = await activity(projectId, token).expect(200);
+      const event = res.body.data.find((e: { type: string }) => e.type === "page.deleted");
+      expect(event).toBeDefined();
+      expect(event.payload.pageTitle).toBe("Temp notes");
+    });
+  });
 
   describe("CRUD + tenant scope", () => {
     it("создаёт/читает/обновляет/удаляет страницу проекта", async () => {
@@ -126,6 +151,77 @@ describe("Pages + PageComment (pages-kb.md)", () => {
 
     it("чужой/несуществующий projectId → 404", async () => {
       await create("does-not-exist", token, { title: "x" }).expect(404);
+    });
+  });
+
+  describe("Полнотекстовый поиск (§8 доп. — Page.searchText, GIN по to_tsvector)", () => {
+    const search = (pid: string, tok: string, q: string) =>
+      request(app.getHttpServer())
+        .get(`/v1/projects/${pid}/pages`)
+        .query({ q })
+        .set("Authorization", `Bearer ${tok}`);
+
+    it("находит по совпадению в заголовке", async () => {
+      await create(projectId, token, { title: "Onboarding checklist" }).expect(201);
+      await create(projectId, token, { title: "Random unrelated page" }).expect(201);
+
+      const res = await search(projectId, token, "onboarding").expect(200);
+      expect(res.body.data).toHaveLength(1);
+      expect(res.body.data[0].title).toBe("Onboarding checklist");
+    });
+
+    it("находит по совпадению внутри content (текст ProseMirror-узлов, не только title)", async () => {
+      await create(projectId, token, {
+        title: "Meeting notes",
+        content: {
+          type: "doc",
+          content: [
+            { type: "paragraph", content: [{ type: "text", text: "Обсудили budget approval process" }] },
+          ],
+        },
+      }).expect(201);
+      await create(projectId, token, { title: "Другая страница", content: { type: "doc" } }).expect(201);
+
+      const res = await search(projectId, token, "budget").expect(200);
+      expect(res.body.data).toHaveLength(1);
+      expect(res.body.data[0].title).toBe("Meeting notes");
+    });
+
+    it("обновление content пересчитывает searchText — старый текст больше не находится, новый находится", async () => {
+      const created = await create(projectId, token, {
+        title: "Doc",
+        content: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "oldword" }] }] },
+      }).expect(201);
+
+      expect((await search(projectId, token, "oldword").expect(200)).body.data).toHaveLength(1);
+
+      await update(created.body.data.id, token, {
+        content: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "newword" }] }] },
+      }).expect(200);
+
+      expect((await search(projectId, token, "oldword").expect(200)).body.data).toHaveLength(0);
+      expect((await search(projectId, token, "newword").expect(200)).body.data).toHaveLength(1);
+    });
+
+    it("находит по неполному слову (префиксный поиск, не строгое совпадение)", async () => {
+      await create(projectId, token, { title: "Тест жирного текста" }).expect(201);
+      await create(projectId, token, { title: "Другая страница" }).expect(201);
+
+      const res = await search(projectId, token, "жирн").expect(200);
+      expect(res.body.data).toHaveLength(1);
+      expect(res.body.data[0].title).toBe("Тест жирного текста");
+    });
+
+    it("без совпадений → пустой список, без q → полный список", async () => {
+      await create(projectId, token, { title: "Something" }).expect(201);
+      expect((await search(projectId, token, "nomatch12345").expect(200)).body.data).toHaveLength(0);
+      expect((await list(projectId, token).expect(200)).body.data).toHaveLength(1);
+    });
+
+    it("поиск уважает тенант-изоляцию — чужая орга не видит совпадений", async () => {
+      await create(projectId, token, { title: "Findable secret" }).expect(201);
+      const stranger = await signUp(app);
+      await search(projectId, stranger.token, "findable").expect(404);
     });
   });
 

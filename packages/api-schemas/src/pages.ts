@@ -54,6 +54,13 @@ export type PageResponse = z.infer<typeof pageResponseSchema>;
 export const pageListResponseSchema = z.array(pageResponseSchema);
 export type PageListResponse = z.infer<typeof pageListResponseSchema>;
 
+// §8 (доп.) — GET /v1/projects/:projectId/pages?q= — полнотекстовый поиск по title+content
+// (Page.searchText, CLAUDE.md manual-migration point #6). Пусто/не задан = обычный список.
+export const listPagesQuerySchema = z.object({
+  q: z.string().trim().min(1).optional(),
+});
+export type ListPagesQuery = z.infer<typeof listPagesQuerySchema>;
+
 // §2 — mentionedUserIds: фронт резолвит "@Имя" → id (ростер участников), бэкенд не парсит текст.
 export const createPageCommentSchema = z.object({
   body: z.string().trim().min(1).max(5000),

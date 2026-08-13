@@ -96,7 +96,7 @@ export class AttachmentsController {
     @Param("projectId") projectId: string,
     @Param("attachmentId") attachmentId: string,
   ): Promise<null> {
-    await this.attachments.delete(auth.activeOrgId, projectId, attachmentId);
+    await this.attachments.delete(auth.activeOrgId, projectId, attachmentId, auth.userId);
     return null;
   }
 }

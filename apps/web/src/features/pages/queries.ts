@@ -2,10 +2,11 @@ import { queryOptions } from "@tanstack/react-query";
 import { pageCommentListResponseSchema, pageListResponseSchema, pageResponseSchema } from "@helix/api-schemas";
 import { queryKeys, request } from "../../shared/api";
 
-export function projectPagesQueryOptions(orgId: string, projectId: string) {
+export function projectPagesQueryOptions(orgId: string, projectId: string, q?: string) {
   return queryOptions({
-    queryKey: queryKeys.projectPages(orgId, projectId),
-    queryFn: () => request({ path: `/v1/projects/${projectId}/pages`, schema: pageListResponseSchema }),
+    queryKey: queryKeys.projectPages(orgId, projectId, q),
+    queryFn: () =>
+      request({ path: `/v1/projects/${projectId}/pages`, searchParams: { q }, schema: pageListResponseSchema }),
   });
 }
 

@@ -9,37 +9,66 @@ import type {
 import type { Prisma, Role } from "@helix/db";
 import { roleRank } from "../../core/authz/role-hierarchy";
 import { ForbiddenActionError, ResourceNotFoundError } from "../../core/errors/domain-error";
+import { extractPlainText } from "../../core/lib/full-text-search";
+import { PrismaService } from "../../core/prisma/prisma.service";
+import { ActivityRecorder } from "../activity/activity-recorder";
 import { MENTION_COMMENT_PREVIEW_LENGTH } from "../notifications/mention-job";
 import { NotificationsService } from "../notifications/notifications.service";
 import { ProjectsRepository } from "../projects/projects.repository";
+import { UsersRepository } from "../users/users.repository";
 import { PagesRepository, type PageCommentRow, type PageRow } from "./pages.repository";
 
 @Injectable()
 export class PagesService {
   constructor(
+    private readonly prisma: PrismaService,
     private readonly pages: PagesRepository,
     private readonly projects: ProjectsRepository,
     private readonly notifications: NotificationsService,
+    private readonly users: UsersRepository,
+    private readonly activity: ActivityRecorder,
   ) {}
 
-  async create(orgId: string, projectId: string, dto: CreatePageInput): Promise<PageResponse> {
+  // page.created — веха (создан новый документ), не автосейв контента (§6.3-принцип: "структурное"
+  // событие, не каждое изменение) — атомарно со вставкой (P4).
+  async create(orgId: string, projectId: string, actorId: string, dto: CreatePageInput): Promise<PageResponse> {
     if (!(await this.projects.findByIdInOrg(projectId, orgId))) {
       throw new ResourceNotFoundError("Project not found");
     }
-    const row = await this.pages.create({
-      orgId,
-      projectId,
-      title: dto.title,
-      content: dto.content as Prisma.InputJsonValue | undefined,
+    const row = await this.prisma.client.$transaction(async (tx) => {
+      const created = await this.pages.create(
+        {
+          orgId,
+          projectId,
+          title: dto.title,
+          content: dto.content as Prisma.InputJsonValue | undefined,
+          searchText: extractPlainText(dto.title, dto.content ?? {}),
+        },
+        tx,
+      );
+      const actor = await this.users.findProfileById(actorId, tx);
+      await this.activity.record(tx, {
+        orgId,
+        projectId,
+        actorId,
+        event: {
+          type: "page.created",
+          schemaVersion: 1,
+          payload: { pageId: created.id, pageTitle: created.title, actorName: actor?.name ?? null },
+        },
+      });
+      return created;
     });
     return toPageResponse(row);
   }
 
-  async list(orgId: string, projectId: string): Promise<PageResponse[]> {
+  async list(orgId: string, projectId: string, q?: string): Promise<PageResponse[]> {
     if (!(await this.projects.findByIdInOrg(projectId, orgId))) {
       throw new ResourceNotFoundError("Project not found");
     }
-    const rows = await this.pages.listByProject(projectId, orgId);
+    const rows = q?.trim()
+      ? await this.pages.searchByProject(projectId, orgId, q.trim())
+      : await this.pages.listByProject(projectId, orgId);
     return rows.map(toPageResponse);
   }
 
@@ -50,17 +79,40 @@ export class PagesService {
   }
 
   async update(orgId: string, id: string, dto: UpdatePageInput): Promise<PageResponse> {
-    if (!(await this.pages.findById(id, orgId))) throw new ResourceNotFoundError("Page not found");
+    const existing = await this.pages.findById(id, orgId);
+    if (!existing) throw new ResourceNotFoundError("Page not found");
+
+    // searchText пересчитываем при любом патче title/content (частичный PATCH — если поле не
+    // пришло, берём текущее значение строки, не даём индексу разъехаться со старым содержимым).
+    const needsRecompute = dto.title !== undefined || dto.content !== undefined;
     const row = await this.pages.update(id, {
       title: dto.title,
       content: dto.content as Prisma.InputJsonValue | undefined,
+      searchText: needsRecompute
+        ? extractPlainText(dto.title ?? existing.title, dto.content ?? existing.content)
+        : undefined,
     });
     return toPageResponse(row);
   }
 
-  async remove(orgId: string, id: string): Promise<void> {
-    if (!(await this.pages.findById(id, orgId))) throw new ResourceNotFoundError("Page not found");
-    await this.pages.delete(id);
+  async remove(orgId: string, id: string, actorId: string): Promise<void> {
+    const existing = await this.pages.findById(id, orgId);
+    if (!existing) throw new ResourceNotFoundError("Page not found");
+
+    await this.prisma.client.$transaction(async (tx) => {
+      await this.pages.delete(id, tx);
+      const actor = await this.users.findProfileById(actorId, tx);
+      await this.activity.record(tx, {
+        orgId,
+        projectId: existing.projectId,
+        actorId,
+        event: {
+          type: "page.deleted",
+          schemaVersion: 1,
+          payload: { pageId: existing.id, pageTitle: existing.title, actorName: actor?.name ?? null },
+        },
+      });
+    });
   }
 
   /** pages-kb.md §2 — mentionedUserIds уже резолвлены фронтом в id, бэкенд текст не парсит. */

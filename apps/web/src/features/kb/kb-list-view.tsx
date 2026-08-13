@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { keepPreviousData, useQuery, useSuspenseQuery } from "@tanstack/react-query";
-import { BookOpen, Plus, Trash2 } from "lucide-react";
+import { BookOpen, Download, Plus, Search, Trash2 } from "lucide-react";
 import {
+  Avatar,
   Button,
   Input,
   Select,
@@ -13,10 +14,15 @@ import {
 } from "@helix/ui";
 import { useCan } from "../../shared/auth/ability";
 import { useLocaleStore, useT } from "../../shared/i18n";
+import { downloadMarkdown } from "../../shared/lib/content-to-markdown";
+import { extractExcerpt, extractSnippet } from "../../shared/lib/extract-snippet";
+import { highlightMatch } from "../../shared/lib/highlight-match";
 import { workspacesQueryOptions } from "../workspaces/queries";
 import { CreateKbArticleDialog } from "./create-kb-article-dialog";
 import { DeleteKbArticleDialog } from "./delete-kb-article-dialog";
 import { kbArticlesQueryOptions } from "./queries";
+import { tagColorClass } from "./tag-color";
+import { TagFilterSelect } from "./tag-filter-select";
 
 const ALL_WORKSPACES = "all";
 
@@ -36,21 +42,22 @@ export function KbListView({ orgId }: { orgId: string }) {
     return () => clearTimeout(timer);
   }, [search]);
   const [tag, setTag] = useState("");
-  const [debouncedTag, setDebouncedTag] = useState("");
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedTag(tag.trim()), 300);
-    return () => clearTimeout(timer);
-  }, [tag]);
   const [workspaceFilter, setWorkspaceFilter] = useState(ALL_WORKSPACES);
 
-  const query = {
-    q: debouncedSearch || undefined,
-    tag: debouncedTag || undefined,
-    workspaceId: workspaceFilter === ALL_WORKSPACES ? undefined : workspaceFilter,
-  };
+  const workspaceIdParam = workspaceFilter === ALL_WORKSPACES ? undefined : workspaceFilter;
+  const query = { q: debouncedSearch || undefined, tag: tag || undefined, workspaceId: workspaceIdParam };
   // useQuery + placeholderData (не useSuspenseQuery) — смена фильтров не должна мигать пустым
   // экраном, тот же приём, что companies-view.tsx.
   const { data: articles = [] } = useQuery({ ...kbArticlesQueryOptions(orgId, query), placeholderData: keepPreviousData });
+
+  // Словарь тегов для TagFilterSelect/TagPillInput — из ОТДЕЛЬНОГО запроса без tag/q (иначе выбор
+  // тега схлопнул бы список кандидатов до одного, а поиск — до случайного подмножества); тот же
+  // "candidates из уже загруженных данных" приём, что wiki-ссылки, не отдельный backend-эндпоинт.
+  const { data: allArticlesInScope = [] } = useQuery(kbArticlesQueryOptions(orgId, { workspaceId: workspaceIdParam }));
+  const knownTags = useMemo(
+    () => [...new Set(allArticlesInScope.flatMap((a) => a.tags))].sort((a, b) => a.localeCompare(b)),
+    [allArticlesInScope],
+  );
 
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
@@ -58,18 +65,16 @@ export function KbListView({ orgId }: { orgId: string }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={t("kb.page.searchPlaceholder")}
-          className="max-w-xs"
-        />
-        <Input
-          value={tag}
-          onChange={(e) => setTag(e.target.value)}
-          placeholder={t("kb.page.tagPlaceholder")}
-          className="max-w-40"
-        />
+        <div className="relative max-w-xs flex-1">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t("kb.page.searchPlaceholder")}
+            className="pl-8"
+          />
+        </div>
+        <TagFilterSelect value={tag} onChange={setTag} knownTags={knownTags} />
         <Select value={workspaceFilter} onValueChange={setWorkspaceFilter}>
           <SelectTrigger className="w-48">
             <SelectValue />
@@ -95,49 +100,91 @@ export function KbListView({ orgId }: { orgId: string }) {
       {articles.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-8 text-center text-muted-foreground">
           <BookOpen className="h-8 w-8" />
-          <p>{debouncedSearch || debouncedTag ? t("kb.page.noResults") : t("kb.list.empty")}</p>
+          <p>{debouncedSearch || tag ? t("kb.page.noResults") : t("kb.list.empty")}</p>
         </div>
       ) : (
-        <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
-          {articles.map((article) => (
-            <li key={article.id} className="group flex items-center justify-between gap-2 px-3 py-2.5">
-              {/* Метаданные (воркспейс/теги/дата) — отдельной строкой снизу, не в одну line с
-                  title: при узком контейнере shrink-0 сиблинги (особенно длинная метка воркспейса)
-                  съедали всю ширину и схлопывали truncate-заголовок до 0px (реальный баг, найден
-                  в браузере) — тот же приём, что AttachmentCard (title/description). */}
-              <Link
-                to="/kb/$articleId"
-                params={{ articleId: article.id }}
-                className="flex min-w-0 flex-1 flex-col gap-0.5 text-sm hover:underline"
-              >
-                <span className="flex min-w-0 items-center gap-2">
-                  <BookOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span className="min-w-0 truncate">{article.title}</span>
-                </span>
-                <span className="flex flex-wrap items-center gap-1.5 pl-6 text-xs text-muted-foreground">
-                  <span>{article.workspaceId ? workspaceNameById.get(article.workspaceId) : t("kb.workspace.orgWide")}</span>
-                  {article.tags.map((tagValue) => (
-                    <span key={tagValue} className="rounded-full bg-muted px-2 py-0.5">
-                      {tagValue}
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {articles.map((article) => {
+            // Превью текста (design review: "мёртвая пустота в карточке") — сниппет вокруг
+            // совпадения при активном поиске, иначе просто начало текста (Шаг A/B — тот же приём,
+            // что pages-list-view.tsx, plus всегда-видимый excerpt без поиска).
+            const snippet = debouncedSearch ? extractSnippet(article.content, debouncedSearch) : extractExcerpt(article.content);
+            return (
+              <li key={article.id} className="group relative rounded-lg border border-border bg-card p-3 transition-colors hover:border-primary/40">
+                <Link to="/kb/$articleId" params={{ articleId: article.id }} className="flex flex-col gap-2">
+                  <div className="flex items-start gap-2">
+                    {/* Иконка/эмодзи (Notion-style) — визуальный якорь карточки, "разбивает шум" (design review). */}
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-lg">
+                      {article.icon || <BookOpen className="h-4 w-4 text-muted-foreground" />}
                     </span>
-                  ))}
-                  <span className="ml-auto shrink-0">{dateFormatter.format(new Date(article.updatedAt))}</span>
-                </span>
-              </Link>
-              {canDelete && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t("kb.list.delete")}
-                  className="opacity-0 group-hover:opacity-100"
-                  onClick={() => setDeleteTarget({ id: article.id, title: article.title })}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              )}
-            </li>
-          ))}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">
+                        {debouncedSearch ? highlightMatch(article.title, debouncedSearch) : article.title}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {article.workspaceId ? workspaceNameById.get(article.workspaceId) : t("kb.workspace.orgWide")}
+                      </p>
+                    </div>
+                  </div>
+
+                  {snippet && (
+                    <p className="line-clamp-2 text-sm text-muted-foreground">
+                      {debouncedSearch ? highlightMatch(snippet, debouncedSearch) : snippet}
+                    </p>
+                  )}
+
+                  {article.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {article.tags.map((tagValue) => (
+                        <span key={tagValue} className={`rounded-full px-2 py-0.5 text-xs ${tagColorClass(tagValue)}`}>
+                          {tagValue}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between pt-1">
+                    {/* Автор (design review: "профессиональной отделки") — аватар с инициалами,
+                        как в комментариях Pages; null (сид блюпринта/удалённый юзер) — просто без бейджа. */}
+                    {article.authorName ? (
+                      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Avatar name={article.authorName} size="sm" className="h-5 w-5 text-[10px]" />
+                        <span className="truncate">{article.authorName}</span>
+                      </span>
+                    ) : (
+                      <span />
+                    )}
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {dateFormatter.format(new Date(article.updatedAt))}
+                    </span>
+                  </div>
+                </Link>
+
+                <div className="absolute right-2 top-2 flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={t("kb.detail.download")}
+                    onClick={() => downloadMarkdown(article.title, article.content)}
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                  </Button>
+                  {canDelete && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={t("kb.list.delete")}
+                      onClick={() => setDeleteTarget({ id: article.id, title: article.title })}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
 

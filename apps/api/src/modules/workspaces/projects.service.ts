@@ -22,6 +22,7 @@ import {
   StaleNeighborsError,
   WorkspaceHasNoPhasesError,
 } from "../../core/errors/domain-error";
+import { extractPlainText } from "../../core/lib/full-text-search";
 import { PrismaService } from "../../core/prisma/prisma.service";
 import { ActivityRecorder } from "../activity/activity-recorder";
 import { ActivityRepository } from "../activity/activity.repository";
@@ -533,7 +534,13 @@ export class ProjectsService {
         const items = parseTemplateItems(pageTemplates, this.logger, `Blueprint pageTemplates (project ${project.id})`);
         for (const item of items) {
           await this.pages.create(
-            { orgId, projectId: project.id, title: item.title, content: item.contentJson as Prisma.InputJsonValue | undefined },
+            {
+              orgId,
+              projectId: project.id,
+              title: item.title,
+              content: item.contentJson as Prisma.InputJsonValue | undefined,
+              searchText: extractPlainText(item.title, item.contentJson ?? {}),
+            },
             tx,
           );
         }
