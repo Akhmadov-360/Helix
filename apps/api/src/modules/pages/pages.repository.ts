@@ -21,6 +21,29 @@ const PAGE_SELECT = {
   updatedAt: true,
 } satisfies Prisma.PageSelect;
 
+export interface PageVersionRow {
+  id: string;
+  pageId: string;
+  title: string;
+  content: unknown;
+  createdAt: Date;
+}
+
+const PAGE_VERSION_SELECT = {
+  id: true,
+  pageId: true,
+  title: true,
+  content: true,
+  createdAt: true,
+} satisfies Prisma.PageVersionSelect;
+
+const PAGE_VERSION_LIST_SELECT = {
+  id: true,
+  pageId: true,
+  title: true,
+  createdAt: true,
+} satisfies Prisma.PageVersionSelect;
+
 export interface PageCommentRow {
   id: string;
   pageId: string;
@@ -88,12 +111,51 @@ export class PagesRepository {
   update(
     id: string,
     data: { title?: string; content?: Prisma.InputJsonValue; searchText?: string },
+    tx?: Prisma.TransactionClient,
   ): Promise<PageRow> {
-    return this.prisma.client.page.update({ where: { id }, data, select: PAGE_SELECT });
+    return (tx ?? this.prisma.client).page.update({ where: { id }, data, select: PAGE_SELECT });
+  }
+
+  // Сериализует конкурентные update()/restoreVersion() на ОДНОЙ странице (code review: без этого
+  // check-then-act в maybeSnapshotVersion — findLatestVersionCreatedAt + createVersion — гонка:
+  // два PATCH могли пройти проверку троттлинга ДО того, как любой из них вставил строку, и оба
+  // создать снапшот в одном окне). FOR UPDATE держит лок до конца охватывающей транзакции — второй
+  // конкурентный вызов блокируется на этом SELECT, а не проходит throttle-проверку параллельно.
+  async lockForUpdate(id: string, tx: Prisma.TransactionClient): Promise<void> {
+    await tx.$queryRaw`SELECT id FROM "Page" WHERE id = ${id} FOR UPDATE`;
   }
 
   async delete(id: string, tx?: Prisma.TransactionClient): Promise<void> {
     await (tx ?? this.prisma.client).page.delete({ where: { id } });
+  }
+
+  createVersion(
+    data: { pageId: string; title: string; content: Prisma.InputJsonValue },
+    tx?: Prisma.TransactionClient,
+  ): Promise<PageVersionRow> {
+    return (tx ?? this.prisma.client).pageVersion.create({ data, select: PAGE_VERSION_SELECT });
+  }
+
+  listVersions(pageId: string): Promise<Omit<PageVersionRow, "content">[]> {
+    return this.prisma.client.pageVersion.findMany({
+      where: { pageId },
+      select: PAGE_VERSION_LIST_SELECT,
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  findVersionById(id: string, pageId: string): Promise<PageVersionRow | null> {
+    return this.prisma.client.pageVersion.findFirst({ where: { id, pageId }, select: PAGE_VERSION_SELECT });
+  }
+
+  // Троттлинг снапшотов (§8) — только момент последнего, не вся история.
+  async findLatestVersionCreatedAt(pageId: string, tx?: Prisma.TransactionClient): Promise<Date | null> {
+    const latest = await (tx ?? this.prisma.client).pageVersion.findFirst({
+      where: { pageId },
+      select: { createdAt: true },
+      orderBy: { createdAt: "desc" },
+    });
+    return latest?.createdAt ?? null;
   }
 
   createComment(data: { pageId: string; authorId: string; body: string }): Promise<PageCommentRow> {

@@ -13,7 +13,7 @@ import {
 import { queryKeys, request } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
 import { toPageError } from "./page-error";
-import { pageCommentsQueryOptions, pageQueryOptions, projectPagesQueryOptions } from "./queries";
+import { pageCommentsQueryOptions, pageQueryOptions, pageVersionsQueryOptions, projectPagesQueryOptions } from "./queries";
 
 function pageErrorKey(kind: ReturnType<typeof toPageError>): MessageKey {
   switch (kind) {
@@ -66,6 +66,37 @@ export function useUpdatePage(orgId: string, projectId: string, pageId: string) 
         projectPagesQueryOptions(orgId, projectId).queryKey,
         (current) => current && current.map((p) => (p.id === page.id ? page : p)),
       );
+    },
+  });
+}
+
+// §8 — restore не разрушительный (бэкенд сам снапшотит текущее состояние перед перезаписью), но
+// UI всё равно спрашивает подтверждение (VersionHistoryDialog) — перезапись видимого контента
+// без явного клика удивила бы пользователя, даже если технически отменяема через ту же историю.
+export function useRestorePageVersion(orgId: string, projectId: string, pageId: string) {
+  const queryClient = useQueryClient();
+  const t = useT();
+
+  return useMutation({
+    mutationFn: (versionId: string) =>
+      request({
+        method: "POST",
+        path: `/v1/pages/${pageId}/versions/${versionId}/restore`,
+        schema: pageResponseSchema,
+      }),
+    onError: (error) => {
+      const kind = toPageError(error);
+      if (kind === "permissionDenied") void queryClient.invalidateQueries({ queryKey: queryKeys.me() });
+      toast.error(t(pageErrorKey(kind)));
+    },
+    onSuccess: (page) => {
+      queryClient.setQueryData(pageQueryOptions(orgId, pageId).queryKey, page);
+      queryClient.setQueryData<PageResponse[]>(
+        projectPagesQueryOptions(orgId, projectId).queryKey,
+        (current) => current && current.map((p) => (p.id === page.id ? page : p)),
+      );
+      void queryClient.invalidateQueries({ queryKey: pageVersionsQueryOptions(orgId, pageId).queryKey });
+      toast.success(t("pages.history.restoreSuccess"));
     },
   });
 }

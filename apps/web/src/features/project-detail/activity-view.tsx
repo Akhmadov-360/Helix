@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import type { ProjectEvent } from "@helix/api-schemas";
 import { useLocaleStore, useT, type TFunction } from "../../shared/i18n";
+import { formatRelative } from "../../shared/lib/format-relative";
 import { useLocalize } from "../../shared/lib/localize";
 import { projectActivityQueryOptions } from "./queries";
 import { toActivityItems, type ActivityItem } from "./select";
@@ -68,16 +69,6 @@ export function ActivityView({ orgId, projectId }: { orgId: string; projectId: s
       })}
     </ol>
   );
-}
-
-function formatRelative(iso: string, formatter: Intl.RelativeTimeFormat): string {
-  const diffMs = new Date(iso).getTime() - Date.now();
-  const diffMinutes = Math.round(diffMs / 60_000);
-  if (Math.abs(diffMinutes) < 60) return formatter.format(diffMinutes, "minute");
-  const diffHours = Math.round(diffMinutes / 60);
-  if (Math.abs(diffHours) < 24) return formatter.format(diffHours, "hour");
-  const diffDays = Math.round(diffHours / 24);
-  return formatter.format(diffDays, "day");
 }
 
 function describe(item: ActivityItem, t: TFunction, localize: ReturnType<typeof useLocalize>): string {

@@ -4,6 +4,7 @@ import type {
   CreatePageInput,
   PageCommentResponse,
   PageResponse,
+  PageVersionResponse,
   UpdatePageInput,
 } from "@helix/api-schemas";
 import type { Prisma, Role } from "@helix/db";
@@ -17,6 +18,11 @@ import { NotificationsService } from "../notifications/notifications.service";
 import { ProjectsRepository } from "../projects/projects.repository";
 import { UsersRepository } from "../users/users.repository";
 import { PagesRepository, type PageCommentRow, type PageRow } from "./pages.repository";
+
+// pages-kb.md §8 — не снапшотить чаще, чем раз в N минут (иначе debounced-автосейв на каждой
+// правке абзаца плодил бы версию за версией). Явный restore снапшотит текущее состояние в обход
+// троттлинга (см. restoreVersion) — это осознанное действие пользователя, не автосейв.
+const PAGE_VERSION_THROTTLE_MINUTES = 10;
 
 @Injectable()
 export class PagesService {
@@ -85,12 +91,82 @@ export class PagesService {
     // searchText пересчитываем при любом патче title/content (частичный PATCH — если поле не
     // пришло, берём текущее значение строки, не даём индексу разъехаться со старым содержимым).
     const needsRecompute = dto.title !== undefined || dto.content !== undefined;
-    const row = await this.pages.update(id, {
-      title: dto.title,
-      content: dto.content as Prisma.InputJsonValue | undefined,
-      searchText: needsRecompute
-        ? extractPlainText(dto.title ?? existing.title, dto.content ?? existing.content)
-        : undefined,
+
+    const row = await this.prisma.client.$transaction(async (tx) => {
+      // code review: без лока конкурентные PATCH на одной Page могли оба пройти throttle-проверку
+      // ДО того, как любой вставил снапшот (check-then-act race) — FOR UPDATE сериализует их.
+      await this.pages.lockForUpdate(id, tx);
+      if (needsRecompute) await this.maybeSnapshotVersion(existing, tx);
+      return this.pages.update(
+        id,
+        {
+          title: dto.title,
+          content: dto.content as Prisma.InputJsonValue | undefined,
+          searchText: needsRecompute
+            ? extractPlainText(dto.title ?? existing.title, dto.content ?? existing.content)
+            : undefined,
+        },
+        tx,
+      );
+    });
+    return toPageResponse(row);
+  }
+
+  // §8 — снапшот состояния ДО перезаписи, только если с последнего снапшота этой Page прошло
+  // больше PAGE_VERSION_THROTTLE_MINUTES (или снапшотов ещё не было). Троттлинг молчаливый — без
+  // отдельного UI-индикатора "версия сохранена": подтверждение того, что снапшот случился, даёт
+  // сама панель истории (список с относительным временем), не отдельная плашка поверх автосейва.
+  // Вызывающий код обязан держать lockForUpdate(existing.id, tx) до этого вызова (см. update()/
+  // restoreVersion()) — иначе check-then-act ниже не защищён от гонки.
+  private async maybeSnapshotVersion(existing: PageRow, tx: Prisma.TransactionClient): Promise<void> {
+    const lastSnapshotAt = await this.pages.findLatestVersionCreatedAt(existing.id, tx);
+    const cutoff = new Date(Date.now() - PAGE_VERSION_THROTTLE_MINUTES * 60_000);
+    if (lastSnapshotAt && lastSnapshotAt > cutoff) return;
+    await this.pages.createVersion(
+      {
+        pageId: existing.id,
+        title: existing.title,
+        content: existing.content as Prisma.InputJsonValue,
+      },
+      tx,
+    );
+  }
+
+  async listVersions(orgId: string, id: string): Promise<PageVersionResponse[]> {
+    if (!(await this.pages.findById(id, orgId))) throw new ResourceNotFoundError("Page not found");
+    const rows = await this.pages.listVersions(id);
+    return rows.map((row) => ({ id: row.id, pageId: row.pageId, title: row.title, createdAt: row.createdAt.toISOString() }));
+  }
+
+  // §8 — restore не разрушительный: текущее состояние снапшотится ПЕРЕД перезаписью, в обход
+  // троттлинга (явное действие пользователя) — можно откатить сам откат через ту же историю.
+  // lockForUpdate (code review) — та же защита от гонки, что update(): без неё конкурентный PATCH
+  // мог бы прочитать/перезаписать content между snapshot-чтением и update() ниже.
+  async restoreVersion(orgId: string, id: string, versionId: string): Promise<PageResponse> {
+    const existing = await this.pages.findById(id, orgId);
+    if (!existing) throw new ResourceNotFoundError("Page not found");
+    const version = await this.pages.findVersionById(versionId, id);
+    if (!version) throw new ResourceNotFoundError("Page version not found");
+
+    const row = await this.prisma.client.$transaction(async (tx) => {
+      await this.pages.lockForUpdate(id, tx);
+      await this.pages.createVersion(
+        {
+          pageId: existing.id,
+          title: existing.title,
+          content: existing.content as Prisma.InputJsonValue,
+        },
+        tx,
+      );
+      return this.pages.update(
+        id,
+        {
+          title: version.title,
+          content: version.content as Prisma.InputJsonValue,
+          searchText: extractPlainText(version.title, version.content),
+        },
+        tx,
+      );
     });
     return toPageResponse(row);
   }

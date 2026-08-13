@@ -1,5 +1,10 @@
 import { queryOptions } from "@tanstack/react-query";
-import { pageCommentListResponseSchema, pageListResponseSchema, pageResponseSchema } from "@helix/api-schemas";
+import {
+  pageCommentListResponseSchema,
+  pageListResponseSchema,
+  pageResponseSchema,
+  pageVersionListResponseSchema,
+} from "@helix/api-schemas";
 import { queryKeys, request } from "../../shared/api";
 
 export function projectPagesQueryOptions(orgId: string, projectId: string, q?: string) {
@@ -21,5 +26,14 @@ export function pageCommentsQueryOptions(orgId: string, pageId: string) {
   return queryOptions({
     queryKey: queryKeys.pageComments(orgId, pageId),
     queryFn: () => request({ path: `/v1/pages/${pageId}/comments`, schema: pageCommentListResponseSchema }),
+  });
+}
+
+// pages-kb.md §8 — метаданные версий (без content, P3); открывается по клику на "История", не
+// suspense — не должно блокировать рендер страницы.
+export function pageVersionsQueryOptions(orgId: string, pageId: string) {
+  return queryOptions({
+    queryKey: queryKeys.pageVersions(orgId, pageId),
+    queryFn: () => request({ path: `/v1/pages/${pageId}/versions`, schema: pageVersionListResponseSchema }),
   });
 }

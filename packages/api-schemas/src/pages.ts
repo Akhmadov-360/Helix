@@ -80,3 +80,17 @@ export type PageCommentResponse = z.infer<typeof pageCommentResponseSchema>;
 
 export const pageCommentListResponseSchema = z.array(pageCommentResponseSchema);
 export type PageCommentListResponse = z.infer<typeof pageCommentListResponseSchema>;
+
+// pages-kb.md §8 — только метаданные (id/title/createdAt), без content (P3): список версий не
+// должен тащить полный TipTap-документ на каждую строку истории, content нужен только при restore
+// (сервер сам применяет его, фронт не читает content конкретной версии напрямую).
+export const pageVersionResponseSchema = z.object({
+  id: z.string(),
+  pageId: z.string(),
+  title: z.string(),
+  createdAt: z.iso.datetime(),
+});
+export type PageVersionResponse = z.infer<typeof pageVersionResponseSchema>;
+
+export const pageVersionListResponseSchema = z.array(pageVersionResponseSchema);
+export type PageVersionListResponse = z.infer<typeof pageVersionListResponseSchema>;

@@ -25,6 +25,7 @@ import { Download, FolderSearch, Pencil, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { useCan } from "../../shared/auth/ability";
 import { useLocaleStore, useT } from "../../shared/i18n";
+import { navigateToDownload } from "../../shared/lib/navigate-to-download";
 import { AttachmentIcon } from "./attachment-icon";
 import { AttachmentPreviewDialog } from "./attachment-preview-dialog";
 import { categorizeAttachment, type AttachmentCategory } from "./attachment-category";
@@ -40,13 +41,6 @@ interface UploadingItem {
   key: string;
   file: File;
   progress: number; // 0-100 uploading; -1 = confirm в процессе
-}
-
-// Модульная функция, не инлайн в компоненте — react-compiler запрещает мутировать `window.location`
-// внутри рендер-функции (immutability-правило), а обычная навигация — единственный способ
-// заставить браузер уважать Content-Disposition: attachment без ручного fetch+blob (см. S3Service).
-function navigateToDownload(url: string): void {
-  window.location.href = url;
 }
 
 export function AttachmentsView({ orgId, projectId }: { orgId: string; projectId: string }) {

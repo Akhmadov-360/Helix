@@ -1,14 +1,28 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { EditorContent, useEditor, useEditorState, ReactRenderer, type Editor, type JSONContent } from "@tiptap/react";
+import {
+  EditorContent,
+  useEditor,
+  useEditorState,
+  ReactRenderer,
+  Node,
+  NodeViewWrapper,
+  ReactNodeViewRenderer,
+  mergeAttributes,
+  type Editor,
+  type JSONContent,
+  type NodeViewProps,
+} from "@tiptap/react";
 import { TableKit } from "@tiptap/extension-table";
 import Placeholder from "@tiptap/extension-placeholder";
 import Mention from "@tiptap/extension-mention";
 import StarterKit from "@tiptap/starter-kit";
-import { Bold, FileText, Heading2, Italic, Link2, List, ListOrdered, Table as TableIcon } from "lucide-react";
+import { Bold, FileText, Heading2, Italic, Link2, List, ListOrdered, Paperclip, Search, Table as TableIcon } from "lucide-react";
 import type { SuggestionKeyDownProps, SuggestionProps } from "@tiptap/suggestion";
 import type { DOMOutputSpec, Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { cn } from "../lib/cn";
 import { Button } from "./button";
+import { Input } from "./input";
+import { Popover, PopoverContent, PopoverTrigger } from "./popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip";
 
 // Тип пакета Mention требует DOMOutputSpec, но собственная реализация renderHTML по умолчанию (см.
@@ -26,6 +40,11 @@ export interface RichTextEditorProps {
   /** Wiki-ссылки ("[["): страницы этого же проекта, доступные для связывания. */
   pageLinkCandidates?: { id: string; title: string }[];
   onNavigateToPage?: (pageId: string) => void;
+  /** pages-kb.md §6 — embed-ссылки на файлы проекта: attachmentId+filename денормализованы в узел
+   * (тот же приём, что label у wiki-ссылок), сам файл не резолвится при вставке/рендере. Кнопка в
+   * тулбаре видна только когда проп передан (тот же гейт, что showPageLink у onNavigateToPage). */
+  attachmentCandidates?: { id: string; filename: string }[];
+  onDownloadAttachment?: (attachmentId: string) => void;
   /** i18n тулбара — компонент в packages/ui без доступа к i18n приложения (см. sendLabel у
    * MentionTextarea, тот же приём): без пропа остаётся английский дефолт, не ломает KB/др. вызовы. */
   toolbarLabels?: Partial<RichTextToolbarLabels>;
@@ -40,6 +59,9 @@ interface RichTextToolbarLabels {
   table: string;
   pageLink: string;
   pageLinkTooltip: string;
+  insertFile: string;
+  insertFileSearchPlaceholder: string;
+  insertFileEmpty: string;
 }
 
 const DEFAULT_TOOLBAR_LABELS: RichTextToolbarLabels = {
@@ -51,6 +73,9 @@ const DEFAULT_TOOLBAR_LABELS: RichTextToolbarLabels = {
   table: "Insert table",
   pageLink: "Link to page",
   pageLinkTooltip: 'Link to another page — type "[[" and pick from the list',
+  insertFile: "Insert file",
+  insertFileSearchPlaceholder: "Search files…",
+  insertFileEmpty: "No files found",
 };
 
 interface PageLinkItem {
@@ -195,6 +220,135 @@ function createPageLinkSuggestionRenderer(suggestionOpenRef: { current: boolean 
   };
 }
 
+// pages-kb.md §6 — embed-ссылка на файл: attachmentId+filename денормализованы в атрибуты узла
+// (тот же приём, что label у wiki-ссылок), бэкенд content не парсит. Отдельная Node, не Mention.extend
+// — вставляется явным выбором из пикера по клику на кнопку тулбара, не по триггер-символу при наборе
+// текста (Suggestion здесь не нужен), поэтому не переиспользует Mention/Suggestion-инфраструктуру.
+function AttachmentEmbedView({ node, extension }: NodeViewProps) {
+  const attachmentId = node.attrs.attachmentId as string;
+  const filename = node.attrs.filename as string;
+  return (
+    <NodeViewWrapper as="span" className="inline-block align-middle" contentEditable={false}>
+      <button
+        type="button"
+        onClick={() => (extension.options.onDownload as (id: string) => void)(attachmentId)}
+        className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-sm hover:bg-accent"
+      >
+        <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        <span className="max-w-[220px] truncate">{filename}</span>
+      </button>
+    </NodeViewWrapper>
+  );
+}
+
+const AttachmentEmbed = Node.create<{ onDownload: (attachmentId: string) => void }>({
+  name: "attachmentEmbed",
+  group: "inline",
+  inline: true,
+  atom: true,
+  addOptions() {
+    return { onDownload: () => {} };
+  },
+  addAttributes() {
+    return {
+      attachmentId: { default: null },
+      filename: { default: "" },
+    };
+  },
+  parseHTML() {
+    return [{ tag: 'span[data-type="attachmentEmbed"]' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ["span", mergeAttributes(HTMLAttributes, { "data-type": "attachmentEmbed" })];
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(AttachmentEmbedView);
+  },
+});
+
+interface AttachmentItem {
+  id: string;
+  filename: string;
+}
+
+// Кнопка тулбара → Popover-пикер (design review), не Suggestion-триггер по символу как у "[[":
+// для файлов нет естественного текстового триггера, и список кандидатов приходит из отдельного
+// запроса (Files-таб проекта), не из уже открытого документа — тот же Popover-паттерн, что
+// TagFilterSelect в apps/web/features/kb.
+function AttachmentPickerButton({
+  editor,
+  items,
+  label,
+  searchPlaceholder,
+  emptyLabel,
+}: {
+  editor: Editor;
+  items: AttachmentItem[];
+  label: string;
+  searchPlaceholder: string;
+  emptyLabel: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const filtered = items.filter((item) => item.filename.toLowerCase().includes(query.toLowerCase()));
+
+  function insert(item: AttachmentItem) {
+    editor.chain().focus().insertContent({ type: "attachmentEmbed", attrs: { attachmentId: item.id, filename: item.filename } }).run();
+    setOpen(false);
+    setQuery("");
+  }
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) setQuery("");
+      }}
+    >
+      <PopoverTrigger asChild>
+        {/* onClick — no-op: открытие/закрытие ведёт PopoverTrigger (asChild клонирует свой onClick
+            на этот span), ToolbarButton здесь — только визуальный триггер, не источник toggle. */}
+        <span>
+          <ToolbarButton active={open} label={label} onClick={() => {}}>
+            <Paperclip className="h-4 w-4" />
+          </ToolbarButton>
+        </span>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-1.5" align="start">
+        <div className="relative mb-1.5">
+          <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={searchPlaceholder}
+            className="h-8 pl-7"
+            autoFocus
+          />
+        </div>
+        <div className="scroll-slim max-h-56 overflow-y-auto">
+          {filtered.length === 0 ? (
+            <p className="px-2 py-3 text-center text-xs text-muted-foreground">{emptyLabel}</p>
+          ) : (
+            filtered.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => insert(item)}
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-muted"
+              >
+                <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <span className="truncate">{item.filename}</span>
+              </button>
+            ))
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 // Заголовки/списки/таблица/bold/italic — ровно то, что просит FR-PG-1 ("headings/lists/tables"),
 // НЕ весь StarterKit-набор: blockquote/codeBlock/horizontalRule выключены — нет запроса на них,
 // заводить площадь редактора "на всякий случай" незачем (CLAUDE.md — не создавать спекулятивно).
@@ -210,6 +364,8 @@ export function RichTextEditor({
   className,
   pageLinkCandidates,
   onNavigateToPage,
+  attachmentCandidates,
+  onDownloadAttachment,
   toolbarLabels,
 }: RichTextEditorProps) {
   const labels = { ...DEFAULT_TOOLBAR_LABELS, ...toolbarLabels };
@@ -225,6 +381,12 @@ export function RichTextEditor({
   useEffect(() => {
     onNavigateRef.current = onNavigateToPage;
   }, [onNavigateToPage]);
+  // Тот же ref-приём: extension.options читается NodeView-компонентом вне цикла рендера React
+  // (см. AttachmentEmbedView), конфигурируется один раз при создании editor.
+  const onDownloadRef = useRef(onDownloadAttachment);
+  useEffect(() => {
+    onDownloadRef.current = onDownloadAttachment;
+  }, [onDownloadAttachment]);
 
   const editor = useEditor({
     extensions: [
@@ -268,6 +430,8 @@ export function RichTextEditor({
           render: createPageLinkSuggestionRenderer(suggestionOpenRef),
         },
       }),
+      // eslint-disable-next-line react-hooks/refs -- onDownloadRef читается только в NodeView-колбэке
+      AttachmentEmbed.configure({ onDownload: (id: string) => onDownloadRef.current?.(id) }),
     ],
     content: content as JSONContent | undefined,
     editable,
@@ -303,7 +467,19 @@ export function RichTextEditor({
   return (
     <div className={cn("flex flex-col gap-2", className)}>
       {editable && (
-        <RichTextToolbar editor={editor} showPageLink={onNavigateToPage !== undefined} labels={labels} />
+        // sticky, не fixed — держится за ближайшего скроллящегося предка (design review: "тело
+        // документа не влезает на экран в большинстве случаев, тулбар не должен уезжать вместе с
+        // ним"), какой бы это ни был — lg:overflow-y-auto колонка PageDetailView/KbDetailView или
+        // <main> AppShell на мобильном/KB, где своей scroll-колонки нет. bg-background — иначе
+        // текст, проскроллированный под тулбар, был бы виден сквозь него.
+        <div className="sticky top-0 z-10 bg-background">
+          <RichTextToolbar
+            editor={editor}
+            showPageLink={onNavigateToPage !== undefined}
+            attachmentCandidates={attachmentCandidates}
+            labels={labels}
+          />
+        </div>
       )}
       <EditorContent editor={editor} />
     </div>
@@ -313,10 +489,12 @@ export function RichTextEditor({
 function RichTextToolbar({
   editor,
   showPageLink,
+  attachmentCandidates,
   labels,
 }: {
   editor: Editor;
   showPageLink: boolean;
+  attachmentCandidates: AttachmentItem[] | undefined;
   labels: RichTextToolbarLabels;
 }) {
   // useEditorState вместо editor.isActive() напрямую в теле рендера: toggleBold/toggleItalic на
@@ -390,6 +568,15 @@ function RichTextToolbar({
         >
           <Link2 className="h-4 w-4" />
         </ToolbarButton>
+      )}
+      {attachmentCandidates !== undefined && (
+        <AttachmentPickerButton
+          editor={editor}
+          items={attachmentCandidates}
+          label={labels.insertFile}
+          searchPlaceholder={labels.insertFileSearchPlaceholder}
+          emptyLabel={labels.insertFileEmpty}
+        />
       )}
     </div>
   );

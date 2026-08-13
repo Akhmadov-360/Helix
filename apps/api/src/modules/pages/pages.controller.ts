@@ -10,6 +10,7 @@ import {
   type ListPagesQuery,
   type PageCommentResponse,
   type PageResponse,
+  type PageVersionListResponse,
   type UpdatePageInput,
 } from "@helix/api-schemas";
 import { CurrentAuth, type AuthContext } from "../../core/auth-context";
@@ -69,6 +70,24 @@ export class PagesController {
   async remove(@CurrentAuth() auth: AuthContext, @Param("id") id: string): Promise<null> {
     await this.pages.remove(auth.activeOrgId, id, auth.userId);
     return null;
+  }
+
+  // §8 — история версий: право читать = право читать Page (включая Viewer).
+  @Get("pages/:id/versions")
+  @CheckPolicy("read", "Page")
+  listVersions(@CurrentAuth() auth: AuthContext, @Param("id") id: string): Promise<PageVersionListResponse> {
+    return this.pages.listVersions(auth.activeOrgId, id);
+  }
+
+  // Restore перезаписывает content — то же право, что update.
+  @Post("pages/:id/versions/:versionId/restore")
+  @CheckPolicy("update", "Page")
+  restoreVersion(
+    @CurrentAuth() auth: AuthContext,
+    @Param("id") id: string,
+    @Param("versionId") versionId: string,
+  ): Promise<PageResponse> {
+    return this.pages.restoreVersion(auth.activeOrgId, id, versionId);
   }
 
   // §4 — право комментировать = право читать Page (включая Viewer).

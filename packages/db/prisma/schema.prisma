@@ -556,6 +556,7 @@ model Page {
   org      Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
   project  Project       @relation(fields: [projectId, orgId], references: [id, orgId], onDelete: Cascade)
   comments PageComment[]
+  versions PageVersion[]
 
   @@index([projectId])
 }
@@ -571,6 +572,22 @@ model PageComment {
   author User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
 
   @@index([pageId])
+}
+
+// pages-kb.md §8 — снапшот title+content на момент сохранения. Троттлинг (не на каждый PATCH) —
+// в PagesService, не здесь: строка появляется, только если с последнего снапшота этой Page прошло
+// достаточно времени, ЛИБО явно перед restore (см. PagesService.restoreVersion). orgId не дублируем
+// (тот же паттерн, что PageComment) — тенант уже проверен через Page при каждом обращении.
+model PageVersion {
+  id        String   @id @default(cuid())
+  pageId    String
+  title     String
+  content   Json
+  createdAt DateTime @default(now())
+
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId, createdAt])
 }
 
 model KBArticle {

@@ -72,8 +72,13 @@ function ArticleEditor({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1000px] gap-8 py-2">
-      <div className="mx-auto flex w-full max-w-[800px] flex-col gap-4">
+    // Своя unpadded overflow-y-auto колонка (тот же приём, что PageDetailView) — иначе sticky-
+    // тулбар RichTextEditor стикался бы к padding-box <main> (AppShell: p-6), а не к истинному
+    // краю вьюпорта, и текст, проскроллированный "под" тулбар, был бы виден в этом зазоре
+    // (design review: "тело документа не влезает на экран — тулбар не должен уезжать вместе с ним").
+    <div className="scroll-slim h-full min-h-0 overflow-y-auto">
+      <div className="mx-auto flex w-full max-w-[1000px] gap-8 py-2">
+        <div className="mx-auto flex w-full max-w-[800px] flex-col gap-4">
         <Link
           to="/kb"
           className="flex w-fit items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
@@ -215,9 +220,10 @@ function ArticleEditor({
         />
       </div>
 
-      {headings.length > 0 && (
-        <TableOfContents headings={headings} activeIndex={activeIndex} onSelect={scrollToHeading} />
-      )}
+        {headings.length > 0 && (
+          <TableOfContents headings={headings} activeIndex={activeIndex} onSelect={scrollToHeading} />
+        )}
+      </div>
     </div>
   );
 }

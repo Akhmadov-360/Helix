@@ -399,4 +399,114 @@ describe("Pages + PageComment (pages-kb.md)", () => {
       expect(reread.body.data.content).toEqual(page.body.data.content); // не изменился, не удалён
     });
   });
+
+  describe("Version history (§8) — троттлинг снапшотов + restore", () => {
+    const versions = (id: string, tok: string) =>
+      request(app.getHttpServer()).get(`/v1/pages/${id}/versions`).set("Authorization", `Bearer ${tok}`);
+    const restore = (id: string, versionId: string, tok: string) =>
+      request(app.getHttpServer())
+        .post(`/v1/pages/${id}/versions/${versionId}/restore`)
+        .set("Authorization", `Bearer ${tok}`)
+        .send({});
+
+    it("первый PATCH с изменением контента создаёт снапшот ДО-состояния", async () => {
+      const created = await create(projectId, token, { title: "Draft v1" }).expect(201);
+
+      await update(created.body.data.id, token, { title: "Draft v2" }).expect(200);
+
+      const res = await versions(created.body.data.id, token).expect(200);
+      expect(res.body.data).toHaveLength(1);
+      expect(res.body.data[0].title).toBe("Draft v1"); // снапшот старого, не нового заголовка
+    });
+
+    it("повторные PATCH в пределах троттлинга не плодят новые снапшоты", async () => {
+      const created = await create(projectId, token, { title: "Draft v1" }).expect(201);
+
+      await update(created.body.data.id, token, { title: "Draft v2" }).expect(200);
+      await update(created.body.data.id, token, { title: "Draft v3" }).expect(200);
+      await update(created.body.data.id, token, { title: "Draft v4" }).expect(200);
+
+      const res = await versions(created.body.data.id, token).expect(200);
+      expect(res.body.data).toHaveLength(1); // одно и то же окно — не 3 снапшота на 3 PATCH
+    });
+
+    it("конкурентные PATCH на одной странице не создают дублирующие снапшоты (code review — гонка check-then-act)", async () => {
+      const created = await create(projectId, token, { title: "Draft v1" }).expect(201);
+
+      await Promise.all([
+        update(created.body.data.id, token, { title: "Draft v2" }),
+        update(created.body.data.id, token, { title: "Draft v3" }),
+        update(created.body.data.id, token, { title: "Draft v4" }),
+      ]);
+
+      const res = await versions(created.body.data.id, token).expect(200);
+      expect(res.body.data).toHaveLength(1); // FOR UPDATE сериализует — не 3 гонки → не 3 снапшота
+    });
+
+    it("PATCH без title/content (например, только пустой body) не создаёт снапшот", async () => {
+      const created = await create(projectId, token, { title: "Draft v1" }).expect(201);
+
+      await update(created.body.data.id, token, {}).expect(200);
+
+      const res = await versions(created.body.data.id, token).expect(200);
+      expect(res.body.data).toHaveLength(0);
+    });
+
+    it("по истечении окна троттлинга следующий PATCH создаёт новый снапшот", async () => {
+      const created = await create(projectId, token, { title: "Draft v1" }).expect(201);
+      await update(created.body.data.id, token, { title: "Draft v2" }).expect(200);
+
+      // Симулируем "снапшот был давно" — раздвигаем окно троттлинга назад во времени напрямую в БД
+      // (тот же приём, что refresh.spec.ts для истёкшей/использованной сессии).
+      await prisma.pageVersion.updateMany({
+        where: { pageId: created.body.data.id },
+        data: { createdAt: new Date(Date.now() - 15 * 60_000) },
+      });
+
+      await update(created.body.data.id, token, { title: "Draft v3" }).expect(200);
+
+      const res = await versions(created.body.data.id, token).expect(200);
+      expect(res.body.data).toHaveLength(2);
+      expect(res.body.data.map((v: { title: string }) => v.title).sort()).toEqual(["Draft v1", "Draft v2"]);
+    });
+
+    it("restore применяет content/title версии и сам снапшотит текущее состояние (не разрушительный)", async () => {
+      const created = await create(projectId, token, {
+        title: "Original",
+        content: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "original text" }] }] },
+      }).expect(201);
+      await update(created.body.data.id, token, {
+        title: "Edited",
+        content: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "edited text" }] }] },
+      }).expect(200);
+
+      const versionId = (await versions(created.body.data.id, token).expect(200)).body.data[0].id;
+      const restored = await restore(created.body.data.id, versionId, token).expect(201);
+
+      expect(restored.body.data.title).toBe("Original");
+      expect(restored.body.data.content).toEqual({
+        type: "doc",
+        content: [{ type: "paragraph", content: [{ type: "text", text: "original text" }] }],
+      });
+
+      // Откат отменяем — "Edited" должен быть доступен как версия для восстановления обратно.
+      const afterRestore = await versions(created.body.data.id, token).expect(200);
+      expect(afterRestore.body.data.map((v: { title: string }) => v.title)).toContain("Edited");
+    });
+
+    it("восстановление несуществующей версии → 404", async () => {
+      const created = await create(projectId, token, { title: "Solo" }).expect(201);
+      await restore(created.body.data.id, "does-not-exist", token).expect(404);
+    });
+
+    it("чужая орга → 404 на оба эндпоинта", async () => {
+      const created = await create(projectId, token, { title: "Secret" }).expect(201);
+      await update(created.body.data.id, token, { title: "Secret v2" }).expect(200);
+      const versionId = (await versions(created.body.data.id, token).expect(200)).body.data[0].id;
+
+      const stranger = await signUp(app);
+      await versions(created.body.data.id, stranger.token).expect(404);
+      await restore(created.body.data.id, versionId, stranger.token).expect(404);
+    });
+  });
 });

@@ -12,6 +12,20 @@ const HEADING_SELECTOR = ".tiptap h2, .tiptap h3";
 // текст ещё виден под ним, а не только в момент когда он уже скрылся за верхним краем).
 const ACTIVE_THRESHOLD_PX = 96;
 
+// Ближайший реально скроллящийся предок — не хардкодим "main": KbDetailView заводит свою
+// unpadded overflow-y-auto колонку (тот же приём, что уже был у PageDetailView), чтобы sticky-
+// тулбар RichTextEditor не упирался в padding <main> (design review: "текст, проскроллированный
+// под тулбар, был виден сквозь него" — sticky top:0 меряется от padding-box ближайшего реального
+// скролл-предка, а не от истинного края вьюпорта; padding на <main> сдвигал точку прилипания).
+function closestScrollable(el: HTMLElement): HTMLElement | Window {
+  let node: HTMLElement | null = el.parentElement;
+  while (node) {
+    if (/(auto|scroll)/.test(getComputedStyle(node).overflowY)) return node;
+    node = node.parentElement;
+  }
+  return window;
+}
+
 // Свой лёгкий ToC (design review — без @tiptap/extension-table-of-contents: единственный
 // потребитель, новая зависимость не оправдана). После рендера сканирует .tiptap h2/h3 по DOM
 // (не по TipTap JSON — проще и надёжнее для scrollIntoView, узел и DOM-элемент гарантированно
@@ -30,9 +44,7 @@ export function useHeadingsToc(containerRef: RefObject<HTMLElement | null>): {
     const container = containerRef.current;
     if (!container) return;
 
-    // Реальный скролл идёт на <main> (AppShell: overflow-y-auto), не на window — контент этой
-    // страницы сам по себе не скроллится отдельно.
-    const scrollParent = container.closest("main") ?? window;
+    const scrollParent = closestScrollable(container);
 
     const scan = () => {
       const nodes = container.querySelectorAll<HTMLElement>(HEADING_SELECTOR);

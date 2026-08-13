@@ -3,13 +3,18 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import type { PageResponse, UpdatePageInput } from "@helix/api-schemas";
 import { Button, RichTextEditor } from "@helix/ui";
-import { ArrowLeft, Check, Download, Loader2, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, Download, History, Loader2, Pencil, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { useCan } from "../../shared/auth/ability";
 import { useT } from "../../shared/i18n";
+import { fetchDownloadUrl } from "../attachments/mutations";
+import { projectAttachmentsQueryOptions } from "../attachments/queries";
 import { downloadMarkdown } from "../../shared/lib/content-to-markdown";
+import { navigateToDownload } from "../../shared/lib/navigate-to-download";
 import { DeletePageDialog } from "./delete-page-dialog";
 import { useUpdatePage } from "./mutations";
 import { PageComments } from "./page-comments";
+import { PageVersionHistoryDialog } from "./page-version-history-dialog";
 import { pageQueryOptions, projectPagesQueryOptions } from "./queries";
 
 const AUTOSAVE_DELAY_MS = 1200;
@@ -48,10 +53,24 @@ function PageEditor({
   const pageLinkCandidates = projectPages
     .filter((p) => p.id !== page.id)
     .map((p) => ({ id: p.id, title: p.title }));
+  // pages-kb.md §6 — кандидаты для attachment-embed: файлы этого же проекта; тот же "не suspense"
+  // приём, что pageLinkCandidates выше.
+  const projectAttachments = useQuery(projectAttachmentsQueryOptions(orgId, projectId)).data ?? [];
+  const attachmentCandidates = projectAttachments.map((a) => ({ id: a.id, filename: a.filename }));
+
+  async function handleDownloadAttachment(attachmentId: string) {
+    try {
+      const url = await fetchDownloadUrl(projectId, attachmentId, "attachment");
+      navigateToDownload(url);
+    } catch {
+      toast.error(t("attachments.error.unexpected"));
+    }
+  }
 
   const [title, setTitle] = useState(page.title);
   const [status, setStatus] = useState<SaveStatus>("idle");
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingRef = useRef<UpdatePageInput>({});
 
@@ -74,7 +93,7 @@ function PageEditor({
     // review): двухколоночный layout — редактор слева (растягивается, скроллится сам при длинном
     // документе), комментарии — сайдбар фиксированной ширины справа на всю высоту страницы.
     <div className="flex h-full min-h-0 w-full flex-col gap-3 lg:flex-row lg:items-stretch lg:gap-6">
-      <div className="flex shrink-0 flex-col gap-3 lg:min-h-0 lg:flex-1 lg:shrink lg:overflow-y-auto lg:pr-1">
+      <div className="scroll-slim flex shrink-0 flex-col gap-3 lg:min-h-0 lg:flex-1 lg:shrink lg:overflow-y-auto lg:pr-1">
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
           <Link
             to="/projects/$projectId/pages"
@@ -120,6 +139,18 @@ function PageEditor({
               </span>
             )}
 
+            {canUpdate && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label={t("pages.history.title")}
+                onClick={() => setHistoryOpen(true)}
+              >
+                <History className="h-4 w-4" />
+              </Button>
+            )}
+
             <Button
               type="button"
               variant="ghost"
@@ -150,6 +181,8 @@ function PageEditor({
             placeholder={t("pages.editor.placeholder")}
             pageLinkCandidates={pageLinkCandidates}
             onNavigateToPage={(id) => void navigate({ to: "/pages/$pageId", params: { pageId: id } })}
+            attachmentCandidates={attachmentCandidates}
+            onDownloadAttachment={(id) => void handleDownloadAttachment(id)}
             toolbarLabels={{
               heading: t("pages.editor.toolbar.heading"),
               bold: t("pages.editor.toolbar.bold"),
@@ -159,6 +192,9 @@ function PageEditor({
               table: t("pages.editor.toolbar.table"),
               pageLink: t("pages.editor.toolbar.pageLink"),
               pageLinkTooltip: t("pages.editor.toolbar.pageLinkTooltip"),
+              insertFile: t("pages.editor.toolbar.insertFile"),
+              insertFileSearchPlaceholder: t("pages.editor.toolbar.insertFileSearchPlaceholder"),
+              insertFileEmpty: t("pages.editor.toolbar.insertFileEmpty"),
             }}
           />
         </div>
@@ -175,6 +211,14 @@ function PageEditor({
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         onDeleted={() => void navigate({ to: "/projects/$projectId/pages", params: { projectId } })}
+      />
+
+      <PageVersionHistoryDialog
+        orgId={orgId}
+        projectId={projectId}
+        pageId={page.id}
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
       />
     </div>
   );
