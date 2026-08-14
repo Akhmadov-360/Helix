@@ -21,3 +21,5 @@ export * from "./invites";
 export * from "./attachments";
 export * from "./pages";
 export * from "./kb-articles";
+export * from "./ai-tools";
+export * from "./ai-threads";

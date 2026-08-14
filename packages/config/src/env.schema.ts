@@ -54,6 +54,15 @@ export const envSchema = z.object({
   // Refresh-cookie идёт с credentials: "include" (auth.md §4) → нужен ТОЧНЫЙ origin
   // в Access-Control-Allow-Origin, wildcard "*" с credentials браузер отклоняет.
   WEB_ORIGIN: z.url().default("http://localhost:5173"),
+
+  // ── AI / RAG (M4, docs/specs/ai-chat.md §9) ───────────────────────────────────
+  // Все optional() на уровне env — то, ЧЕМ обслуживать чат/эмбеддинги, выбирается per-org
+  // (Organization.settings.aiProvider), не глобально. Если оргия выбрала provider, для которого
+  // здесь нет ключа — это не boot-time ошибка (как S3_BUCKET), а runtime 422 "AI не настроен для
+  // этой организации" (ai-chat.md §12) — ключей может не быть вовсе, если AI никто не включал.
+  ANTHROPIC_API_KEY: z.string().optional(),
+  OPENAI_API_KEY: z.string().optional(), // также обслуживает embeddingProvider="openai" (ADR, decisions.md — Anthropic без embeddings endpoint)
+  AWS_BEDROCK_REGION: z.string().optional(), // Bedrock — default credential provider chain (IAM role), тот же паттерн, что SES_REGION
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -4,7 +4,7 @@ name: helix-dev
 
 services:
   postgres:
-    # pgvector-образ уже сейчас: pgvector включим в M4 (RAG) без смены образа.
+    # pgvector-образ; extension включена миграцией M4 (ai-chat.md §1.1, CLAUDE.md manual point #8).
     image: pgvector/pgvector:pg17
     restart: unless-stopped
     environment:
