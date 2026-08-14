@@ -452,11 +452,11 @@ data-access скоуп. M1 де-факто пошёл через ЯВНЫЙ па
 (findByIdInOrg(id, orgId), where:{orgId}). Выбор зафиксирован в пользу явного:
 
 (1) виден в сигнатуре — компилятор не даёт забыть orgId; ALS-скоуп невидим в
-    сигнатуре и тихо отваливается вне HTTP-контекста;
+сигнатуре и тихо отваливается вне HTTP-контекста;
 (2) BullMQ-воркеры (M4) выполняются ВНЕ запроса — интерсептор там не срабатывает,
-    currentTenant() вернул бы пусто/чужое, orgId всё равно пришлось бы передавать
-    явно. Значит ALS не дожил бы до M4 → было бы два механизма (ALS для HTTP,
-    явный для воркеров). Явный везде — консистентнее и переживает async-границу.
+currentTenant() вернул бы пусто/чужое, orgId всё равно пришлось бы передавать
+явно. Значит ALS не дожил бы до M4 → было бы два механизма (ALS для HTTP,
+явный для воркеров). Явный везде — консистентнее и переживает async-границу.
 
 ALS-задел (TenantContextInterceptor, tenantStorage, currentTenant, TenantContext)
 удалён как незавершённая параллельная реализация, не мусор — осознанный выбор
@@ -467,6 +467,7 @@ ADR-FE-1: TanStack Router вместо зафиксированного React Ro
 
 PRD §12.3 / CLAUDE.md пинили React Router. Фронт (frontend-architecture.md §4)
 отклоняется на TanStack Router. Причины:
+
 - client-heavy SPA-дашборд; типизированные search-params под фильтры доски,
   которые держим в URL;
 - общий кэш и паттерн мутаций с уже выбранным TanStack Query;
@@ -604,7 +605,7 @@ Bedrock... configurable per org/region") — читается так, будто
 эмбеддинги. Это физически невыполнимо для Anthropic: у Anthropic API нет embeddings endpoint.
 
 Решено: `Organization.settings.aiProvider` получает два независимых поля — `provider` (чат) и
-`embeddingProvider` (эмбеддинги для RAG-индексации и retrieval). Если оргия выбрала
+`embeddingProvider` (эмбеддинги для RAG-индексации и retrieval). Если организация выбрала
 `provider=anthropic`, `embeddingProvider` обязан быть другим (openai/bedrock-titan) — это
 enforcement на уровне Zod-схемы, когда появится реальный потребитель (`packages/ai`), не сейчас
 (тот же принцип, что уже применён к самому `aiProviderSchema` — "провайдер валидируется реальными

@@ -17,6 +17,7 @@ import { InvitesModule } from "./modules/invites/invites.module";
 import { AttachmentsModule } from "./modules/attachments/attachments.module";
 import { PagesModule } from "./modules/pages/pages.module";
 import { KbModule } from "./modules/kb/kb.module";
+import { IngestEmbeddingsModule } from "./modules/ai/ingest-embeddings.module";
 import { AllExceptionsFilter } from "./core/filters/all-exceptions.filter";
 import { ResponseTransformInterceptor } from "./core/interceptors/response-transform.interceptor";
 
@@ -39,6 +40,7 @@ import { ResponseTransformInterceptor } from "./core/interceptors/response-trans
     AttachmentsModule,
     PagesModule,
     KbModule,
+    IngestEmbeddingsModule,
   ],
   providers: [
     // Глобальные cross-cutting провайдеры через APP_* (DI-friendly).

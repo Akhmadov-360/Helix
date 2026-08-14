@@ -8,11 +8,19 @@ import type {
 import type { Prisma } from "@helix/db";
 import { extractPlainText } from "../../core/lib/full-text-search";
 import { ResourceNotFoundError } from "../../core/errors/domain-error";
+import { PrismaService } from "../../core/prisma/prisma.service";
+import { EmbeddingChunkRepository } from "../ai/embedding-chunk.repository";
+import { IngestEmbeddingsProducer } from "../ai/ingest-embeddings.producer";
 import { KbRepository, type KbArticleRow } from "./kb.repository";
 
 @Injectable()
 export class KbService {
-  constructor(private readonly kb: KbRepository) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly kb: KbRepository,
+    private readonly ingest: IngestEmbeddingsProducer,
+    private readonly embeddingChunks: EmbeddingChunkRepository,
+  ) {}
 
   async create(orgId: string, actorId: string, dto: CreateKbArticleInput): Promise<KbArticleResponse> {
     const row = await this.kb.create({
@@ -25,6 +33,9 @@ export class KbService {
       authorId: actorId,
       searchText: extractPlainText(dto.title, dto.content ?? {}),
     });
+    // ai-chat.md §3.1 — после коммита (P4); KBArticle не project-scoped, EmbeddingChunk.projectId
+    // остаётся null, только workspaceId (null = org-wide KB, тот же смысл, что у самой статьи).
+    await this.ingest.enqueue({ orgId, sourceType: "KB_ARTICLE", sourceId: row.id, projectId: null, workspaceId: row.workspaceId });
     return toKbArticleResponse(row);
   }
 
@@ -55,12 +66,22 @@ export class KbService {
         ? extractPlainText(dto.title ?? existing.title, dto.content ?? existing.content)
         : undefined,
     });
+    if (needsRecompute) {
+      await this.ingest.enqueue({ orgId, sourceType: "KB_ARTICLE", sourceId: row.id, projectId: null, workspaceId: row.workspaceId });
+    }
     return toKbArticleResponse(row);
   }
 
   async remove(orgId: string, id: string): Promise<void> {
     if (!(await this.kb.findById(id, orgId))) throw new ResourceNotFoundError("KB article not found");
-    await this.kb.delete(id);
+    // code review: было два отдельных await без транзакции — краш/ошибка между ними оставляла бы
+    // чанки сиротами навсегда (статья уже удалена, deleteBySource не вызван). Одна транзакция —
+    // тот же приём, что PagesService.remove()/AttachmentsService.delete().
+    await this.prisma.client.$transaction(async (tx) => {
+      await this.kb.delete(id, tx);
+      // ai-chat.md §1.1 — чанки не FK-каскадятся от KBArticle, чистим явно (P2 не применяется к EmbeddingChunk).
+      await this.embeddingChunks.deleteBySource("KB_ARTICLE", id, tx);
+    });
   }
 }
 

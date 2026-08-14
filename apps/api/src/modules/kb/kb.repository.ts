@@ -66,8 +66,8 @@ export class KbRepository {
     return this.prisma.client.kBArticle.update({ where: { id }, data, select: KB_ARTICLE_SELECT });
   }
 
-  async delete(id: string): Promise<void> {
-    await this.prisma.client.kBArticle.delete({ where: { id } });
+  async delete(id: string, tx?: Prisma.TransactionClient): Promise<void> {
+    await (tx ?? this.prisma.client).kBArticle.delete({ where: { id } });
   }
 
   /**

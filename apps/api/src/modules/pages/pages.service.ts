@@ -13,6 +13,8 @@ import { ForbiddenActionError, ResourceNotFoundError } from "../../core/errors/d
 import { extractPlainText } from "../../core/lib/full-text-search";
 import { PrismaService } from "../../core/prisma/prisma.service";
 import { ActivityRecorder } from "../activity/activity-recorder";
+import { EmbeddingChunkRepository } from "../ai/embedding-chunk.repository";
+import { IngestEmbeddingsProducer } from "../ai/ingest-embeddings.producer";
 import { MENTION_COMMENT_PREVIEW_LENGTH } from "../notifications/mention-job";
 import { NotificationsService } from "../notifications/notifications.service";
 import { ProjectsRepository } from "../projects/projects.repository";
@@ -33,6 +35,8 @@ export class PagesService {
     private readonly notifications: NotificationsService,
     private readonly users: UsersRepository,
     private readonly activity: ActivityRecorder,
+    private readonly ingest: IngestEmbeddingsProducer,
+    private readonly embeddingChunks: EmbeddingChunkRepository,
   ) {}
 
   // page.created — веха (создан новый документ), не автосейв контента (§6.3-принцип: "структурное"
@@ -65,6 +69,8 @@ export class PagesService {
       });
       return created;
     });
+    // ai-chat.md §3.1 — enqueue ПОСЛЕ коммита (P4), не внутри транзакции: сайд-эффект, не факт-состояние.
+    await this.ingest.enqueue({ orgId, sourceType: "PAGE", sourceId: row.id, projectId: row.projectId, workspaceId: null });
     return toPageResponse(row);
   }
 
@@ -109,6 +115,9 @@ export class PagesService {
         tx,
       );
     });
+    if (needsRecompute) {
+      await this.ingest.enqueue({ orgId, sourceType: "PAGE", sourceId: row.id, projectId: row.projectId, workspaceId: null });
+    }
     return toPageResponse(row);
   }
 
@@ -168,6 +177,7 @@ export class PagesService {
         tx,
       );
     });
+    await this.ingest.enqueue({ orgId, sourceType: "PAGE", sourceId: row.id, projectId: row.projectId, workspaceId: null });
     return toPageResponse(row);
   }
 
@@ -177,6 +187,9 @@ export class PagesService {
 
     await this.prisma.client.$transaction(async (tx) => {
       await this.pages.delete(id, tx);
+      // ai-chat.md §1.1 (P2 намеренно не применяется к EmbeddingChunk) — чанки не FK-каскадятся
+      // от Page, чистим явно, иначе retrieval продолжит находить контент удалённой страницы.
+      await this.embeddingChunks.deleteBySource("PAGE", id, tx);
       const actor = await this.users.findProfileById(actorId, tx);
       await this.activity.record(tx, {
         orgId,

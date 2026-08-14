@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { AuthzModule } from "../../core/authz/authz.module";
 import { ActivityModule } from "../activity/activity.module";
+import { AiChatModule } from "../ai/ai-chat.module";
 import { AttachmentsModule } from "../attachments/attachments.module";
 import { AuthModule } from "../auth/auth.module";
 import { BlueprintsModule } from "../blueprints/blueprints.module";
@@ -41,6 +42,7 @@ import { WorkspacesService } from "./workspaces.service";
     AttachmentsModule,
     KbModule,
     PagesModule,
+    AiChatModule,
   ],
   controllers: [WorkspacesController, PhasesController, FieldsController, ProjectsController],
   providers: [WorkspacesService, WorkspacesRepository, PhasesService, FieldsService, ProjectsService],
