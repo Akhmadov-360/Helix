@@ -14,6 +14,14 @@ export interface EmbeddingChunkInsert {
   embedding: number[];
 }
 
+export interface RetrievedChunk {
+  id: string;
+  sourceType: EmbeddingSourceType;
+  sourceId: string;
+  content: string;
+  similarity: number;
+}
+
 @Injectable()
 export class EmbeddingChunkRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -57,6 +65,39 @@ export class EmbeddingChunkRepository {
     await client.$executeRaw`
       INSERT INTO "EmbeddingChunk" (id, "orgId", "projectId", "workspaceId", "sourceType", "sourceId", "chunkIndex", content, embedding, "createdAt")
       VALUES ${values}
+    `;
+  }
+
+  /**
+   * ai-chat.md §2 — retrieval для scope=PROJECT: Page/Attachment чанки фильтруются по
+   * projectId треда, KBArticle чанки — по workspaceId проекта (org-wide KB — workspaceId IS NULL —
+   * видна из любого проекта той орги, тот же принцип видимости, что у KB вне AI). orgId — на
+   * каждом уровне (§2 "не только на верхнем"), даже когда projectId технически уже сужает до
+   * тенанта: EmbeddingChunk не incentive под composite-FK backbone.
+   *
+   * Cosine distance (`<=>`, pgvector) — вектор сериализуется в тот же текстовый литерал, что
+   * createMany(). similarity = 1 - distance (0..1, выше = ближе) — удобнее для порога/логов,
+   * чем сырое distance (0=идентично, растёт без верхней границы для несвязанных векторов).
+   */
+  async searchProjectScope(
+    orgId: string,
+    projectId: string,
+    workspaceId: string,
+    queryEmbedding: number[],
+    topK: number,
+  ): Promise<RetrievedChunk[]> {
+    const vectorLiteral = `[${queryEmbedding.join(",")}]`;
+    return this.prisma.client.$queryRaw<RetrievedChunk[]>`
+      SELECT id, "sourceType", "sourceId", content,
+             1 - (embedding <=> ${vectorLiteral}::vector) AS similarity
+      FROM "EmbeddingChunk"
+      WHERE "orgId" = ${orgId}
+        AND (
+          "projectId" = ${projectId}
+          OR ("sourceType" = 'KB_ARTICLE' AND ("workspaceId" = ${workspaceId} OR "workspaceId" IS NULL))
+        )
+      ORDER BY embedding <=> ${vectorLiteral}::vector ASC
+      LIMIT ${topK}
     `;
   }
 }

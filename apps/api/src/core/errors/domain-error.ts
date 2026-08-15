@@ -429,3 +429,20 @@ export class AiProviderNotImplementedError extends UnprocessableError {
     super(`AI provider "${provider}" is not implemented yet`);
   }
 }
+
+/**
+ * ai-chat.md §6 шаг 5/§10 — единый код на оба случая гонки вокруг tool-call confirm/reject:
+ * (a) статус уже не PROPOSED (двойной confirm/reject, либо уже выполнено) и (b) состояние ЦЕЛИ
+ * успело измениться между propose и confirm (фаза/сосед удалены — исполняющий сервис бросил
+ * ResourceNotFoundError/ConflictError). Оба — "то, что было верно 5 минут назад, больше не верно"
+ * → 409, не 500/404: второй случай ai-chat.md §10 явно требует именно 409, а не транспортный код
+ * исполняющего сервиса (тот 404 был бы верен для REST-эндпоинта фазы, но не для tool-call —
+ * здесь это состояние ПРЕДЛОЖЕНИЯ протухло, не "фаза не найдена" с точки зрения confirm-ручки).
+ */
+export class ToolCallNotPendingError extends ConflictError {
+  readonly code = "TOOL_CALL_NOT_PENDING";
+
+  constructor(message = "This action is no longer pending confirmation") {
+    super(message);
+  }
+}

@@ -46,5 +46,8 @@ import { WorkspacesService } from "./workspaces.service";
   ],
   controllers: [WorkspacesController, PhasesController, FieldsController, ProjectsController],
   providers: [WorkspacesService, WorkspacesRepository, PhasesService, FieldsService, ProjectsService],
+  // ProjectsService — для AiThreadsModule (tool-call-executor.ts, ai-chat.md §6 шаг 3:
+  // move_phase/update_field исполняются ЧЕРЕЗ существующий сервис, не напрямую в БД).
+  exports: [ProjectsService],
 })
 export class WorkspacesModule {}
