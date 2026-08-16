@@ -125,3 +125,4 @@ export {
   SheetTitle,
   SheetDescription,
 } from "./components/sheet";
+export { Skeleton } from "./components/skeleton";
