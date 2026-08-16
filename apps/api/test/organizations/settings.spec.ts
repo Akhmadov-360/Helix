@@ -191,5 +191,45 @@ describe("FR-ORG-3 — org-level settings", () => {
         .send({ currency: "USD" })
         .expect(401);
     });
+
+    it("OWNER меняет name — читается назад, не попадает в settings JSON", async () => {
+      const { token, orgId } = await signUpAs(app);
+
+      const res = await request(app.getHttpServer())
+        .patch("/v1/organizations/settings")
+        .set("Authorization", `Bearer ${token}`)
+        .send({ name: "Acme Corp", currency: "USD" })
+        .expect(200);
+
+      expect(res.body.data).toEqual({ orgId, name: "Acme Corp", settings: { currency: "USD" } });
+
+      const org = await prisma.organization.findUniqueOrThrow({ where: { id: orgId } });
+      expect(org.name).toBe("Acme Corp");
+    });
+
+    it("пустое name → 400", async () => {
+      const { token } = await signUpAs(app);
+
+      await request(app.getHttpServer())
+        .patch("/v1/organizations/settings")
+        .set("Authorization", `Bearer ${token}`)
+        .send({ name: "" })
+        .expect(400);
+    });
+
+    it("смена name попадает в changedKeys аудита", async () => {
+      const { token, orgId } = await signUpAs(app);
+
+      await request(app.getHttpServer())
+        .patch("/v1/organizations/settings")
+        .set("Authorization", `Bearer ${token}`)
+        .send({ name: "Acme Corp" })
+        .expect(200);
+
+      const entry = await prisma.auditLog.findFirstOrThrow({
+        where: { orgId, action: "organization.settings_updated" },
+      });
+      expect((entry.payload as { changedKeys: string[] }).changedKeys).toEqual(["name"]);
+    });
   });
 });

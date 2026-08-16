@@ -165,6 +165,8 @@ export function useUpdateOrgSettings(orgId: string) {
     },
     onSuccess: (settings) => {
       queryClient.setQueryData(queryKeys.orgSettings(orgId), settings);
+      // name может смениться — sidebar/org-switcher читают отдельный список (myOrgs), не settings.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.myOrgs() });
       toast.success(t("settings.general.saved"));
     },
   });

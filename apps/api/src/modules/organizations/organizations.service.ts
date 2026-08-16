@@ -8,6 +8,7 @@ import type {
   OrganizationSettings,
   OrganizationSettingsResponse,
   OrgMemberListResponse,
+  UpdateOrganizationSettingsInput,
 } from "@helix/api-schemas";
 import {
   LastOwnerError,
@@ -136,21 +137,28 @@ export class OrganizationsService {
    * не PUT) — иначе фронт был бы обязан прислать все 4 группы полей на каждое сохранение формы.
    * changedKeys для аудита — только верхнеуровневые ключи, чьё значение реально отличается
    * (JSON.stringify-сравнение: значения — плоские объекты/примитивы, глубокий diff избыточен).
+   *
+   * name — ОТДЕЛЬНАЯ колонка (Organization.name), не часть JSON `settings` (нет дублирования
+   * P1/P2), но приходит той же формой/PATCH-запросом — вынимаем из patch до merge в settings.
    */
-  async updateSettings(orgId: string, actorId: string, patch: OrganizationSettings): Promise<OrganizationSettingsResponse> {
+  async updateSettings(orgId: string, actorId: string, patch: UpdateOrganizationSettingsInput): Promise<OrganizationSettingsResponse> {
     const org = await this.orgs.findSettings(orgId);
     if (!org) throw new ResourceNotFoundError("Organization not found");
 
+    const { name, ...settingsPatch } = patch;
     const current = (org.settings ?? {}) as OrganizationSettings;
-    const merged: OrganizationSettings = { ...current, ...patch };
-    const changedKeys = Object.keys(patch).filter(
-      (key) => JSON.stringify(patch[key as keyof OrganizationSettings]) !== JSON.stringify(current[key as keyof OrganizationSettings]),
+    const merged: OrganizationSettings = { ...current, ...settingsPatch };
+    const changedKeys = Object.keys(settingsPatch).filter(
+      (key) =>
+        JSON.stringify(settingsPatch[key as keyof OrganizationSettings]) !== JSON.stringify(current[key as keyof OrganizationSettings]),
     );
+    const nameChanged = name !== undefined && name !== org.name;
+    if (nameChanged) changedKeys.push("name");
 
     if (changedKeys.length === 0) return { orgId, name: org.name, settings: current };
 
     await this.prisma.client.$transaction(async (tx) => {
-      await this.orgs.updateSettings(orgId, merged, tx);
+      await this.orgs.updateSettings(orgId, { name: nameChanged ? name : undefined, settings: merged }, tx);
       await this.audit.record(tx, {
         orgId,
         actorId,
@@ -158,7 +166,7 @@ export class OrganizationsService {
       });
     });
 
-    return { orgId, name: org.name, settings: merged };
+    return { orgId, name: nameChanged ? name : org.name, settings: merged };
   }
 
   /** Org-уровневый аудит (Appendix B, O/A only — см. CheckPolicy на контроллере). */

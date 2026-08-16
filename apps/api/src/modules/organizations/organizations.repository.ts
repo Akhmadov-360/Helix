@@ -40,17 +40,19 @@ export class OrganizationsRepository {
   }
 
   /**
-   * Замена всей settings-колонки. Партиальный merge (старое + новое) считается в service —
-   * репозиторий получает уже готовый финальный объект, а не занимается JSON-логикой.
+   * Замена всей settings-колонки + опционально name (отдельная колонка, не часть JSON).
+   * Партиальный merge (старое + новое) считается в service — репозиторий получает уже готовый
+   * финальный объект, а не занимается JSON-логикой. name: undefined → Prisma пропускает поле,
+   * не трогает существующее значение (обычная PATCH-семантика).
    */
   async updateSettings(
     orgId: string,
-    settings: Prisma.InputJsonValue,
+    data: { name?: string; settings: Prisma.InputJsonValue },
     tx?: Prisma.TransactionClient,
   ): Promise<void> {
     await (tx ?? this.prisma.client).organization.update({
       where: { id: orgId },
-      data: { settings },
+      data,
     });
   }
 

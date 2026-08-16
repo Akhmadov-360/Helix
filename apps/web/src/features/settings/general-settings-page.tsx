@@ -10,6 +10,7 @@ import {
   type AiChatProviderName,
   type AiEmbeddingProviderName,
   type OrganizationSettings,
+  type UpdateOrganizationSettingsInput,
 } from "@helix/api-schemas";
 import { Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@helix/ui";
 import { useCan } from "../../shared/auth/ability";
@@ -29,6 +30,7 @@ export function GeneralSettingsPage({ orgId }: { orgId: string }) {
   const update = useUpdateOrgSettings(orgId);
 
   const [form, setForm] = useState<OrganizationSettings>(settings.settings);
+  const [name, setName] = useState(settings.name);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function set<K extends keyof OrganizationSettings>(key: K, value: OrganizationSettings[K]) {
@@ -52,7 +54,13 @@ export function GeneralSettingsPage({ orgId }: { orgId: string }) {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const payload: OrganizationSettings = {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      toast.error(t("settings.general.name.required"));
+      return;
+    }
+    const payload: UpdateOrganizationSettingsInput = {
+      name: trimmedName,
       currency: form.currency || undefined,
       timezone: form.timezone || undefined,
       branding: {
@@ -77,6 +85,14 @@ export function GeneralSettingsPage({ orgId }: { orgId: string }) {
 
       <form onSubmit={handleSubmit} className="flex max-w-xl flex-col gap-6">
         <fieldset disabled={!canUpdate || update.isPending} className="flex flex-col gap-6">
+          <section className="flex flex-col gap-3">
+            <h2 className="text-sm font-medium text-foreground">{t("settings.general.section.identity")}</h2>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="org-name">{t("settings.general.name")}</Label>
+              <Input id="org-name" value={name} onChange={(e) => setName(e.target.value)} required />
+            </div>
+          </section>
+
           <section className="flex flex-col gap-3">
             <h2 className="text-sm font-medium text-foreground">{t("settings.general.section.regional")}</h2>
             <div className="flex flex-col gap-1.5">

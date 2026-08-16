@@ -92,8 +92,12 @@ export const organizationSettingsSchema = z.object({
 });
 export type OrganizationSettings = z.infer<typeof organizationSettingsSchema>;
 
-// PATCH-тело — то же самое (уже все поля optional), отдельный алиас для читаемости контроллера.
-export const updateOrganizationSettingsSchema = organizationSettingsSchema;
+// PATCH-тело — то же самое (все поля optional) + name. name — не часть JSON `settings` (это
+// отдельная колонка Organization.name, см. registration.service.ts), но живёт в той же форме и
+// том же PATCH-запросе, что и остальные 4 группы (одна форма-редактор, см. general-settings-page.tsx).
+export const updateOrganizationSettingsSchema = organizationSettingsSchema.extend({
+  name: z.string().trim().min(1).max(200).optional(),
+});
 export type UpdateOrganizationSettingsInput = z.infer<typeof updateOrganizationSettingsSchema>;
 
 export const organizationSettingsResponseSchema = z.object({
