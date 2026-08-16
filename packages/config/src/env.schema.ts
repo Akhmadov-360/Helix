@@ -23,9 +23,14 @@ export const envSchema = z.object({
   APP_URL: z.url(), // база для deep link в письме (§5)
   // SES (prod): без кастомных кред-переменных — default credential provider chain (IAM role), §7.
   SES_REGION: z.string().optional(),
-  // SMTP (dev/MailHog): без auth, MailHog не проверяет креды.
+  // SMTP: в деве (MailHog) без auth — USER/PASS не заданы. В проде реальный провайдер
+  // (Resend/SendGrid/Mailgun и т.п.) авторизацию требует всегда — оба поля optional() на уровне
+  // env (те же условные креды, что SES_REGION/S3_*), но SmtpMailerService передаёt auth ТОЛЬКО
+  // если оба заданы (см. smtp-mailer.service.ts) — не шлёт пустой auth-объект туда, где его не ждут.
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
 
   // ── Files / S3 · MinIO (M3, docs/specs/files.md §12) ──────────────────────────
   S3_ENDPOINT: z.url().optional(), // задан → MinIO/S3-совместимый (dev); не задан → настоящий AWS S3 (prod)
