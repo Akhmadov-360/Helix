@@ -54,3 +54,18 @@ export type AiMessageResponse = z.infer<typeof aiMessageResponseSchema>;
 
 export const aiMessageListResponseSchema = z.array(aiMessageResponseSchema);
 export type AiMessageListResponse = z.infer<typeof aiMessageListResponseSchema>;
+
+// ai-chat.md §4/§13.5 — SSE wire-формат POST /v1/ai-threads/:id/messages. Единственный источник
+// истины и для apps/api (AiThreadsService.streamChat), и для apps/web (парсинг "data: {...}\n\n"
+// блоков) — до этой схемы формат был только TS-типом внутри apps/api, фронт дублировал бы его
+// вручную без рантайм-проверки на границе сети (§6.2 apps/web — граница доверия = сеть).
+export const aiStreamEventSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("text_delta"), text: z.string() }),
+  z.object({ type: z.literal("tool_call_proposed"), id: z.string(), tool: z.string(), args: z.record(z.string(), z.unknown()) }),
+  z.object({ type: z.literal("done") }),
+  z.object({ type: z.literal("error"), message: z.string() }),
+  // §13.5: одно финальное событие с уже сохранённым Message (citations/toolCalls) — фронту не
+  // нужен отдельный round-trip за только что написанным ответом.
+  z.object({ type: z.literal("message_saved"), message: aiMessageResponseSchema }),
+]);
+export type AiStreamEvent = z.infer<typeof aiStreamEventSchema>;

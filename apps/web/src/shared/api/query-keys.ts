@@ -55,4 +55,6 @@ export const queryKeys = {
     ["org", orgId, "auditLog", query] as const,
   archivedProjects: (orgId: string, workspaceId: string) =>
     ["org", orgId, "workspace", workspaceId, "archivedProjects"] as const,
+  aiThreads: (orgId: string, projectId: string) => ["org", orgId, "project", projectId, "aiThreads"] as const,
+  aiThreadMessages: (orgId: string, threadId: string) => ["org", orgId, "aiThread", threadId, "messages"] as const,
 };

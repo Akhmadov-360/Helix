@@ -10,6 +10,15 @@ export const AI_TOOL_NAMES = ["move_phase", "create_task", "update_field", "draf
 export const toolNameSchema = z.enum(AI_TOOL_NAMES);
 export type ToolName = z.infer<typeof toolNameSchema>;
 
+// Единственный источник истины "какие инструменты read-only" — переиспользуется apps/api
+// (tool-schema.ts TOOL_POLICY: null для этих же имён) и apps/web (ActionCard.tsx §13.4: read-only
+// приходит уже EXECUTED без PROPOSED, рисуется как "Draft ready", не "✓ Executed" — не дублировать
+// список руками во фронте, разъедется при добавлении 6-го инструмента).
+// readonly ToolName[] (не литеральный tuple-тип) — иначе Array.prototype.includes() на вызывающей
+// стороне сужал бы принимаемый аргумент до "draft_email" | "summarize_files", отвергая обычный
+// ToolName (apps/api/apps/web оба зовут .includes(tool: ToolName)).
+export const READ_ONLY_TOOL_NAMES: readonly ToolName[] = ["draft_email", "summarize_files"];
+
 // Side-effecting инструменты переиспользуют СУЩЕСТВУЮЩИЕ input-схемы доменов, не изобретаются
 // заново (§6) — projectId неявный (берётся из AiThread.scope на confirm-эндпоинте), не часть
 // аргументов, которые формирует LLM.

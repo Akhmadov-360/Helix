@@ -185,6 +185,42 @@
     }
   }
 
+  /* ai-chat.md §13.1 — боковая панель (Sheet/ChatDrawer): полноценный slide from translateX(100%),
+     не 8px-микросдвиг ui-pop-anim-side (тот для попапов/меню). exit быстрее enter — тот же принцип,
+     что остальные анимации этого файла. */
+  @keyframes ui-sheet-in {
+    from {
+      opacity: 0;
+      transform: translateX(100%);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  @keyframes ui-sheet-out {
+    from {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateX(100%);
+    }
+  }
+  .ui-sheet-anim[data-state="open"] {
+    animation: ui-sheet-in 200ms ease-out;
+  }
+  .ui-sheet-anim[data-state="closed"] {
+    animation: ui-sheet-out 150ms ease-in;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ui-sheet-anim[data-state="open"],
+    .ui-sheet-anim[data-state="closed"] {
+      animation: none;
+    }
+  }
+
   /* Radix Collapsible экспонирует высоту контента как CSS-переменную на самом Content —
      анимируем её, а не max-height (без произвольной "достаточно большой" константы). */
   @keyframes ui-collapsible-down {

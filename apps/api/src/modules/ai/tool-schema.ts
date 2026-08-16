@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   AI_TOOL_NAMES,
+  READ_ONLY_TOOL_NAMES,
   createTaskToolArgsSchema,
   draftEmailToolArgsSchema,
   movePhaseToolArgsSchema,
@@ -47,7 +48,10 @@ export const TOOL_POLICY: Record<ToolName, { action: AppAction; subject: AppSubj
   summarize_files: null,
 };
 
-export const READ_ONLY_TOOL_NAMES: ToolName[] = AI_TOOL_NAMES.filter((name) => TOOL_POLICY[name] === null);
+// code review: раньше пересчитывалось здесь из TOOL_POLICY (единственный потребитель) — теперь
+// apps/web (ActionCard.tsx) тоже классифицирует по read-only/side-effecting, поэтому источник
+// истины переехал в api-schemas (READ_ONLY_TOOL_NAMES), а не остался локальной production здесь.
+export { READ_ONLY_TOOL_NAMES };
 
 // unrepresentable: "any" — некоторые input-схемы переиспользуют z.coerce.date()
 // (createTaskSchema.dueAt), которое JSON Schema не выражает 1:1; деградация до "any" для этого

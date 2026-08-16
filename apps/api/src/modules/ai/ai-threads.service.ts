@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import type {
   AiMessageListResponse,
   AiMessageResponse,
+  AiStreamEvent,
   AiThreadListResponse,
   AiThreadResponse,
   Citation,
@@ -48,10 +49,10 @@ export interface ChatSession {
   streamChat: (params: { messages: ChatMessage[]; tools: ReturnType<typeof buildToolSchemas> }) => AsyncIterable<ChatStreamEvent>;
 }
 
-// Событие, сохранённое сообщение — не часть контракта packages/ai (ChatStreamEvent описывает
-// только провайдер↔сервис), а SSE wire-формат этого эндпоинта: клиенту не нужен отдельный
-// round-trip за citations/toolCalls только что сохранённого ответа.
-export type AiWireEvent = ChatStreamEvent | { type: "message_saved"; message: AiMessageResponse };
+// §13.5 apps/web — wire-формат этого эндпоинта живёт как Zod-схема в api-schemas (aiStreamEventSchema),
+// не только TS-тип здесь: apps/web парсит "data: {...}\n\n" блоки той же схемой (§6.2 apps/web —
+// граница доверия = сеть). AiStreamEvent = @helix/api-schemas type alias для этого union.
+export type AiWireEvent = AiStreamEvent;
 
 @Injectable()
 export class AiThreadsService {

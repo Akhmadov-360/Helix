@@ -475,3 +475,117 @@ frontend chat UI.
 | `orgId` без сконфигурированного `aiProvider` | 422 | "AI не настроен для этой организации" — не тихий fallback на дефолтный провайдер без ключа |
 | Tool-call confirm на устаревшее состояние | 409 | См. §10 |
 | Tool-call confirm без прав | 403 | `ForbiddenActionError` → `toAiToolCallError` → `toast.error` (тот же паттерн, что `toPageError`/`toKbError`, см. §6.1) — не сырой Forbidden; карточка действия в треде переходит в `REJECTED` с причиной, остаётся в истории |
+
+---
+
+## 13. Frontend — чат-дровер (Фаза 1, §11)
+
+Прогнано через `ui-ux-pro-max` → `design-handoff` → `design-critique`; мокап в
+`chat-drawer-mockup.html` (артефакт сессии, не в репозитории — визуальная сверка, источник истины
+здесь и в коде). Все токены/примитивы — из `packages/ui`, ничего нового кроме Sheet (ниже).
+
+### 13.1 Новый примитив — `packages/ui` Sheet
+
+В `packages/ui` пока нет бокового панельного примитива (только центрированный `Dialog`). Правая
+панель — не локальная разметка приложения (CLAUDE.md: "нужен новый примитив — добавь в
+`packages/ui`"), заводится один раз, переиспользуется, если позже понадобится где-то ещё.
+
+- Radix `Dialog` как основа (Portal + Overlay + Content), не с нуля — та же примитив-база, что
+  `dialog.tsx`.
+- `DialogContent`-эквивалент со стороны right: `fixed inset-y-0 right-0 h-full w-full sm:w-[400px]`,
+  без `-translate-x/y-1/2` центрирования.
+- Новая keyframe-пара в `globals.css` (не переиспользовать `ui-pop-anim`/`ui-pop-anim-side` — те
+  8px-микросдвиги для попапов, дровер требует полноценный slide from `translateX(100%)`):
+  `ui-sheet-in`/`ui-sheet-out`, `translateX(100%) → translateX(0)`, 200ms ease-out / 150ms ease-in
+  (дровер крупнее попапа — чуть дольше, тот же принцип "exit быстрее enter", §7 ui-ux-pro-max).
+  `prefers-reduced-motion` guard — тот же паттерн, что существующие keyframes.
+- Overlay — тот же `bg-foreground/50`, что `Dialog`.
+
+### 13.2 `ChatDrawer` — layout
+
+Правая панель, `w-[400px]` (полная ширина на `<640px`), открывается из Files/Pages-тулбара
+проекта (кнопка "Ask AI" рядом с существующими табами) — не отдельный таб (решение сессии:
+дровер, не таб — не конкурирует с шириной основного контента, к тому же ближе к существующему
+паттерну side-panel'ов в проекте, чем к табам верхнего уровня).
+
+```
+┌─────────────────────────────────┐
+│ [Thread ▾]          [+]   [×]   │  header, 1px border-b
+├─────────────────────────────────┤
+│  (сообщения, scroll-slim)       │
+│  User bubble (right, primary)   │
+│  Assistant bubble (left, muted) │
+│    CitationsList (chips row)    │
+│    ActionCard[] (proposed/…)    │
+│  ⋯ typing indicator             │
+├─────────────────────────────────┤
+│ [textarea............] [Send]   │  input dock, 1px border-t
+│ Enter to send · Shift+Enter…    │
+└─────────────────────────────────┘
+```
+
+- **Header**: thread-selector (`DropdownMenu`, заголовок треда truncate + chevron, `flex-1
+  min-w-0`) + "New chat" (`icon-btn`, plus) + Close (`icon-btn`, x) — оба фиксированной ширины,
+  никогда не сжимаются selector'ом (`flex-shrink: 0`).
+- **Message list**: `scroll-slim` (существующий утилитарный класс, не переизобретать), `Message`/
+  `MessageAvatar`/`MessageContent` из `packages/ui` — тот же примитив, что уже несёт Pages-комменты
+  (§ pages-kb.md), не бespoke чат-эстетика.
+- **Input dock**: тот же интеракшн-контракт, что `MentionTextarea` (Enter=отправить,
+  Shift+Enter=перенос, disabled во время стрима) — БЕЗ mention-расширения (чат не про @-упоминания
+  участников орги, только текст) — новый компонент `ChatTextarea`, не форк `MentionTextarea`, но
+  тот же keydown-паттерн (переиспользовать логику, не только визуал).
+
+### 13.3 `CitationsList.tsx`
+
+- Ряд чипов под ассистентским сообщением, **только если `citations.length > 0`** — пустой массив
+  не рендерит пустой контейнер.
+- На чип: `sourceType` → иконка (`lucide-react`, тот же набор, что весь проект): `PAGE` → `FileText`,
+  `KB_ARTICLE` → `BookOpen`, `ATTACHMENT` → `Paperclip`.
+- **Труд-ревью (design-critique):** `label` — сырой текст чанка до 80 символов (§1.3 бэкенда), в
+  чип НЕ помещается целиком. Чип — `max-w-[140px] truncate`, полный текст — `Tooltip` по
+  hover/focus (существующий `packages/ui` примитив). Ряд чипов — `overflow-x-auto` (горизонтальный
+  скролл), НЕ `flex-wrap` — перенос на 2-3 строки отодвигал бы сам ответ вниз, цитаты вторичны.
+- Дедуп по `sourceId` уже сделан бэкендом (§1.3), максимум 5 — фронт не режет повторно.
+
+### 13.4 `ActionCard.tsx`
+
+Props: `toolName: ToolName`, `params: Record<string, unknown>`, `status: ToolCallStatus`,
+`result?: unknown`, `errorMessage?: string`, `onConfirm`, `onReject`, `isPending: boolean`.
+
+**Труд-ревью (design-critique) — два разных "готово", не одно.** Read-only инструменты
+(`draft_email`/`summarize_files`) приходят от бэкенда УЖЕ `EXECUTED` без предложения (§6 бэкенда) —
+если рисовать это тем же зелёным "✓ Executed", что реальная мутация CRM (`move_phase` и т.п.),
+пользователь перестаёт читать карточки внимательно ещё до первого реального confirm. Различаем по
+`TOOL_POLICY[toolName]` (уже есть на бэкенде, `tool-schema.ts` — фронту нужен тот же список
+side-effecting-имён как константа в `api-schemas`, не дублировать вручную):
+
+| `status` | side-effecting (`move_phase`/`update_field`/`create_task`) | read-only (`draft_email`/`summarize_files`) |
+|---|---|---|
+| `PROPOSED` | Confirm (`variant="default"`, единственная primary-кнопка в карточке) + Reject (`variant="outline"`), `gap-2`, `isPending` дизейблит обе и подменяет текст нажатой на "Confirming…"/"Rejecting…" | *(никогда — read-only не проходит через PROPOSED)* |
+| `EXECUTED` | `Badge variant="success"` "✓ Executed" + результат (`diff`-строка) | `Badge variant="outline"` "Draft ready" / "Summary ready" — БЕЗ галочки, ничего в CRM не менялось |
+| `REJECTED` | `Badge variant="destructive"` "Rejected" + `errorMessage` (§12: "insufficient permissions" / "state changed") строкой под бейджем | — |
+
+- Диф параметров — не JSON-дамп: маппинг человекочитаемых полей на инструмент (`move_phase` →
+  "Phase: {old} → {new}" по `fromPhaseName`/`toPhaseName`, если бэкенд их отдаёт в `result`;
+  `update_field` → построчно изменённые ключи; `create_task` → заголовок задачи + due).
+- Карточка **остаётся в истории после решения** (не исчезает, не сворачивается) — итог виден при
+  повторном открытии треда.
+- 403 на confirm НЕ переводит карточку в терминальное состояние — `AiThreadsService.confirmToolCall`
+  откатывает `CONFIRMED` обратно в `PROPOSED` перед тем, как бросить `ForbiddenActionError` (см.
+  `apps/api/src/modules/ai/ai-threads.service.ts`) — тот же callId confirmable повторно, если роль
+  актора изменится.
+
+### 13.5 Стриминг + доступность
+
+- SSE-токены накапливаются в локальный `content` стейт, ре-рендерятся как обычный текст (не
+  markdown в Фазе 1 — `content` из бэкенда — plain text, парсер не нужен, не заводить его
+  превентивно).
+- Typing-индикатор (три точки, `ui-fade-up`-подобная пульсация) — показывается ТОЛЬКО пока не
+  пришёл первый `text_delta`/`tool_call_proposed`; с первого токена индикатор заменяется реальным
+  текстом без layout shift (зарезервировать `min-height` на строку).
+- **Труд-ревью (a11y):** SSE-дельты НЕ оборачиваются в `aria-live="polite"` напрямую (анонс на
+  каждый токен — непригодный шум для скринридера). `aria-live="polite"` регион анонсирует ОДИН раз
+  на `done`/`message_saved` событие — весь готовый ответ целиком.
+- Фокус: после отправки сообщения фокус остаётся в textarea (не уводится к появившемуся
+  ActionCard) — пользователь может сразу писать следующее сообщение; Tab уводит к
+  Confirm/Reject кнопкам по мере появления карточек, в DOM-порядке (совпадает с visual order).
