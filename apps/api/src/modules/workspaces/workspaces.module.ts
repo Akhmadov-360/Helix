@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { AuthzModule } from "../../core/authz/authz.module";
 import { ActivityModule } from "../activity/activity.module";
+import { AiChatModule } from "../ai/ai-chat.module";
 import { AttachmentsModule } from "../attachments/attachments.module";
 import { AuthModule } from "../auth/auth.module";
 import { BlueprintsModule } from "../blueprints/blueprints.module";
@@ -41,8 +42,12 @@ import { WorkspacesService } from "./workspaces.service";
     AttachmentsModule,
     KbModule,
     PagesModule,
+    AiChatModule,
   ],
   controllers: [WorkspacesController, PhasesController, FieldsController, ProjectsController],
   providers: [WorkspacesService, WorkspacesRepository, PhasesService, FieldsService, ProjectsService],
+  // ProjectsService — для AiThreadsModule (tool-call-executor.ts, ai-chat.md §6 шаг 3:
+  // move_phase/update_field исполняются ЧЕРЕЗ существующий сервис, не напрямую в БД).
+  exports: [ProjectsService],
 })
 export class WorkspacesModule {}

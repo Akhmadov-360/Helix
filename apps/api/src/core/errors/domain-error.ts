@@ -397,3 +397,52 @@ export class ProjectStorageQuotaExceededError extends BadRequestError {
     super("Project storage quota exceeded");
   }
 }
+
+/**
+ * Запрос корректен и разрешён (не 400/403), но выполнить его сейчас нельзя из-за состояния
+ * конфигурации, не зависящего от самого запроса — ai-chat.md §12: "AI не настроен для этой
+ * организации" не тихий fallback на дефолтный провайдер без ключа. 422, не 400: тело запроса
+ * ни при чём, дело в оргии.
+ */
+export abstract class UnprocessableError extends DomainError {}
+
+/**
+ * ai-chat.md §5/§12 — в env нет ключа для выбранного провайдера (ProviderNotConfiguredError из
+ * @helix/ai). Отдельный code от AiProviderNotImplementedError (code review) — "добавьте API-ключ"
+ * и "этот провайдер ещё не поддержан" требуют разных действий от админа, один код на оба случая
+ * увёл бы админа чинить несуществующую проблему с ключом там, где дело в Bedrock-заглушке.
+ */
+export class AiProviderNotConfiguredError extends UnprocessableError {
+  readonly code = "AI_PROVIDER_NOT_CONFIGURED";
+
+  constructor(provider: string) {
+    super(`AI provider "${provider}" is not configured for this organization`);
+  }
+}
+
+/** ai-chat.md §11 — провайдер выбран (Bedrock), но реализация ещё не завершена в этом заходе
+ * (ProviderNotImplementedError из @helix/ai — "можно вторым"). НЕ путать с отсутствием ключа. */
+export class AiProviderNotImplementedError extends UnprocessableError {
+  readonly code = "AI_PROVIDER_NOT_IMPLEMENTED";
+
+  constructor(provider: string) {
+    super(`AI provider "${provider}" is not implemented yet`);
+  }
+}
+
+/**
+ * ai-chat.md §6 шаг 5/§10 — единый код на оба случая гонки вокруг tool-call confirm/reject:
+ * (a) статус уже не PROPOSED (двойной confirm/reject, либо уже выполнено) и (b) состояние ЦЕЛИ
+ * успело измениться между propose и confirm (фаза/сосед удалены — исполняющий сервис бросил
+ * ResourceNotFoundError/ConflictError). Оба — "то, что было верно 5 минут назад, больше не верно"
+ * → 409, не 500/404: второй случай ai-chat.md §10 явно требует именно 409, а не транспортный код
+ * исполняющего сервиса (тот 404 был бы верен для REST-эндпоинта фазы, но не для tool-call —
+ * здесь это состояние ПРЕДЛОЖЕНИЯ протухло, не "фаза не найдена" с точки зрения confirm-ручки).
+ */
+export class ToolCallNotPendingError extends ConflictError {
+  readonly code = "TOOL_CALL_NOT_PENDING";
+
+  constructor(message = "This action is no longer pending confirmation") {
+    super(message);
+  }
+}

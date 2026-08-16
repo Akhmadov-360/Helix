@@ -1,3 +1,4 @@
+import type { Readable } from "node:stream";
 import { Inject, Injectable } from "@nestjs/common";
 import {
   DeleteObjectCommand,
@@ -71,6 +72,19 @@ export class S3Service {
       if (isNotFoundError(err)) return null;
       throw err;
     }
+  }
+
+  /** ai-chat.md §3.2 — ingest-пайплайн читает СОДЕРЖИМОЕ файла для извлечения текста: единственный
+   * потребитель, которому нужен реальный body объекта на сервере, не presigned URL (presigned —
+   * для браузера, тут сервер сам делает запрос). */
+  async getObjectBuffer(key: string): Promise<Buffer> {
+    const result = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
+    const stream = result.Body as Readable;
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as ArrayBuffer));
+    }
+    return Buffer.concat(chunks);
   }
 
   /** files.md §6 — удаление одного вложения, синхронно. */

@@ -1,7 +1,16 @@
 import { useRef, useState } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { CURRENCY_CODES, MAX_LOGO_FILE_BYTES, TIME_ZONES, type OrganizationSettings } from "@helix/api-schemas";
+import {
+  AI_CHAT_PROVIDERS,
+  AI_EMBEDDING_PROVIDERS,
+  CURRENCY_CODES,
+  MAX_LOGO_FILE_BYTES,
+  TIME_ZONES,
+  type AiChatProviderName,
+  type AiEmbeddingProviderName,
+  type OrganizationSettings,
+} from "@helix/api-schemas";
 import { Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@helix/ui";
 import { useCan } from "../../shared/auth/ability";
 import { useT } from "../../shared/i18n";
@@ -51,7 +60,8 @@ export function GeneralSettingsPage({ orgId }: { orgId: string }) {
         primaryColor: form.branding?.primaryColor || undefined,
       },
       aiProvider: {
-        provider: form.aiProvider?.provider?.trim() || undefined,
+        provider: form.aiProvider?.provider || undefined,
+        embeddingProvider: form.aiProvider?.embeddingProvider || undefined,
         region: form.aiProvider?.region?.trim() || undefined,
       },
     };
@@ -158,11 +168,43 @@ export function GeneralSettingsPage({ orgId }: { orgId: string }) {
             <p className="text-xs text-muted-foreground">{t("settings.general.aiProvider.hint")}</p>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="org-ai-provider">{t("settings.general.aiProvider.provider")}</Label>
-              <Input
-                id="org-ai-provider"
+              <Select
                 value={form.aiProvider?.provider ?? ""}
-                onChange={(e) => set("aiProvider", { ...form.aiProvider, provider: e.target.value })}
-              />
+                onValueChange={(v) => set("aiProvider", { ...form.aiProvider, provider: v as AiChatProviderName })}
+              >
+                <SelectTrigger id="org-ai-provider">
+                  <SelectValue placeholder={t("settings.general.aiProvider.provider.placeholder")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {AI_CHAT_PROVIDERS.map((provider) => (
+                    <SelectItem key={provider} value={provider}>
+                      {provider}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="org-ai-embedding-provider">{t("settings.general.aiProvider.embeddingProvider")}</Label>
+              {/* Anthropic намеренно отсутствует в списке — у Anthropic нет embeddings endpoint
+                  (ADR, decisions.md), embedding-провайдер выбирается независимо от chat-провайдера. */}
+              <Select
+                value={form.aiProvider?.embeddingProvider ?? ""}
+                onValueChange={(v) =>
+                  set("aiProvider", { ...form.aiProvider, embeddingProvider: v as AiEmbeddingProviderName })
+                }
+              >
+                <SelectTrigger id="org-ai-embedding-provider">
+                  <SelectValue placeholder={t("settings.general.aiProvider.embeddingProvider.placeholder")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {AI_EMBEDDING_PROVIDERS.map((provider) => (
+                    <SelectItem key={provider} value={provider}>
+                      {provider}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="org-ai-region">{t("settings.general.aiProvider.region")}</Label>

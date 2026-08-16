@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { AuthzModule } from "../../core/authz/authz.module";
+import { AiChatModule } from "../ai/ai-chat.module";
 import { AuthModule } from "../auth/auth.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { KbController } from "./kb.controller";
@@ -7,8 +8,9 @@ import { KbRepository } from "./kb.repository";
 import { KbService } from "./kb.service";
 
 // pages-kb.md §7. exports: KbRepository — WorkspacesModule (createFromBlueprint → kbSeed, §3).
+// AiChatModule — IngestEmbeddingsProducer/EmbeddingChunkRepository (ai-chat.md §3.1).
 @Module({
-  imports: [AuthModule, AuthzModule, OrganizationsModule],
+  imports: [AuthModule, AuthzModule, OrganizationsModule, AiChatModule],
   controllers: [KbController],
   providers: [KbService, KbRepository],
   exports: [KbRepository],

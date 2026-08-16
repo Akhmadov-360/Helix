@@ -26,6 +26,7 @@ import { extractPlainText } from "../../core/lib/full-text-search";
 import { PrismaService } from "../../core/prisma/prisma.service";
 import { ActivityRecorder } from "../activity/activity-recorder";
 import { ActivityRepository } from "../activity/activity.repository";
+import { EmbeddingChunkRepository } from "../ai/embedding-chunk.repository";
 import { AttachmentCleanupProducer } from "../attachments/attachment-cleanup.producer";
 import { AttachmentsRepository } from "../attachments/attachments.repository";
 import { BlueprintsRepository } from "../blueprints/blueprints.repository";
@@ -71,6 +72,7 @@ export class ProjectsService {
     private readonly attachmentCleanup: AttachmentCleanupProducer,
     private readonly blueprints: BlueprintsRepository,
     private readonly pages: PagesRepository,
+    private readonly embeddingChunks: EmbeddingChunkRepository,
   ) {}
 
   async getById(orgId: string, projectId: string): Promise<ProjectResponse> {
@@ -192,6 +194,11 @@ export class ProjectsService {
     const storageKeys = await this.prisma.client.$transaction(async (tx) => {
       const keys = await this.attachments.listStorageKeysByProject(projectId, tx);
       await this.projects.delete(projectId, tx);
+      // code review: Page/Attachment каскадятся от Project на уровне БД (ON DELETE CASCADE) в
+      // обход сервисного remove()/delete(), который иначе почистил бы EmbeddingChunk по sourceId —
+      // без этого чанки удалённых Page/Attachment осиротели бы навсегда (ai-chat.md §1.1: чанки
+      // намеренно НЕ FK-каскадятся от Project — держит приложение).
+      await this.embeddingChunks.deleteByProject(projectId, tx);
       return keys;
     });
     await this.attachmentCleanup.enqueueProjectCleanup(storageKeys);

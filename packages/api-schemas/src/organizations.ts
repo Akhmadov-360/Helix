@@ -69,11 +69,18 @@ const brandingSchema = z.object({
     .optional(),
 });
 
-// aiProvider — конфиг-заглушка под M4 (AI/RAG ещё не построены): свободные строки, без
-// enforcement сегодня. Провайдер/регион валидируются реальными значениями, когда появится
-// потребитель (packages/ai), не раньше — не изобретаем enum под несуществующую интеграцию.
+// aiProvider — потребитель появился (@helix/ai, ai-chat.md §5), enum'ы теперь реальные значения,
+// не свободная строка. embeddingProvider — ОТДЕЛЬНОЕ поле от provider (ADR, decisions.md): у
+// Anthropic нет embeddings endpoint, поэтому chat- и embedding-провайдер выбираются независимо —
+// схема не должна давать выбрать anthropic туда, где нужен embeddingProvider.
+export const AI_CHAT_PROVIDERS = ["anthropic", "openai", "bedrock"] as const;
+export type AiChatProviderName = (typeof AI_CHAT_PROVIDERS)[number];
+export const AI_EMBEDDING_PROVIDERS = ["openai", "bedrock"] as const;
+export type AiEmbeddingProviderName = (typeof AI_EMBEDDING_PROVIDERS)[number];
+
 const aiProviderSchema = z.object({
-  provider: z.string().trim().min(1).max(100).optional(),
+  provider: z.enum(AI_CHAT_PROVIDERS).optional(),
+  embeddingProvider: z.enum(AI_EMBEDDING_PROVIDERS).optional(),
   region: z.string().trim().min(1).max(100).optional(),
 });
 

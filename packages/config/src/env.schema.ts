@@ -23,13 +23,18 @@ export const envSchema = z.object({
   APP_URL: z.url(), // база для deep link в письме (§5)
   // SES (prod): без кастомных кред-переменных — default credential provider chain (IAM role), §7.
   SES_REGION: z.string().optional(),
-  // SMTP (dev/MailHog): без auth, MailHog не проверяет креды.
+  // SMTP: в деве (MailHog) без auth — USER/PASS не заданы. В проде реальный провайдер
+  // (Resend/SendGrid/Mailgun и т.п.) авторизацию требует всегда — оба поля optional() на уровне
+  // env (те же условные креды, что SES_REGION/S3_*), но SmtpMailerService передаёt auth ТОЛЬКО
+  // если оба заданы (см. smtp-mailer.service.ts) — не шлёт пустой auth-объект туда, где его не ждут.
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
 
   // ── Files / S3 · MinIO (M3, docs/specs/files.md §12) ──────────────────────────
-  S3_ENDPOINT: z.url().optional(),   // задан → MinIO/S3-совместимый (dev); не задан → настоящий AWS S3 (prod)
-  S3_REGION: z.string().optional(),  // как SES_REGION — не обязателен, SDK резолвит по умолчанию
+  S3_ENDPOINT: z.url().optional(), // задан → MinIO/S3-совместимый (dev); не задан → настоящий AWS S3 (prod)
+  S3_REGION: z.string().optional(), // как SES_REGION — не обязателен, SDK резолвит по умолчанию
   S3_ACCESS_KEY: z.string().optional(), // нужен только при заданном S3_ENDPOINT (MinIO)
   S3_SECRET_KEY: z.string().optional(), // нужен только при заданном S3_ENDPOINT (MinIO)
   S3_BUCKET: z.string(), // ОБЯЗАТЕЛЕН: без него Attachment-модуль не может работать вообще
@@ -54,6 +59,15 @@ export const envSchema = z.object({
   // Refresh-cookie идёт с credentials: "include" (auth.md §4) → нужен ТОЧНЫЙ origin
   // в Access-Control-Allow-Origin, wildcard "*" с credentials браузер отклоняет.
   WEB_ORIGIN: z.url().default("http://localhost:5173"),
+
+  // ── AI / RAG (M4, docs/specs/ai-chat.md §9) ───────────────────────────────────
+  // Все optional() на уровне env — то, ЧЕМ обслуживать чат/эмбеддинги, выбирается per-org
+  // (Organization.settings.aiProvider), не глобально. Если организация выбрала provider, для которого
+  // здесь нет ключа — это не boot-time ошибка (как S3_BUCKET), а runtime 422 "AI не настроен для
+  // этой организации" (ai-chat.md §12) — ключей может не быть вовсе, если AI никто не включал.
+  ANTHROPIC_API_KEY: z.string().optional(),
+  OPENAI_API_KEY: z.string().optional(), // также обслуживает embeddingProvider="openai" (ADR, decisions.md — Anthropic без embeddings endpoint)
+  AWS_BEDROCK_REGION: z.string().optional(), // Bedrock — default credential provider chain (IAM role), тот же паттерн, что SES_REGION
 });
 
 export type Env = z.infer<typeof envSchema>;

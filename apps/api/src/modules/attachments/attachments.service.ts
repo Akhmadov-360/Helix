@@ -18,6 +18,9 @@ import {
 import { PrismaService } from "../../core/prisma/prisma.service";
 import { S3Service } from "../../core/storage/s3.service";
 import { ActivityRecorder } from "../activity/activity-recorder";
+import { EmbeddingChunkRepository } from "../ai/embedding-chunk.repository";
+import { IngestEmbeddingsProducer } from "../ai/ingest-embeddings.producer";
+import { isExtractableMimeType } from "../ai/text-extraction";
 import { ProjectsRepository } from "../projects/projects.repository";
 import { UsersRepository } from "../users/users.repository";
 import { AttachmentsRepository, type AttachmentRow } from "./attachments.repository";
@@ -31,6 +34,8 @@ export class AttachmentsService {
     private readonly s3: S3Service,
     private readonly activity: ActivityRecorder,
     private readonly users: UsersRepository,
+    private readonly ingest: IngestEmbeddingsProducer,
+    private readonly embeddingChunks: EmbeddingChunkRepository,
   ) {}
 
   /** files.md §3, шаг 1. */
@@ -98,8 +103,9 @@ export class AttachmentsService {
 
     // attachment.uploaded — только на РЕАЛЬНОМ первом confirm (CAS won=true): повторный вызов на
     // уже подтверждённую строку — идемпотентный успех (см. комментарий выше), не второе событие.
+    let won = false;
     await this.prisma.client.$transaction(async (tx) => {
-      const won = (await this.attachments.confirm(attachmentId, tx)) === 1;
+      won = (await this.attachments.confirm(attachmentId, tx)) === 1;
       if (!won) return;
       await this.activity.record(tx, {
         orgId,
@@ -112,6 +118,11 @@ export class AttachmentsService {
         },
       });
     });
+    // ai-chat.md §3.1 — только на РЕАЛЬНОМ первом confirm (тот же CAS-гейт, что attachment.uploaded
+    // выше), и только для извлекаемых форматов (FR-FILE-3) — не плодим джобы на изображения/архивы.
+    if (won && isExtractableMimeType(row.mimeType)) {
+      await this.ingest.enqueue({ orgId, sourceType: "ATTACHMENT", sourceId: row.id, projectId, workspaceId: null });
+    }
     return toAttachmentResponse({ ...row, confirmedAt: new Date() });
   }
 
@@ -157,6 +168,8 @@ export class AttachmentsService {
     await this.s3.deleteObject(row.storageKey);
     await this.prisma.client.$transaction(async (tx) => {
       await this.attachments.delete(attachmentId, tx);
+      // ai-chat.md §1.1 — чанки не FK-каскадятся от Attachment, чистим явно (P2 не применяется к EmbeddingChunk).
+      await this.embeddingChunks.deleteBySource("ATTACHMENT", attachmentId, tx);
       const actor = await this.users.findProfileById(actorId, tx);
       await this.activity.record(tx, {
         orgId,

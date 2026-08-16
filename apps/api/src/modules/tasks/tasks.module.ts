@@ -24,5 +24,8 @@ import { TasksService } from "./tasks.service";
   ],
   controllers: [ProjectTasksController, TasksController],
   providers: [TasksService, TaskRepository],
+  // TasksService — для AiThreadsModule (tool-call-executor.ts, ai-chat.md §6 шаг 3: create_task
+  // исполняется ЧЕРЕЗ существующий сервис, не напрямую в БД).
+  exports: [TasksService],
 })
 export class TasksModule {}

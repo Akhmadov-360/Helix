@@ -109,6 +109,9 @@ manual-migration-инварианты (ниже) обязательны — па
    полнотекстовый поиск (M3, Pages). Сам столбец обычный (Prisma-колонка), индекс — raw SQL.
 7. `KBArticle.searchText` — тот же приём, что #6, для полнотекстового поиска KB (пересмотр §7
    pages-kb.md: изначально было ILIKE-only, расширено по запросу до full-text, как у Pages).
+8. `EmbeddingChunk.embedding` — `CREATE EXTENSION vector` + HNSW-индекс (`vector_cosine_ops`) под
+   RAG-поиск (M4, ai-chat.md §1.1). Сам столбец — `Unsupported("vector(1536)")`, Prisma не
+   выражает ни extension, ни vector-индексы — raw SQL.
 
 > Каждый `migrate dev` попутно генерит `DROP INDEX "phase_ws_order_unique"` (#1) — **вырезать вручную**
 > из миграции перед применением (см. decisions.md, gotcha #4).

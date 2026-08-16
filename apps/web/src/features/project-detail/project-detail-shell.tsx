@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft, ArrowUpRight, Building2 } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Bot, Building2 } from "lucide-react";
 import type { CompanyResponse } from "@helix/api-schemas";
-import { Avatar, Badge, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@helix/ui";
+import { Avatar, Badge, Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@helix/ui";
+import { ChatDrawer } from "../ai-chat/chat-drawer";
 import { useCan } from "../../shared/auth/ability";
 import { useLocaleStore, useT } from "../../shared/i18n";
 import { orgMembersQueryOptions } from "../../shared/org/queries";
@@ -104,6 +106,7 @@ export function ProjectDetailShell({
   const t = useT();
   const locale = useLocaleStore((state) => state.locale);
   const company = project.companyId ? companies.find((c) => c.id === project.companyId) : undefined;
+  const [chatOpen, setChatOpen] = useState(false);
 
   const value =
     project.value === null || project.currency === null
@@ -133,6 +136,10 @@ export function ProjectDetailShell({
             >
               {t(`projectDetail.status.${project.status}`)}
             </Badge>
+            <Button type="button" variant="outline" size="sm" className="ml-auto gap-1.5" onClick={() => setChatOpen(true)}>
+              <Bot className="h-3.5 w-3.5" />
+              {t("aiChat.trigger")}
+            </Button>
           </div>
           <ProjectTabs projectId={projectId} />
           {children}
@@ -185,6 +192,8 @@ export function ProjectDetailShell({
           <AssigneesPanel orgId={orgId} projectId={projectId} />
         </aside>
       </div>
+
+      <ChatDrawer orgId={orgId} projectId={projectId} open={chatOpen} onOpenChange={setChatOpen} />
     </div>
   );
 }

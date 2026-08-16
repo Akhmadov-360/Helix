@@ -3,6 +3,8 @@ import { AttachmentTooLargeError, AttachmentUploadNotConfirmedError, ResourceNot
 import type { PrismaService } from "../../src/core/prisma/prisma.service";
 import type { S3Service } from "../../src/core/storage/s3.service";
 import type { ActivityRecorder } from "../../src/modules/activity/activity-recorder";
+import type { EmbeddingChunkRepository } from "../../src/modules/ai/embedding-chunk.repository";
+import type { IngestEmbeddingsProducer } from "../../src/modules/ai/ingest-embeddings.producer";
 import { AttachmentsService } from "../../src/modules/attachments/attachments.service";
 import type { AttachmentsRepository, AttachmentRow } from "../../src/modules/attachments/attachments.repository";
 import type { ProjectsRepository } from "../../src/modules/projects/projects.repository";
@@ -47,6 +49,8 @@ describe("AttachmentsService.confirm — реальный размер как е
     const prisma = { client: { $transaction: vi.fn((fn: (tx: unknown) => unknown) => fn({})) } };
     const activity = { record: vi.fn().mockResolvedValue(undefined) };
     const users = { findProfileById: vi.fn().mockResolvedValue(null) };
+    const ingest = { enqueue: vi.fn().mockResolvedValue(undefined) };
+    const embeddingChunks = { deleteBySource: vi.fn().mockResolvedValue(undefined) };
     const service = new AttachmentsService(
       prisma as unknown as PrismaService,
       attachments as unknown as AttachmentsRepository,
@@ -54,8 +58,10 @@ describe("AttachmentsService.confirm — реальный размер как е
       s3 as unknown as S3Service,
       activity as unknown as ActivityRecorder,
       users as unknown as UsersRepository,
+      ingest as unknown as IngestEmbeddingsProducer,
+      embeddingChunks as unknown as EmbeddingChunkRepository,
     );
-    return { service, attachments, s3 };
+    return { service, attachments, s3, ingest, embeddingChunks };
   }
 
   it("объект не найден в S3 → AttachmentUploadNotConfirmedError, confirm() репозитория не вызывается", async () => {
