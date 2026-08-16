@@ -4,6 +4,7 @@ import { TransportError } from "../../shared/api";
 export type BoardError =
   | "staleNeighbors"
   | "missingRequiredFields"
+  | "companyRequired"
   | "permissionDenied"
   | "notFound"
   | "unexpected";
@@ -12,6 +13,7 @@ export function toBoardError(error: unknown): BoardError {
   if (!(error instanceof TransportError)) return "unexpected";
   if (error.kind === "conflict" && error.code === "STALE_NEIGHBORS") return "staleNeighbors";
   if (error.kind === "validation" && error.code === "MISSING_REQUIRED_FIELDS") return "missingRequiredFields";
+  if (error.kind === "validation" && error.code === "COMPANY_REQUIRED") return "companyRequired";
   if (error.kind === "forbidden") return "permissionDenied";
   if (error.kind === "notFound") return "notFound";
   return "unexpected";

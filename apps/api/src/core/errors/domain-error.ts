@@ -187,6 +187,15 @@ export class IncompatibleFieldTypeChangeError extends BadRequestError {
   }
 }
 
+/** B2B-воркспейс: компания обязательна на create (decisions.md — audience разводит B2B/B2C). */
+export class CompanyRequiredError extends BadRequestError {
+  readonly code = "COMPANY_REQUIRED";
+
+  constructor() {
+    super("This workspace requires a company on every lead");
+  }
+}
+
 /** Нельзя создать лид в доске без фаз (§10): Project.phaseId NOT NULL, класть некуда. */
 export class WorkspaceHasNoPhasesError extends ConflictError {
   readonly code = "WORKSPACE_HAS_NO_PHASES";

@@ -17,6 +17,17 @@ async function signUp(app: INestApplication): Promise<{ token: string; orgId: st
   return { token, orgId };
 }
 
+// Блюпринты в этом файле — фиксированно audience "B2B" (не предмет теста): CompanyRequiredError
+// на create (projects.md) требует companyId, здесь просто заводим компанию под фикстуру.
+async function makeCompany(app: INestApplication, token: string): Promise<string> {
+  const res = await request(app.getHttpServer())
+    .post("/v1/companies")
+    .set("Authorization", `Bearer ${token}`)
+    .send({ name: "Acme Corp" })
+    .expect(201);
+  return res.body.data.company.id;
+}
+
 /** Прямая вставка — API создания блюпринта (save-as-blueprint) не принимает pageTemplates/kbSeed
  *  на вход (blueprints.md §0: они валидны в definition, но ничем их туда не кладёт кроме теста). */
 async function insertBlueprintWithTemplates(
@@ -88,10 +99,11 @@ describe("Blueprint instantiation — pageTemplates/kbSeed (pages-kb.md §3)", (
       .send({ name: "From blueprint", blueprintId })
       .expect(201);
 
+    const companyId = await makeCompany(app, token);
     const project = await request(app.getHttpServer())
       .post(`/v1/workspaces/${ws.body.data.id}/projects`)
       .set("Authorization", `Bearer ${token}`)
-      .send({ title: "New lead" })
+      .send({ title: "New lead", companyId })
       .expect(201);
 
     const pages = await prisma.page.findMany({ where: { projectId: project.body.data.id } });
@@ -102,7 +114,7 @@ describe("Blueprint instantiation — pageTemplates/kbSeed (pages-kb.md §3)", (
     const project2 = await request(app.getHttpServer())
       .post(`/v1/workspaces/${ws.body.data.id}/projects`)
       .set("Authorization", `Bearer ${token}`)
-      .send({ title: "Another lead" })
+      .send({ title: "Another lead", companyId })
       .expect(201);
     const pages2 = await prisma.page.findMany({ where: { projectId: project2.body.data.id } });
     expect(pages2).toHaveLength(2);
@@ -119,10 +131,11 @@ describe("Blueprint instantiation — pageTemplates/kbSeed (pages-kb.md §3)", (
       .expect(201);
     expect(await prisma.kBArticle.count({ where: { workspaceId: ws.body.data.id } })).toBe(0);
 
+    const companyId = await makeCompany(app, token);
     const project = await request(app.getHttpServer())
       .post(`/v1/workspaces/${ws.body.data.id}/projects`)
       .set("Authorization", `Bearer ${token}`)
-      .send({ title: "Lead" })
+      .send({ title: "Lead", companyId })
       .expect(201);
     expect(await prisma.page.count({ where: { projectId: project.body.data.id } })).toBe(0);
   });

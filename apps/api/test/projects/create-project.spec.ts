@@ -28,11 +28,11 @@ describe("POST /v1/workspaces/:id/projects", () => {
     await app.close();
   });
 
-  const makeBoard = async (token: string): Promise<{ id: string; firstPhaseId: string }> => {
+  const makeBoard = async (token: string, audience?: "B2B" | "B2C" | "MIXED"): Promise<{ id: string; firstPhaseId: string }> => {
     const res = await request(app.getHttpServer())
       .post("/v1/workspaces")
       .set("Authorization", `Bearer ${token}`)
-      .send({ name: "Board" })
+      .send({ name: "Board", audience })
       .expect(201);
     return { id: res.body.data.id, firstPhaseId: res.body.data.phases[0].id };
   };
@@ -157,6 +157,34 @@ describe("POST /v1/workspaces/:id/projects", () => {
       const board = await makeBoard(owner.token);
       const stranger = await signUp(app);
       await create(stranger.token, board.id, { title: "x" }).expect(404);
+    });
+
+    it("B2B-воркспейс без companyId → 400 COMPANY_REQUIRED", async () => {
+      const { token } = await signUp(app);
+      const board = await makeBoard(token, "B2B");
+
+      const res = await create(token, board.id, { title: "x" }).expect(400);
+      expect(res.body.error.code).toBe("COMPANY_REQUIRED");
+    });
+
+    it("B2B-воркспейс с companyId → 201", async () => {
+      const { token } = await signUp(app);
+      const board = await makeBoard(token, "B2B");
+      const company = await request(app.getHttpServer())
+        .post("/v1/companies")
+        .set("Authorization", `Bearer ${token}`)
+        .send({ name: "Acme Corp" })
+        .expect(201);
+      const companyId = company.body.data.company.id;
+
+      const res = await create(token, board.id, { title: "x", companyId }).expect(201);
+      expect(res.body.data.companyId).toBe(companyId);
+    });
+
+    it("B2C/MIXED-воркспейс без companyId → 201 (companyId остаётся опциональным)", async () => {
+      const { token } = await signUp(app);
+      const board = await makeBoard(token, "B2C");
+      await create(token, board.id, { title: "x" }).expect(201);
     });
 
     it("доска без фаз → 409 WORKSPACE_HAS_NO_PHASES", async () => {

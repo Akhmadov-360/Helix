@@ -139,6 +139,8 @@
   "board.create.source": "Источник",
   "board.create.sourceHint": "Источник сделки (напр. Сайт, Instagram, Рекомендация)",
   "board.create.company": "Компания",
+  "board.create.company.placeholder": "Выберите компанию",
+  "board.create.companyRequiredHint": "В этом воркспейсе (B2B) у каждого лида должна быть компания",
   "board.create.owner": "Владелец",
   "board.create.ownerMe": "{name} (я)",
   "board.create.cancel": "Отмена",
@@ -511,6 +513,7 @@
   "contacts.delete.success": "Контакт удалён",
 
   "board.error.missingRequiredFields": "Заполните обязательные поля",
+  "board.error.companyRequired": "В этом воркспейсе у лида обязательно должна быть компания",
   "projectDetail.sidebar.customFields": "Дополнительные поля",
 
   "fields.group.text": "Текст",

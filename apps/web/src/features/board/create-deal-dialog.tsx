@@ -36,12 +36,15 @@ export function CreateDealDialog({
   orgId,
   workspaceId,
   companies,
+  companyRequired,
   open,
   onOpenChange,
 }: {
   orgId: string;
   workspaceId: string;
   companies: CompanyResponse[];
+  /** B2B-воркспейс (workspace.audience) — companyId обязателен, см. CompanyRequiredError на бэке. */
+  companyRequired: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -54,7 +57,7 @@ export function CreateDealDialog({
   const [value, setValue] = useState("");
   const [currency, setCurrency] = useState("USD");
   const [source, setSource] = useState("");
-  const [companyId, setCompanyId] = useState(NO_COMPANY);
+  const [companyId, setCompanyId] = useState(companyRequired ? "" : NO_COMPANY);
   // Дефолт — сам создатель (decisions.md ADR "ownerId дефолтится создателем"): без владельца
   // «уведомить владельца о новом лиде» выродилось бы в «уведомить почти никого». Явный пикер,
   // а не тихий бэкенд-фолбэк — так владелец виден и его сразу можно поменять, не уходя в reassign.
@@ -66,14 +69,16 @@ export function CreateDealDialog({
     setValue("");
     setCurrency("USD");
     setSource("");
-    setCompanyId(NO_COMPANY);
+    setCompanyId(companyRequired ? "" : NO_COMPANY);
     setOwnerId(me.id);
     setFields({});
   }
 
+  const companyMissing = companyRequired && (companyId === NO_COMPANY || companyId === "");
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!title.trim() || companyMissing) return;
     const parsedValue = value.trim() ? Number(value) : undefined;
     create.mutate(
       {
@@ -81,7 +86,7 @@ export function CreateDealDialog({
         value: parsedValue,
         currency: parsedValue !== undefined ? currency.trim().toUpperCase() : undefined,
         source: source.trim() || undefined,
-        companyId: companyId === NO_COMPANY ? undefined : companyId,
+        companyId: companyId === NO_COMPANY || companyId === "" ? undefined : companyId,
         ownerId,
         fields: fieldDefinitions.length > 0 ? fields : undefined,
       },
@@ -163,13 +168,16 @@ export function CreateDealDialog({
             <p className="text-xs text-muted-foreground">{t("board.create.sourceHint")}</p>
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="deal-company">{t("board.create.company")}</Label>
+            <Label htmlFor="deal-company" required={companyRequired}>
+              {t("board.create.company")}
+            </Label>
             <Select value={companyId} onValueChange={setCompanyId} disabled={create.isPending}>
               <SelectTrigger id="deal-company">
-                <SelectValue />
+                <SelectValue placeholder={companyRequired ? t("board.create.company.placeholder") : undefined} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={NO_COMPANY}>{t("contacts.form.companyNone")}</SelectItem>
+                {/* B2B: без "без компании" — компания обязательна, пустой вариант только путал бы. */}
+                {!companyRequired && <SelectItem value={NO_COMPANY}>{t("contacts.form.companyNone")}</SelectItem>}
                 {companies.map((company) => (
                   <SelectItem key={company.id} value={company.id}>
                     {company.name}
@@ -177,6 +185,7 @@ export function CreateDealDialog({
                 ))}
               </SelectContent>
             </Select>
+            {companyRequired && <p className="text-xs text-muted-foreground">{t("board.create.companyRequiredHint")}</p>}
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="deal-owner">{t("board.create.owner")}</Label>
@@ -221,7 +230,7 @@ export function CreateDealDialog({
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={create.isPending}>
               {t("board.create.cancel")}
             </Button>
-            <Button type="submit" disabled={create.isPending || !title.trim()}>
+            <Button type="submit" disabled={create.isPending || !title.trim() || companyMissing}>
               {create.isPending ? t("board.create.submitting") : t("board.create.submit")}
             </Button>
           </DialogFooter>

@@ -17,6 +17,7 @@ import {
   type UpdateProjectInput,
 } from "@helix/api-schemas";
 import {
+  CompanyRequiredError,
   MissingRequiredFieldsError,
   ResourceNotFoundError,
   StaleNeighborsError,
@@ -485,6 +486,11 @@ export class ProjectsService {
 
     const firstPhase = workspace.phases[0]; // findByIdInOrg отдаёт фазы orderBy order asc
     if (!firstPhase) throw new WorkspaceHasNoPhasesError();
+
+    // audience — единственный дискриминатор B2B/B2C (decisions.md), не отдельная настройка:
+    // B2B-воркспейс обслуживает компании, лид без companyId для него не имеет смысла. B2C/MIXED —
+    // компания как была опциональной, так и остаётся.
+    if (workspace.audience === "B2B" && !input.companyId) throw new CompanyRequiredError();
 
     const topRank = await this.projects.findTopRank(firstPhase.id);
     const rank = rankBetween(null, topRank); // наверх: перед текущим первым

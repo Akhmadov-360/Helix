@@ -139,6 +139,8 @@
   "board.create.source": "Source",
   "board.create.sourceHint": "Where the deal came from (e.g. Website, Instagram, Referral)",
   "board.create.company": "Company",
+  "board.create.company.placeholder": "Select a company",
+  "board.create.companyRequiredHint": "This B2B workspace requires a company on every lead",
   "board.create.owner": "Owner",
   "board.create.ownerMe": "{name} (you)",
   "board.create.cancel": "Cancel",
@@ -511,6 +513,7 @@
   "contacts.delete.success": "Contact deleted",
 
   "board.error.missingRequiredFields": "Fill in the required fields",
+  "board.error.companyRequired": "This workspace requires a company on every lead",
   "projectDetail.sidebar.customFields": "Custom fields",
 
   "fields.group.text": "Text",

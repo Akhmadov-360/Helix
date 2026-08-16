@@ -39,11 +39,23 @@ describe("ProjectContact CRUD (§2/§5, unit 3)", () => {
         .send({ name: "Board", audience })
         .expect(201)
     ).body.data;
+    // B2B требует companyId на create (projects.md — CompanyRequiredError): не тестируем это здесь,
+    // это отдельная зона ответственности create-project.spec.ts.
+    const companyId =
+      audience === "B2B"
+        ? (
+            await request(app.getHttpServer())
+              .post("/v1/companies")
+              .set("Authorization", `Bearer ${token}`)
+              .send({ name: "Acme Corp" })
+              .expect(201)
+          ).body.data.company.id
+        : undefined;
     return (
       await request(app.getHttpServer())
         .post(`/v1/workspaces/${ws.id}/projects`)
         .set("Authorization", `Bearer ${token}`)
-        .send({ title: "Lead" })
+        .send({ title: "Lead", companyId })
         .expect(201)
     ).body.data.id;
   }

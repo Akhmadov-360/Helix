@@ -111,6 +111,8 @@ function boardErrorKey(kind: ReturnType<typeof toBoardError>): MessageKey {
       return "board.error.staleNeighbors";
     case "missingRequiredFields":
       return "board.error.missingRequiredFields";
+    case "companyRequired":
+      return "board.error.companyRequired";
     case "permissionDenied":
       return "board.error.permissionDenied";
     case "notFound":

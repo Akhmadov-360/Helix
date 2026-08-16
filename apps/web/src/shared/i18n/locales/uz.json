@@ -139,6 +139,8 @@
   "board.create.source": "Manba",
   "board.create.sourceHint": "Lid qayerdan kelgani (masalan, Sayt, Instagram, Tavsiya)",
   "board.create.company": "Kompaniya",
+  "board.create.company.placeholder": "Kompaniyani tanlang",
+  "board.create.companyRequiredHint": "Bu B2B workspace'da har bir lidda kompaniya bo'lishi shart",
   "board.create.owner": "Egasi",
   "board.create.ownerMe": "{name} (men)",
   "board.create.cancel": "Bekor qilish",
@@ -511,6 +513,7 @@
   "contacts.delete.success": "Kontakt o‘chirildi",
 
   "board.error.missingRequiredFields": "Majburiy maydonlarni to'ldiring",
+  "board.error.companyRequired": "Bu workspace'da har bir lidda kompaniya bo'lishi shart",
   "projectDetail.sidebar.customFields": "Qo'shimcha maydonlar",
 
   "fields.group.text": "Matn",

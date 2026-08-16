@@ -54,7 +54,14 @@ export function BoardShell({ orgId, workspaceId, workspace, companies, view, onV
           <TableView orgId={orgId} workspaceId={workspaceId} companies={companies} />
         )}
       </div>
-      <CreateDealDialog orgId={orgId} workspaceId={workspaceId} companies={companies} open={createOpen} onOpenChange={setCreateOpen} />
+      <CreateDealDialog
+        orgId={orgId}
+        workspaceId={workspaceId}
+        companies={companies}
+        companyRequired={workspace.audience === "B2B"}
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+      />
     </div>
   );
 }
