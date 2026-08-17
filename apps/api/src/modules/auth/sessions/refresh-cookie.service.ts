@@ -22,17 +22,27 @@ export class RefreshCookieService {
    * Три флага закрывают ТРИ РАЗНЫЕ угрозы — их постоянно путают (§4, §8):
    *  - httpOnly: JS не прочитает cookie → XSS не украдёт refresh (главную ценность,
    *    т.к. он живёт неделями, в отличие от 15-минутного access).
-   *  - sameSite=Lax: браузер не пошлёт cookie при cross-site POST → это защита от
-   *    CSRF, а НЕ от XSS. Strict был бы строже, но ломает переход по внешней ссылке.
-   *  - secure: cookie только по HTTPS. В dev по http://localhost её иначе просто
-   *    не установить, поэтому флаг привязан к окружению.
+   *  - sameSite: браузер не пошлёт Lax-куку на cross-site fetch/XHR вообще (не только
+   *    POST) — только на top-level GET-навигацию. Прод-деплой (Vercel + Railway) —
+   *    РАЗНЫЕ домены, апи-запросы с фронта всегда cross-site → с Lax refresh-кука не
+   *    доезжала НИКОГДА, бэк не видел токен, юзера выкидывало на login после первого
+   *    же протухания access-токена (обнаружено вживую: hard-logout ровно на ~15 мин).
+   *    None — обязателен для этой архитектуры (требует Secure, см. ниже). CSRF-риск
+   *    на этом пути низкий: единственные эндпоинты под path — refresh (ротация токена,
+   *    не даёт атакующему ничего читаемого из-за CORS+SOP) и logout (нет ценности для
+   *    CSRF). В dev/http None невозможен без Secure — там остаётся Lax (localhost:PORT
+   *    — один site независимо от порта, Lax там и так работает).
+   *  - secure: cookie только по HTTPS — обязателен вместе с None, и то же условие
+   *    (NODE_ENV=production) уже гарантирует HTTPS на Railway/Vercel.
    */
+  private cookieOptions() {
+    const secure = this.env.NODE_ENV === "production";
+    return { httpOnly: true, sameSite: secure ? ("none" as const) : ("lax" as const), secure, path: REFRESH_COOKIE_PATH };
+  }
+
   set(response: Response, rawToken: string): void {
     response.cookie(REFRESH_COOKIE_NAME, rawToken, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: this.env.NODE_ENV === "production",
-      path: REFRESH_COOKIE_PATH,
+      ...this.cookieOptions(),
       maxAge: this.env.REFRESH_TTL_DAYS * MS_PER_DAY,
     });
   }
@@ -45,11 +55,6 @@ export class RefreshCookieService {
    * сессии в БД. Здесь мы лишь убираем со стороны клиента токен, который уже мёртв.
    */
   clear(response: Response): void {
-    response.clearCookie(REFRESH_COOKIE_NAME, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: this.env.NODE_ENV === "production",
-      path: REFRESH_COOKIE_PATH,
-    });
+    response.clearCookie(REFRESH_COOKIE_NAME, this.cookieOptions());
   }
 }
