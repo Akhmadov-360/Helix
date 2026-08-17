@@ -127,7 +127,15 @@ export function useDeletePage(orgId: string, projectId: string) {
   });
 }
 
-export function useAddPageComment(orgId: string, pageId: string) {
+/** Локальная проекция: pending — комментарий ещё в полёте (оптимистично вставлен, id клиентский,
+ *  не с бэка). Не часть pageCommentResponseSchema — это чисто клиентское состояние UI (#12). */
+export type PendingPageComment = PageCommentResponse & { pending?: boolean };
+
+// Раньше поле ввода очищалось сразу (MentionTextarea.onSubmit чистит контент синхронно), а
+// комментарий появлялся в списке только на onSuccess — заметный зазор ощущался как "потерялось"
+// (design review, #12). onMutate вставляет его немедленно с pending:true (иконка часов в UI),
+// onSuccess подменяет ровно этот temp-id на реальный ответ сервера (не append второй раз).
+export function useAddPageComment(orgId: string, pageId: string, me: { id: string; name: string }) {
   const queryClient = useQueryClient();
   const { queryKey } = pageCommentsQueryOptions(orgId, pageId);
   const t = useT();
@@ -140,13 +148,32 @@ export function useAddPageComment(orgId: string, pageId: string) {
         body: input,
         schema: pageCommentResponseSchema,
       }),
-    onError: (error) => {
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey });
+      const snapshot = queryClient.getQueryData<PendingPageComment[]>(queryKey);
+      const tempId = `temp-${crypto.randomUUID()}`;
+      const optimistic: PendingPageComment = {
+        id: tempId,
+        pageId,
+        authorId: me.id,
+        authorName: me.name,
+        body: input.body,
+        createdAt: new Date().toISOString(),
+        pending: true,
+      };
+      queryClient.setQueryData<PendingPageComment[]>(queryKey, (current) => [...(current ?? []), optimistic]);
+      return { snapshot, tempId };
+    },
+    onError: (error, _input, ctx) => {
+      if (ctx?.snapshot) queryClient.setQueryData(queryKey, ctx.snapshot);
       const kind = toPageError(error);
       if (kind === "permissionDenied") void queryClient.invalidateQueries({ queryKey: queryKeys.me() });
       toast.error(t(pageErrorKey(kind)));
     },
-    onSuccess: (comment) => {
-      queryClient.setQueryData<PageCommentResponse[]>(queryKey, (current) => [...(current ?? []), comment]);
+    onSuccess: (comment, _input, ctx) => {
+      queryClient.setQueryData<PendingPageComment[]>(queryKey, (current) =>
+        (current ?? []).map((c) => (c.id === ctx?.tempId ? comment : c)),
+      );
     },
   });
 }
