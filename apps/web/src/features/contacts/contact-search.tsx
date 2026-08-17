@@ -35,7 +35,13 @@ export function ContactSearch({
   }, [query]);
 
   const showingCompanySuggestions = Boolean(company) && debounced.trim().length === 0;
-  const search = useQuery({ ...contactSearchQueryOptions(orgId, debounced), enabled: !showingCompanySuggestions });
+  // enabled переопределяем целиком (не спред) — исходный "непустой q" из queries.ts иначе
+  // затирался бы этим же ключом: без company showingCompanySuggestions всегда false, и поиск
+  // летел бы с q="" при каждом открытии диалога (400 от бэка, x3 из-за retry React Query).
+  const search = useQuery({
+    ...contactSearchQueryOptions(orgId, debounced),
+    enabled: !showingCompanySuggestions && debounced.trim().length > 0,
+  });
   const companyContacts = useQuery({
     ...companyContactsQueryOptions(orgId, company?.id ?? ""),
     enabled: showingCompanySuggestions,

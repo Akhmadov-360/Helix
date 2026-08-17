@@ -16,6 +16,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@helix/ui";
+import { sourceUrl } from "../../shared/lib/source-link";
 
 // Больше 3 участников — "+N" вместо бесконечного стека аватаров (карта фиксированной ширины
 // w-72, стек не должен расти неограниченно).
@@ -122,7 +123,19 @@ export function ProjectCard({ project, orgId, workspaceId, companies, overlay = 
           <div className="flex flex-wrap items-center gap-1">
             {project.source && (
               <Badge variant="outline" className="w-fit text-[11px]">
-                {project.source}
+                {sourceUrl(project.source) ? (
+                  <a
+                    href={sourceUrl(project.source)!}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    onClick={(e) => e.stopPropagation()}
+                    className="hover:underline"
+                  >
+                    {project.source}
+                  </a>
+                ) : (
+                  project.source
+                )}
               </Badge>
             )}
             {companyName && (

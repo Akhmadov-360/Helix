@@ -8,6 +8,7 @@ import { Avatar, Badge, Button, Select, SelectContent, SelectItem, SelectTrigger
 import { ChatDrawer } from "../ai-chat/chat-drawer";
 import { useCan } from "../../shared/auth/ability";
 import { useLocaleStore, useT } from "../../shared/i18n";
+import { sourceUrl } from "../../shared/lib/source-link";
 import { orgMembersQueryOptions } from "../../shared/org/queries";
 import { AssigneesPanel } from "./assignees-panel";
 import { CustomFieldsPanel } from "./custom-fields-panel";
@@ -172,10 +173,28 @@ export function ProjectDetailShell({
                   )}
                 </dd>
               </div>
-              <SidebarField
-                label={t("projectDetail.overview.source")}
-                value={project.source ?? t("projectDetail.overview.empty")}
-              />
+              <div className="flex items-center justify-between gap-2">
+                <dt className="text-muted-foreground">{t("projectDetail.overview.source")}</dt>
+                <dd className="font-medium">
+                  {project.source ? (
+                    sourceUrl(project.source) ? (
+                      <a
+                        href={sourceUrl(project.source)!}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="inline-flex items-center gap-1 hover:text-accent"
+                      >
+                        {project.source}
+                        <ArrowUpRight className="h-3 w-3 shrink-0 text-muted-foreground/60" />
+                      </a>
+                    ) : (
+                      project.source
+                    )
+                  ) : (
+                    t("projectDetail.overview.empty")
+                  )}
+                </dd>
+              </div>
               <SidebarField
                 label={t("projectDetail.overview.created")}
                 value={dateFormatter.format(new Date(project.createdAt))}
@@ -189,7 +208,7 @@ export function ProjectDetailShell({
 
           <CustomFieldsPanel orgId={orgId} workspaceId={project.workspaceId} projectId={projectId} fields={project.fields} />
 
-          <AssigneesPanel orgId={orgId} projectId={projectId} />
+          <AssigneesPanel orgId={orgId} projectId={projectId} ownerId={project.ownerId} />
         </aside>
       </div>
 
