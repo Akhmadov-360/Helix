@@ -4,6 +4,7 @@ import type { Env } from "@helix/config";
 import { ConfigModule, ENV } from "../../src/core/config/config.module";
 import { MAILER } from "../../src/modules/notifications/mailer/mailer.interface";
 import { MailerModule } from "../../src/modules/notifications/mailer/mailer.module";
+import { ResendMailerService } from "../../src/modules/notifications/mailer/resend-mailer.service";
 import { SesMailerService } from "../../src/modules/notifications/mailer/ses-mailer.service";
 import { SmtpMailerService } from "../../src/modules/notifications/mailer/smtp-mailer.service";
 
@@ -40,5 +41,16 @@ describe("MailerModule — выбор реализации по MAIL_PROVIDER", 
       .compile();
 
     expect(moduleRef.get(MAILER)).toBeInstanceOf(SesMailerService);
+  });
+
+  it("resend → MAILER резолвится в ResendMailerService", async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [ConfigModule, MailerModule],
+    })
+      .overrideProvider(ENV)
+      .useValue(buildEnv({ MAIL_PROVIDER: "resend", RESEND_API_KEY: "re_test" }))
+      .compile();
+
+    expect(moduleRef.get(MAILER)).toBeInstanceOf(ResendMailerService);
   });
 });

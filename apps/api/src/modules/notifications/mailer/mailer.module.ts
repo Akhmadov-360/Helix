@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import type { Env } from "@helix/config";
 import { ENV } from "../../../core/config/config.module";
 import { MAILER, type MailerService } from "./mailer.interface";
+import { ResendMailerService } from "./resend-mailer.service";
 import { SesMailerService } from "./ses-mailer.service";
 import { SmtpMailerService } from "./smtp-mailer.service";
 
@@ -16,11 +17,15 @@ import { SmtpMailerService } from "./smtp-mailer.service";
   providers: [
     SmtpMailerService,
     SesMailerService,
+    ResendMailerService,
     {
       provide: MAILER,
-      inject: [ENV, SmtpMailerService, SesMailerService],
-      useFactory: (env: Env, smtp: SmtpMailerService, ses: SesMailerService): MailerService =>
-        env.MAIL_PROVIDER === "ses" ? ses : smtp,
+      inject: [ENV, SmtpMailerService, SesMailerService, ResendMailerService],
+      useFactory: (env: Env, smtp: SmtpMailerService, ses: SesMailerService, resend: ResendMailerService): MailerService => {
+        if (env.MAIL_PROVIDER === "ses") return ses;
+        if (env.MAIL_PROVIDER === "resend") return resend;
+        return smtp;
+      },
     },
   ],
   exports: [MAILER],
