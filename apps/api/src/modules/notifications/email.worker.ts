@@ -37,7 +37,10 @@ type EmailJobData =
  * одну и ту же Redis-очередь/конкурентность, отдельный класс на письмо плодил бы
  * DI-boilerplate без выгоды.
  */
-@Processor(EMAIL_QUEUE)
+// drainDelay: 5с-дефолт BullMQ означает опрос Redis каждые 5с даже на пустой очереди — на
+// always-on воркере это основная статья расхода Redis-команд (Upstash считает их поштучно), а не
+// реальные джобы. Письмо на 20с позже роли не играет — задержка на UX не влияет.
+@Processor(EMAIL_QUEUE, { drainDelay: 20 })
 export class EmailWorker extends WorkerHost {
   private readonly logger = new Logger(EmailWorker.name);
 

@@ -18,7 +18,9 @@ import { extractAttachmentText, isExtractableMimeType } from "./text-extraction"
 // ai-chat.md §3.2 — extract → chunk → embed → upsert. delete+insert в ОДНОЙ транзакции (§3.2:
 // "Transaction: DELETE ...; INSERT новые чанки") — источник никогда не виден с частичным/пустым
 // набором чанков между двумя отдельными операциями.
-@Processor(INGEST_EMBEDDINGS_QUEUE)
+// drainDelay: см. email.worker.ts. Индексация страницы/KB на 20-30с позже сохранения не влияет
+// на UX (RAG-поиск не real-time), поэтому можно ослабить опрос так же, как для email.
+@Processor(INGEST_EMBEDDINGS_QUEUE, { drainDelay: 20 })
 export class IngestEmbeddingsWorker extends WorkerHost {
   private readonly logger = new Logger(IngestEmbeddingsWorker.name);
 

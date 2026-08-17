@@ -27,7 +27,10 @@ const DAY_MS = 24 * HOUR_MS;
  * if(X) ... else (Y-по-умолчанию): последнее было корректно ровно при двух job-именах и молча
  * замаскировало бы баг при добавлении третьего (новое имя тихо попало бы в ветку "иначе").
  */
-@Processor(MAINTENANCE_QUEUE)
+// drainDelay: джобы этой очереди — суточные cron-cleanup'ы, задержка реакции на пустой очереди
+// роли не играет вообще; выкручиваем сильнее, чем email (см. email.worker.ts), т.к. тут нет
+// пользователя, ждущего ответа.
+@Processor(MAINTENANCE_QUEUE, { drainDelay: 60 })
 export class MaintenanceWorker extends WorkerHost {
   private readonly logger = new Logger(MaintenanceWorker.name);
 
