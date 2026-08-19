@@ -1,4 +1,4 @@
-import { Module, type OnModuleInit } from "@nestjs/common";
+import { Logger, Module, type OnModuleInit } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bullmq";
 import type { Queue } from "bullmq";
 import { MAINTENANCE_QUEUE } from "../../core/queue/queue.module";
@@ -34,23 +34,43 @@ import { RefreshSessionCleanupRepository } from "./refresh-session-cleanup.repos
   providers: [RefreshSessionCleanupRepository, InviteCleanupRepository, MaintenanceWorker],
 })
 export class MaintenanceModule implements OnModuleInit {
+  private readonly logger = new Logger(MaintenanceModule.name);
+
   constructor(@InjectQueue(MAINTENANCE_QUEUE) private readonly queue: Queue) {}
 
-  async onModuleInit(): Promise<void> {
-    await this.queue.add(
-      REFRESH_SESSION_CLEANUP_JOB,
-      {},
-      { repeat: REFRESH_SESSION_CLEANUP_REPEAT_OPTIONS, jobId: REFRESH_SESSION_CLEANUP_JOB },
-    );
-    await this.queue.add(
-      INVITE_CLEANUP_JOB,
-      {},
-      { repeat: INVITE_CLEANUP_REPEAT_OPTIONS, jobId: INVITE_CLEANUP_JOB },
-    );
-    await this.queue.add(
-      ATTACHMENT_UPLOAD_CLEANUP_JOB,
-      {},
-      { repeat: ATTACHMENT_UPLOAD_CLEANUP_REPEAT_OPTIONS, jobId: ATTACHMENT_UPLOAD_CLEANUP_JOB },
-    );
+  // FIRE-AND-FORGET: раньше был `await` на трёх queue.add() последовательно — если Redis отвечает
+  // медленно (кросс-регион Upstash Singapore ↔ Railway Amsterdam ~300мс/запрос) или подключение
+  // висит на TLS-handshake, bootstrap блокировался на onModuleInit, app.listen() никогда не
+  // вызывался, Railway edge отвечал 502 на все запросы. Регистрация cron'ов идемпотентна —
+  // если этот boot не смог, следующий (или ручной вызов) её выполнит; главное — не блокировать HTTP.
+  onModuleInit(): void {
+    void this.registerRepeatables();
+  }
+
+  private async registerRepeatables(): Promise<void> {
+    try {
+      await Promise.all([
+        this.queue.add(
+          REFRESH_SESSION_CLEANUP_JOB,
+          {},
+          { repeat: REFRESH_SESSION_CLEANUP_REPEAT_OPTIONS, jobId: REFRESH_SESSION_CLEANUP_JOB },
+        ),
+        this.queue.add(
+          INVITE_CLEANUP_JOB,
+          {},
+          { repeat: INVITE_CLEANUP_REPEAT_OPTIONS, jobId: INVITE_CLEANUP_JOB },
+        ),
+        this.queue.add(
+          ATTACHMENT_UPLOAD_CLEANUP_JOB,
+          {},
+          { repeat: ATTACHMENT_UPLOAD_CLEANUP_REPEAT_OPTIONS, jobId: ATTACHMENT_UPLOAD_CLEANUP_JOB },
+        ),
+      ]);
+      this.logger.log("Repeatable cleanup jobs registered");
+    } catch (error) {
+      // Логируем, не бросаем — эта задача не должна валить сервис. Реальный симптом (нет чистки
+      // за сутки) виден в логах воркера, а не тут; здесь важно оставить хлебные крошки для debug.
+      this.logger.error(`Failed to register repeatable jobs: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 }
