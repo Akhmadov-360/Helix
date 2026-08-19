@@ -39,8 +39,9 @@ type EmailJobData =
  */
 // drainDelay: 5с-дефолт BullMQ означает опрос Redis каждые 5с даже на пустой очереди — на
 // always-on воркере это основная статья расхода Redis-команд (Upstash считает их поштучно), а не
-// реальные джобы. Письмо на 20с позже роли не играет — задержка на UX не влияет.
-@Processor(EMAIL_QUEUE, { drainDelay: 20 })
+// реальные джобы. 60с задержка на пустой очереди — письмо-приглашение уходит максимум на минуту
+// позже, не критично; на непустой очереди задержки нет вовсе (BullMQ поднимает next job сразу).
+@Processor(EMAIL_QUEUE, { drainDelay: 60 })
 export class EmailWorker extends WorkerHost {
   private readonly logger = new Logger(EmailWorker.name);
 
