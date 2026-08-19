@@ -23,6 +23,7 @@ import { useT } from "../../shared/i18n";
 import { useLocalize } from "../../shared/lib/localize";
 import { useReorderPhases } from "../phases/mutations";
 import { PhaseFormDialog } from "../phases/phase-form-dialog";
+import { EMPTY_FILTER, isFilterActive, matchesFilter, type BoardFilterState } from "./board-filter";
 import { BoardColumn } from "./board-column";
 import { useLoadMoreColumn, useMoveProject } from "./mutations";
 import { ProjectCard } from "./project-card";
@@ -70,10 +71,12 @@ export function BoardView({
   orgId,
   workspaceId,
   companies,
+  filter = EMPTY_FILTER,
 }: {
   orgId: string;
   workspaceId: string;
   companies: CompanyResponse[];
+  filter?: BoardFilterState;
 }) {
   const board = useSuspenseQuery({ ...boardQueryOptions(orgId, workspaceId), select: toBoardViewModel }).data;
   const move = useMoveProject(orgId, workspaceId);
@@ -98,6 +101,27 @@ export function BoardView({
   const [drag, setDrag] = useState<DragState | null>(null);
   const order = drag?.kind === "card" ? drag.order : serverOrder;
   const columnIds = drag?.kind === "column" ? drag.ids : serverColumnIds;
+
+  // displayOrder — order с применённым client-фильтром (board-filter.ts). Отдельно от order,
+  // чтобы драг-снимок (drag.order) и filter не смешивались в одном источнике: сама drop-логика
+  // (finalOrder ниже) работает от НЕотфильтрованного order — иначе перетащить карту в место
+  // между двух отфильтрованных-скрытых соседей было бы неоднозначно на сервере.
+  const filterActive = isFilterActive(filter);
+  const displayOrder = useMemo(() => {
+    if (!filterActive) return order;
+    const result: ColumnOrder = {};
+    for (const columnId of Object.keys(order)) {
+      result[columnId] = (order[columnId] ?? []).filter((id) => {
+        const project = projectsById.get(id);
+        return project ? matchesFilter(project, filter) : false;
+      });
+    }
+    return result;
+  }, [filterActive, filter, order, projectsById]);
+  const totalVisible = useMemo(
+    () => Object.values(displayOrder).reduce((n, ids) => n + ids.length, 0),
+    [displayOrder],
+  );
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -256,6 +280,15 @@ export function BoardView({
         onDragEnd={handleDragEnd}
         onDragCancel={() => setDrag(null)}
       >
+        {filterActive && totalVisible === 0 && (
+          // Пустое состояние на весь board — колонки под ним всё равно рендерятся (пустые),
+          // это баннер сверху с подсказкой сбросить. Не блокируем drop-зоны — если бы юзер
+          // всё-таки перетащил карточку в отфильтрованно-пустую колонку (edge case: filter
+          // изменился в момент активного drag), поведение drop не должно ломаться.
+          <div className="mb-3 rounded-md border border-dashed border-border bg-muted/40 px-3 py-4 text-center text-sm text-muted-foreground">
+            {t("board.filter.emptyState")}
+          </div>
+        )}
         <SortableContext items={columnIds} strategy={horizontalListSortingStrategy}>
           <div className="scroll-slim flex min-h-0 flex-1 gap-4 overflow-x-auto pb-2">
             {columnIds.map((sortableId) => {
@@ -266,7 +299,7 @@ export function BoardView({
                   key={id}
                   column={column}
                   name={localize(column.phaseName)}
-                  order={order[id] ?? []}
+                  order={displayOrder[id] ?? []}
                   projectsById={projectsById}
                   orgId={orgId}
                   workspaceId={workspaceId}

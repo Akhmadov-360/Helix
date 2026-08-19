@@ -5,6 +5,8 @@ import { Button, cn } from "@helix/ui";
 import { useCan } from "../../shared/auth/ability";
 import { useT } from "../../shared/i18n";
 import { WorkspaceMenu } from "../workspaces/workspace-menu";
+import { BoardFilterPopover } from "./board-filter-popover";
+import { EMPTY_FILTER, type BoardFilterState } from "./board-filter";
 import { BoardView } from "./board-view";
 import { CreateDealDialog } from "./create-deal-dialog";
 import { TableView } from "./table-view";
@@ -27,6 +29,9 @@ export function BoardShell({ orgId, workspaceId, workspace, companies, view, onV
   const t = useT();
   const canCreate = useCan("Project.create");
   const [createOpen, setCreateOpen] = useState(false);
+  // Фильтр в top-level shell, не в BoardView: пережил бы переключение Board↔Table без сброса
+  // (сейчас применяем только к Board, но хук-точка расширения без реорганизации state в будущем).
+  const [filter, setFilter] = useState<BoardFilterState>(EMPTY_FILTER);
 
   return (
     <div className="flex h-full flex-col gap-3">
@@ -40,6 +45,7 @@ export function BoardShell({ orgId, workspaceId, workspace, companies, view, onV
           <div />
         )}
         <div className="flex items-center gap-2">
+          {view === "board" && <BoardFilterPopover orgId={orgId} filter={filter} onChange={setFilter} />}
           <div role="group" aria-label={t("board.view.toggle")} className="flex items-center rounded-lg border border-border p-0.5">
             <ViewToggleButton active={view === "board"} icon={LayoutGrid} label={t("board.view.board")} onClick={() => onViewChange("board")} />
             <ViewToggleButton active={view === "table"} icon={Table2} label={t("board.view.table")} onClick={() => onViewChange("table")} />
@@ -49,7 +55,7 @@ export function BoardShell({ orgId, workspaceId, workspace, companies, view, onV
       </div>
       <div className="min-h-0 flex-1">
         {view === "board" ? (
-          <BoardView orgId={orgId} workspaceId={workspaceId} companies={companies} />
+          <BoardView orgId={orgId} workspaceId={workspaceId} companies={companies} filter={filter} />
         ) : (
           <TableView orgId={orgId} workspaceId={workspaceId} companies={companies} />
         )}
