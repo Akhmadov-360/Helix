@@ -48,12 +48,20 @@ export type AppAbility = MongoAbility<[AppAction, AppSubject]>;
  * merge=Owner/Admin (необратим по связям, §7.7).
  */
 export function defineAbilityForRole(role: Role): AppAbility {
-  const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
+  const { can, cannot, build } = new AbilityBuilder<AppAbility>(createMongoAbility);
 
   switch (role) {
     case "OWNER":
-    case "ADMIN":
       can("manage", "all"); // включает merge/delete/reassign по всем сущностям
+      break;
+    case "ADMIN":
+      can("manage", "all");
+      // Пересмотр (2026-08-19, manual QA): Organization.settings и Membership.role_change над
+      // САМИМ СОБОЙ — Owner-only. Логика: Admin, снимающий с себя роль или меняющий AI-провайдер
+      // всей орги, — сценарий без легитимного use case (передача ownership'а идёт от Owner'а).
+      // Membership self-role-change enforced в сервисе (isSelf + role check), не в CASL: CASL — на
+      // action×subject, «target === actor» — бизнес-инвариант, не капабилити. Здесь только Organization.
+      cannot("update", "Organization");
       break;
     case "MANAGER":
       can("read", "Workspace");

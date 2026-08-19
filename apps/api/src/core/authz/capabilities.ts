@@ -46,8 +46,9 @@ const SUBJECT_OPERATIONS = {
   // публичный эндпоинт (владение токеном из письма = личность), не через CASL вообще.
   Invite: ["create", "read", "delete"],
   // FR-ORG-3: currency/timezone/branding/aiProvider. read — все роли (не секретнее ростера),
-  // update — O/A only (Appendix B «Manage org settings»). create/delete нет: Organization.settings
-  // всегда существует (default "{}" из схемы), отдельного create-эндпоинта не завели.
+  // update — OWNER only (пересмотрено 2026-08-19 manual QA, ранее было O/A — см. app-ability.ts).
+  // create/delete нет: Organization.settings всегда существует (default "{}" из схемы), отдельного
+  // create-эндпоинта не завели.
   Organization: ["read", "update"],
   // files.md §7 (пересмотрено): update = только filename (переименование), не содержимое —
   // "перезалить = удалить+создать заново" остаётся верным для СОДЕРЖИМОГО, не для имени.

@@ -168,6 +168,32 @@ describe("Organizations — membership management (Appendix B)", () => {
         .send({ role: "MEMBER" })
         .expect(200);
     });
+
+    // Self-role-change (пересмотрено 2026-08-19 manual QA): self-исключение только для OWNER'а
+    // (сценарий передачи ownership'а — понизить себя после промоушна преемника). Admin, снимающий
+    // с себя роль сам, — не легитимный use case; блокируем на service-слое, CASL пропускает.
+    it("ADMIN не может менять СВОЮ роль → 403", async () => {
+      const admin = await signUpAs(app, "ADMIN");
+
+      await request(app.getHttpServer())
+        .patch(`/v1/organizations/members/${admin.userId}`)
+        .set("Authorization", `Bearer ${admin.token}`)
+        .send({ role: "MEMBER" })
+        .expect(403);
+    });
+
+    it("OWNER может менять свою роль на ADMIN если есть второй OWNER (сценарий передачи ownership'а)", async () => {
+      // Отдельный тест на смысл self-исключения: сохранён именно для этого сценария.
+      const owner = await signUpAs(app);
+      const other = await signUpAs(app);
+      await addToOrg(owner.orgId, other.userId, "OWNER");
+
+      await request(app.getHttpServer())
+        .patch(`/v1/organizations/members/${owner.userId}`)
+        .set("Authorization", `Bearer ${owner.token}`)
+        .send({ role: "ADMIN" })
+        .expect(200);
+    });
   });
 
   describe("DELETE /v1/organizations/members/:userId — удаление участника", () => {

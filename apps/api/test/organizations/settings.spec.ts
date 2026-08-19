@@ -95,14 +95,17 @@ describe("FR-ORG-3 — org-level settings", () => {
       });
     });
 
-    it("ADMIN тоже может обновлять", async () => {
+    it("ADMIN → 403 (пересмотрено 2026-08-19: settings — Owner-only)", async () => {
+      // Раньше было "ADMIN тоже может обновлять" (Appendix B O/A). Пересмотрели: AI-провайдер и
+      // название орги — уровень решения владельца (стоимость/данные), не операционного администратора.
+      // См. app-ability.ts cannot("update", "Organization") для ADMIN.
       const admin = await signUpAs(app, "ADMIN");
 
       await request(app.getHttpServer())
         .patch("/v1/organizations/settings")
         .set("Authorization", `Bearer ${admin.token}`)
         .send({ currency: "EUR" })
-        .expect(200);
+        .expect(403);
     });
 
     it("MANAGER → 403", async () => {

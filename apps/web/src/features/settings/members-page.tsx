@@ -85,11 +85,12 @@ export function MembersPage({ orgId }: { orgId: string }) {
             members.map((member) => {
               // Иерархия: actor может редактировать только СТРОГО младших (Admin не трогает Admin/
               // Owner), и в списке ролей — только ≤ своего ранга (Admin не может промоут'нуть до
-              // Owner). Self-исключение: собственное membership редактировать/удалять можно всегда
-              // (передача ownership'а, выход из орги) — совпадает с бэковой логикой в
-              // OrganizationsService (canManageMember + isSelf-байпас).
+              // Owner). Self-исключение для СМЕНЫ РОЛИ — только Owner (сценарий передачи ownership'а);
+              // Admin, снимающий с себя роль, — не легитимный use case (совпадает с бэковой логикой
+              // в OrganizationsService.changeMemberRole). Self-исключение для УДАЛЕНИЯ остаётся
+              // всем ролям — "покинуть орг" — валидное действие, отличное от смены роли.
               const isSelf = member.userId === me.id;
-              const canManageThis = canUpdate && (isSelf || canManageMember(me.role, member.role));
+              const canManageThis = canUpdate && (isSelf ? me.role === "OWNER" : canManageMember(me.role, member.role));
               const canDeleteThis = canDelete && (isSelf || canManageMember(me.role, member.role));
               return (
                 <TableRow key={member.userId}>

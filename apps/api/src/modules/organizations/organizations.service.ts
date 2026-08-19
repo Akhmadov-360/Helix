@@ -78,13 +78,14 @@ export class OrganizationsService {
     if (!membership) throw new ResourceNotFoundError("Membership not found");
 
     // Иерархия: actor может трогать target только со СТРОГО меньшим рангом (Admin не трогает
-    // Admin/Owner). Self-action — исключение: собственное membership можно менять всегда, ранг
-    // относительно самого себя тривиально равен (иначе не смогли бы понизить последнего Owner'а
-    // при передаче ownership'а — важный сценарий, покрыт тестом "есть второй OWNER — первого
-    // понизить можно"). canGrantRole всё равно применяется — включая self: MEMBER не может
-    // промоут'нуть себя, ADMIN не может себе OWNER'а выдать.
+    // Admin/Owner). Self-action — ТОЛЬКО для OWNER (пересмотрено 2026-08-19 manual QA): единственный
+    // легитимный use case собственной смены роли — передача ownership'а (Owner понижает себя после
+    // промоушна преемника). Admin, понижающий сам себя, — сценарий без ответа "зачем"; блокируем.
+    // canGrantRole всё равно применяется — Owner не может выдать что-то выше OWNER (моот-check).
     const isSelf = actorId === targetUserId;
-    if (!isSelf && !canManageMember(actorRole, membership.role)) throw new InsufficientRoleRankError();
+    if (isSelf ? actorRole !== "OWNER" : !canManageMember(actorRole, membership.role)) {
+      throw new InsufficientRoleRankError();
+    }
     if (!canGrantRole(actorRole, role)) throw new InsufficientRoleRankError();
 
     // Понижаем ПОСЛЕДНЕГО OWNER — орга осталась бы без единственной роли, которой
