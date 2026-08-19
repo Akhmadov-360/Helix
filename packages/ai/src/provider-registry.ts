@@ -1,4 +1,6 @@
 import { AnthropicChatProvider } from "./providers/anthropic-chat-provider";
+import { GeminiChatProvider } from "./providers/gemini-chat-provider";
+import { GeminiEmbeddingProvider } from "./providers/gemini-embedding-provider";
 import { OpenAiChatProvider } from "./providers/openai-chat-provider";
 import { OpenAiEmbeddingProvider } from "./providers/openai-embedding-provider";
 import type {
@@ -35,6 +37,9 @@ export function createChatProvider(name: ChatProviderName, creds: ProviderCreden
     case "openai":
       if (!creds.openAiApiKey) throw new ProviderNotConfiguredError("openai");
       return new OpenAiChatProvider(creds.openAiApiKey, model);
+    case "gemini":
+      if (!creds.googleAiApiKey) throw new ProviderNotConfiguredError("gemini");
+      return new GeminiChatProvider(creds.googleAiApiKey, model);
     case "bedrock":
       throw new ProviderNotImplementedError("bedrock");
   }
@@ -45,6 +50,9 @@ export function createEmbeddingProvider(name: EmbeddingProviderName, creds: Prov
     case "openai":
       if (!creds.openAiApiKey) throw new ProviderNotConfiguredError("openai");
       return new OpenAiEmbeddingProvider(creds.openAiApiKey, model);
+    case "gemini":
+      if (!creds.googleAiApiKey) throw new ProviderNotConfiguredError("gemini");
+      return new GeminiEmbeddingProvider(creds.googleAiApiKey, model);
     case "bedrock":
       throw new ProviderNotImplementedError("bedrock");
   }

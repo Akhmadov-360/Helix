@@ -34,13 +34,17 @@ export interface AiEmbeddingProvider {
 
 // ADR (decisions.md) — embedding-провайдер выбирается НЕЗАВИСИМО от chat-провайдера (у Anthropic
 // нет embeddings endpoint). Имена — то, что хранится в Organization.settings.aiProvider.
-export type ChatProviderName = "anthropic" | "openai" | "bedrock";
-export type EmbeddingProviderName = "openai" | "bedrock";
+// "gemini" присутствует в обоих enum'ах (Google даёт и chat, и embeddings), в отличие от
+// Anthropic (только chat). Embedding-модель gemini-embedding-001 через outputDimensionality=1536
+// вписывается в существующую vector(1536) без миграции — см. gemini-embedding-provider.ts.
+export type ChatProviderName = "anthropic" | "openai" | "gemini" | "bedrock";
+export type EmbeddingProviderName = "openai" | "gemini" | "bedrock";
 
 // Секреты — приходят из env (apps/api/@helix/config), этот пакет process.env не читает сам:
 // держит его тестируемым (провайдер конструируется из явных аргументов, не глобального состояния).
 export interface ProviderCredentials {
   anthropicApiKey?: string;
   openAiApiKey?: string;
+  googleAiApiKey?: string;
   awsBedrockRegion?: string;
 }

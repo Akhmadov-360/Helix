@@ -58,6 +58,7 @@ export class AiProviderService {
     return {
       anthropicApiKey: this.env.ANTHROPIC_API_KEY,
       openAiApiKey: this.env.OPENAI_API_KEY,
+      googleAiApiKey: this.env.GOOGLE_AI_API_KEY,
       awsBedrockRegion: this.env.AWS_BEDROCK_REGION,
     };
   }
