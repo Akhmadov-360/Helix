@@ -23,6 +23,7 @@ import { useMe } from "../../shared/auth/session";
 import { useT } from "../../shared/i18n";
 import { toAiChatError } from "./ai-chat-error";
 import { ActionCard } from "./action-card";
+import { AssistantMarkdown } from "./assistant-markdown";
 import { CitationsList } from "./citations-list";
 import { useConfirmToolCall, useCreateAiThread, useDeleteAiThread, useRejectToolCall } from "./mutations";
 import { aiThreadMessagesQueryOptions, projectAiThreadsQueryOptions } from "./queries";
@@ -276,7 +277,11 @@ export function ChatDrawer({
                     </MessageAvatar>
                     <MessageContent>
                       <div className="w-fit max-w-[85%] self-start rounded-lg bg-secondary px-3 py-2 text-sm text-secondary-foreground">
-                        {activeStreaming.assistantContent || <TypingIndicator />}
+                        {activeStreaming.assistantContent ? (
+                          <AssistantMarkdown content={activeStreaming.assistantContent} />
+                        ) : (
+                          <TypingIndicator />
+                        )}
                       </div>
                     </MessageContent>
                   </Message>
@@ -367,7 +372,7 @@ function ChatBubble({
               : "w-fit max-w-[85%] self-start rounded-lg bg-secondary px-3 py-2 text-sm text-secondary-foreground"
           }
         >
-          {message.content}
+          {isUser ? message.content : <AssistantMarkdown content={message.content} />}
         </div>
         {!isUser && message.citations && message.citations.length > 0 && <CitationsList citations={message.citations} />}
         {!isUser &&
