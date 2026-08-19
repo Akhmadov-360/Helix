@@ -14,7 +14,17 @@ import { projectAssigneesQueryOptions } from "./queries";
 // Design review: full-width Select + отдельная кнопка "Добавить" — два клика на одно действие
 // (выбрать в списке, потом ещё раз кликнуть "Добавить"), тот же паттерн, что уже есть в
 // tasks/assignee-field.tsx — один клик по кандидату в попапе сразу назначает и закрывает попап.
-export function AssigneesPanel({ orgId, projectId }: { orgId: string; projectId: string }) {
+export function AssigneesPanel({
+  orgId,
+  projectId,
+  ownerId,
+}: {
+  orgId: string;
+  projectId: string;
+  /** Владелец уже единолично ответственный за лид (Project.ownerId) — не предлагаем добавить его
+   *  же со-исполнителем, это ничего не значит поверх того, что он уже owner. */
+  ownerId: string | null;
+}) {
   const t = useT();
   const assignees = useSuspenseQuery(projectAssigneesQueryOptions(orgId, projectId)).data;
   const members = useSuspenseQuery(orgMembersQueryOptions(orgId)).data;
@@ -25,7 +35,7 @@ export function AssigneesPanel({ orgId, projectId }: { orgId: string; projectId:
   const [open, setOpen] = useState(false);
 
   const assignedIds = new Set(assignees.map((a) => a.userId));
-  const candidates = members.filter((m) => !assignedIds.has(m.userId));
+  const candidates = members.filter((m) => !assignedIds.has(m.userId) && m.userId !== ownerId);
 
   return (
     <div className="flex flex-col gap-2">

@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Building2, Search } from "lucide-react";
+import { Building2, Search, X } from "lucide-react";
 import type { ContactResponse, DedupHint } from "@helix/api-schemas";
-import { Button, Card, Input } from "@helix/ui";
+import { Button, Card, cn, Input } from "@helix/ui";
 import { useT } from "../../shared/i18n";
 import { companyContactsQueryOptions, contactSearchQueryOptions } from "./queries";
 import { CreateContactForm } from "./create-contact-form";
@@ -16,12 +16,16 @@ export function ContactSearch({
   excludeIds,
   onLinkExisting,
   onCreated,
+  onCancel,
   company,
 }: {
   orgId: string;
   excludeIds: Set<string>;
   onLinkExisting: (contact: ContactResponse) => void;
   onCreated: (contact: ContactResponse, dedupHint: DedupHint) => void;
+  /** Опционален — сам компонент решает, нужна ли кнопка закрытия (пусто при "контактов ещё нет",
+   *  где поиск открыт всегда и закрывать нечем, см. ContactsView). */
+  onCancel?: () => void;
   company?: { id: string; name: string };
 }) {
   const t = useT();
@@ -35,7 +39,13 @@ export function ContactSearch({
   }, [query]);
 
   const showingCompanySuggestions = Boolean(company) && debounced.trim().length === 0;
-  const search = useQuery({ ...contactSearchQueryOptions(orgId, debounced), enabled: !showingCompanySuggestions });
+  // enabled переопределяем целиком (не спред) — исходный "непустой q" из queries.ts иначе
+  // затирался бы этим же ключом: без company showingCompanySuggestions всегда false, и поиск
+  // летел бы с q="" при каждом открытии диалога (400 от бэка, x3 из-за retry React Query).
+  const search = useQuery({
+    ...contactSearchQueryOptions(orgId, debounced),
+    enabled: !showingCompanySuggestions && debounced.trim().length > 0,
+  });
   const companyContacts = useQuery({
     ...companyContactsQueryOptions(orgId, company?.id ?? ""),
     enabled: showingCompanySuggestions,
@@ -67,8 +77,22 @@ export function ContactSearch({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t("contacts.search.placeholder")}
-          className="pl-9"
+          autoFocus={Boolean(onCancel)}
+          className={cn("pl-9", onCancel && "pr-9")}
         />
+        {/* Раньше это была текстовая ссылка ПОД карточкой результатов (design review, screen 9) —
+            при длинном списке совпадений её приходилось искать глазами. Кнопка в самой строке
+            поиска — всегда на виду, без скролла, независимо от того, сколько результатов ниже. */}
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            aria-label={t("contacts.search.cancel")}
+            className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
       {showingCompanySuggestions && results.length > 0 && (
         <p className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -92,13 +116,16 @@ export function ContactSearch({
               )}
             </button>
           ))}
+          {/* "Создать" — только когда поиск реально ничего не нашёл (design review, screen 9):
+              показывать его рядом с уже найденным совпадением создавало ложное впечатление, что
+              искомый контакт не существует, хотя он прямо над этой кнопкой. */}
           {!showingCompanySuggestions && !search.isFetching && results.length === 0 && (
-            <p className="px-2 py-1.5 text-sm text-muted-foreground">{t("contacts.search.noResults")}</p>
-          )}
-          {!showingCompanySuggestions && (
-            <Button variant="ghost" size="sm" className="justify-start" onClick={() => setCreating(true)}>
-              {t("contacts.search.createNew", { query })}
-            </Button>
+            <>
+              <p className="px-2 py-1.5 text-sm text-muted-foreground">{t("contacts.search.noResults")}</p>
+              <Button variant="ghost" size="sm" className="justify-start" onClick={() => setCreating(true)}>
+                {t("contacts.search.createNew", { query })}
+              </Button>
+            </>
           )}
         </Card>
       )}

@@ -1,12 +1,13 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { authResultSchema, registerSchema, type RegisterInput } from "@helix/api-schemas";
-import { Button, Input, Label, PasswordInput } from "@helix/ui";
+import { Button, Input, Label, PasswordInput, PasswordRequirementsList, PasswordStrengthMeter } from "@helix/ui";
 import { request, setAccessToken, TransportError } from "../../shared/api";
 import { useT, type MessageKey } from "../../shared/i18n";
 import { clearLastWorkspaceId } from "../../shared/lib/last-workspace";
+import { passwordRequirementsMet, passwordStrength } from "../../shared/lib/password-strength";
 
 export function RegisterForm() {
   const t = useT();
@@ -29,6 +30,9 @@ export function RegisterForm() {
 
   const { errors } = form.formState;
   const rootError = register.isError ? t(registerErrorKey(register.error)) : null;
+  const password = useWatch({ control: form.control, name: "password" });
+  const strength = passwordStrength(password);
+  const requirementsMet = passwordRequirementsMet(password);
 
   return (
     <form
@@ -70,6 +74,20 @@ export function RegisterForm() {
           hideLabel={t("auth.password.hide")}
           {...form.register("password")}
         />
+        {password.length > 0 && (
+          <PasswordRequirementsList
+            requirements={[
+              { key: "length", label: t("auth.password.requirement.length"), met: requirementsMet.length },
+              { key: "case", label: t("auth.password.requirement.case"), met: requirementsMet.case },
+              { key: "symbols", label: t("auth.password.requirement.symbols"), met: requirementsMet.symbols },
+            ]}
+          />
+        )}
+        {/* strength=0 (короче минимума) — чек-лист выше уже красным крестиком сообщает об этом,
+            !== 0, не > 0 — TS сужает числовой union по равенству/неравенству, не по сравнению. */}
+        {password.length > 0 && strength !== 0 && (
+          <PasswordStrengthMeter strength={strength} label={t(`auth.password.strength.${strength}`)} />
+        )}
         {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
       </div>
 

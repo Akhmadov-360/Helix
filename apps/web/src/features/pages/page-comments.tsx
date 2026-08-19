@@ -1,6 +1,6 @@
 import { Fragment, useRef } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { Trash2 } from "lucide-react";
+import { Check, Clock, Trash2 } from "lucide-react";
 import {
   Avatar,
   Button,
@@ -11,12 +11,15 @@ import {
   MessageHeader,
   MentionTextarea,
   ScrollArea,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
   type MentionTextareaHandle,
 } from "@helix/ui";
 import { useMe } from "../../shared/auth/session";
-import { useT, useLocaleStore } from "../../shared/i18n";
+import { useT, useLocaleStore, type TFunction } from "../../shared/i18n";
 import { orgMembersQueryOptions } from "../../shared/org/queries";
-import { useAddPageComment, useDeletePageComment } from "./mutations";
+import { useAddPageComment, useDeletePageComment, type PendingPageComment } from "./mutations";
 import { pageCommentsQueryOptions } from "./queries";
 
 // pages-kb.md §4 — удалить комментарий может автор или Manager+ (не CASL-грант, сервер решает
@@ -52,16 +55,33 @@ function highlightMentions(body: string, memberNames: string[]): React.ReactNode
   return parts;
 }
 
+function isSameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+// Telegram-style: разделитель "Сегодня"/"Вчера"/дата НАД первым комментарием дня — не повторяем
+// полную дату на каждой строке (design review, #12), в заголовке комментария остаётся только время.
+function dayLabel(iso: string, locale: string, t: TFunction): string {
+  const date = new Date(iso);
+  const now = new Date();
+  if (isSameDay(date, now)) return t("pages.comments.today");
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (isSameDay(date, yesterday)) return t("pages.comments.yesterday");
+  return new Intl.DateTimeFormat(locale, { dateStyle: "long" }).format(date);
+}
+
 export function PageComments({ orgId, pageId }: { orgId: string; pageId: string }) {
   const t = useT();
   const locale = useLocaleStore((state) => state.locale);
   const me = useMe();
-  const comments = useSuspenseQuery(pageCommentsQueryOptions(orgId, pageId)).data;
+  // pending:true подмешивается локально мутацией (см. mutations.ts) — не часть серверного ответа.
+  const comments = useSuspenseQuery(pageCommentsQueryOptions(orgId, pageId)).data as PendingPageComment[];
   const members = useSuspenseQuery(orgMembersQueryOptions(orgId)).data;
-  const addComment = useAddPageComment(orgId, pageId);
+  const addComment = useAddPageComment(orgId, pageId, { id: me.id, name: me.name });
   const deleteComment = useDeletePageComment(orgId, pageId);
   const inputRef = useRef<MentionTextareaHandle>(null);
-  const dateFormatter = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
+  const timeFormatter = new Intl.DateTimeFormat(locale, { timeStyle: "short" });
 
   const candidates = members.map((m) => ({ id: m.userId, name: m.name }));
   const memberNames = members.map((m) => m.name);
@@ -97,37 +117,79 @@ export function PageComments({ orgId, pageId }: { orgId: string; pageId: string 
         // ScrollArea (shadcn) вместо голого overflow-y-auto — тонкий скроллбар в стиле остального UI.
         <ScrollArea className="min-h-[160px] flex-1 rounded-md border border-border">
           <MessageGroup className="p-3">
-            {comments.map((comment) => {
+            {comments.map((comment, i) => {
               const authorName = comment.authorName ?? t("pages.comments.deletedAuthor");
+              const isMine = comment.authorId === me.id;
+              const showDayDivider = i === 0 || !isSameDay(new Date(comment.createdAt), new Date(comments[i - 1]!.createdAt));
+
               return (
-                <Message key={comment.id}>
-                  <MessageAvatar>
-                    <Avatar name={authorName} size="sm" />
-                  </MessageAvatar>
-                  <MessageContent>
-                    <MessageHeader>
-                      <span>{authorName}</span>
-                      <span className="ml-2">{dateFormatter.format(new Date(comment.createdAt))}</span>
-                      {(canDelete || comment.authorId === me.id) && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-xs"
-                          aria-label={t("pages.comments.delete")}
-                          className="ml-auto"
-                          onClick={() => deleteComment.mutate({ commentId: comment.id })}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </MessageHeader>
-                    <p className="whitespace-pre-wrap px-3 text-sm">
-                      {highlightMentions(comment.body, memberNames).map((part, i) => (
-                        <Fragment key={i}>{part}</Fragment>
-                      ))}
-                    </p>
-                  </MessageContent>
-                </Message>
+                <Fragment key={comment.id}>
+                  {showDayDivider && (
+                    <div className="flex justify-center py-1">
+                      <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">
+                        {dayLabel(comment.createdAt, locale, t)}
+                      </span>
+                    </div>
+                  )}
+                  <Message className="group/comment">
+                    <MessageAvatar>
+                      {/* Имя убрано из вечно видимого текста (design review, #12) — теперь по
+                          hover/focus на аватар, tooltip. button+tabIndex — не только hover: без
+                          фокусируемого элемента клавиатурный пользователь подсказку не увидел бы
+                          вообще (Radix Tooltip показывает и на focus, не только на hover). */}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            <Avatar name={authorName} size="sm" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>{authorName}</TooltipContent>
+                      </Tooltip>
+                    </MessageAvatar>
+                    <MessageContent>
+                      <MessageHeader>
+                        <span>{timeFormatter.format(new Date(comment.createdAt))}</span>
+                        {/* Статус — только для СВОИХ сообщений (Telegram-конвенция: read receipt
+                            имеет смысл только для того, кто отправил), часы во время полёта запроса
+                            меняются на галочку сразу по ответу сервера (onSuccess в mutations.ts). */}
+                        {isMine &&
+                          (comment.pending ? (
+                            <Clock
+                              role="img"
+                              className="ml-1 h-3 w-3 text-muted-foreground"
+                              aria-label={t("pages.comments.sending")}
+                            />
+                          ) : (
+                            <Check
+                              role="img"
+                              className="ml-1 h-3 w-3 text-muted-foreground"
+                              aria-label={t("pages.comments.sent")}
+                            />
+                          ))}
+                        {!comment.pending && (canDelete || comment.authorId === me.id) && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-xs"
+                            aria-label={t("pages.comments.delete")}
+                            className="ml-auto opacity-0 transition-opacity focus-visible:opacity-100 group-hover/comment:opacity-100"
+                            onClick={() => deleteComment.mutate({ commentId: comment.id })}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </MessageHeader>
+                      <p className="whitespace-pre-wrap px-3 text-sm">
+                        {highlightMentions(comment.body, memberNames).map((part, j) => (
+                          <Fragment key={j}>{part}</Fragment>
+                        ))}
+                      </p>
+                    </MessageContent>
+                  </Message>
+                </Fragment>
               );
             })}
           </MessageGroup>

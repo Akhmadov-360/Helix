@@ -18,19 +18,24 @@ export const envSchema = z.object({
   REDIS_URL: z.url(), // было optional() — M0-заглушка; с M2 BullMQ реально подключён, обязателен
 
   // ── Notifications / Email (M2, notifications.md §8) ──────────────────────────
-  MAIL_PROVIDER: z.enum(["ses", "smtp"]),
+  MAIL_PROVIDER: z.enum(["ses", "smtp", "resend"]),
   MAIL_FROM: z.email(), // адрес отправителя, "Helix <noreply@...>"
   APP_URL: z.url(), // база для deep link в письме (§5)
   // SES (prod): без кастомных кред-переменных — default credential provider chain (IAM role), §7.
   SES_REGION: z.string().optional(),
-  // SMTP: в деве (MailHog) без auth — USER/PASS не заданы. В проде реальный провайдер
-  // (Resend/SendGrid/Mailgun и т.п.) авторизацию требует всегда — оба поля optional() на уровне
-  // env (те же условные креды, что SES_REGION/S3_*), но SmtpMailerService передаёt auth ТОЛЬКО
-  // если оба заданы (см. smtp-mailer.service.ts) — не шлёт пустой auth-объект туда, где его не ждут.
+  // SMTP: в деве (MailHog) без auth — USER/PASS не заданы. Для облачных SMTP-провайдеров
+  // (Resend/SendGrid/Mailgun и т.п.) через реальный порт — оба поля optional() на уровне env (те же
+  // условные креды, что SES_REGION/S3_*), но SmtpMailerService передаёt auth ТОЛЬКО если оба заданы
+  // (см. smtp-mailer.service.ts). НЕ используется в проде на Railway — см. RESEND_API_KEY ниже.
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().optional(),
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
+  // Resend HTTP API (не SMTP!) — обнаружено вживую: Railway (и большинство PaaS) блокирует
+  // исходящие SMTP-порты (25/465/587) на уровне сети ради анти-спам политики, SMTPConnection падал
+  // по "Connection timeout" ещё до того, как Resend вообще видел запрос. HTTP на 443 не блокируется —
+  // MAIL_PROVIDER=resend отправляет через api.resend.com, тот же MAIL_FROM.
+  RESEND_API_KEY: z.string().optional(), // обязателен только когда MAIL_PROVIDER=resend
 
   // ── Files / S3 · MinIO (M3, docs/specs/files.md §12) ──────────────────────────
   S3_ENDPOINT: z.url().optional(), // задан → MinIO/S3-совместимый (dev); не задан → настоящий AWS S3 (prod)

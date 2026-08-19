@@ -1,13 +1,14 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { resetPasswordSchema, type ResetPasswordInput } from "@helix/api-schemas";
 import { z } from "zod";
-import { Button, Label, PasswordInput } from "@helix/ui";
+import { Button, Label, PasswordInput, PasswordRequirementsList, PasswordStrengthMeter } from "@helix/ui";
 import { request, TransportError } from "../../shared/api";
 import { toast } from "sonner";
 import { useT, type MessageKey } from "../../shared/i18n";
+import { passwordRequirementsMet, passwordStrength } from "../../shared/lib/password-strength";
 
 export function ResetPasswordForm({ token }: { token: string }) {
   const t = useT();
@@ -28,6 +29,9 @@ export function ResetPasswordForm({ token }: { token: string }) {
   });
 
   const { errors } = form.formState;
+  const newPassword = useWatch({ control: form.control, name: "newPassword" });
+  const strength = passwordStrength(newPassword);
+  const requirementsMet = passwordRequirementsMet(newPassword);
 
   return (
     <form
@@ -45,6 +49,18 @@ export function ResetPasswordForm({ token }: { token: string }) {
           hideLabel={t("auth.password.hide")}
           {...form.register("newPassword")}
         />
+        {newPassword.length > 0 && (
+          <PasswordRequirementsList
+            requirements={[
+              { key: "length", label: t("auth.password.requirement.length"), met: requirementsMet.length },
+              { key: "case", label: t("auth.password.requirement.case"), met: requirementsMet.case },
+              { key: "symbols", label: t("auth.password.requirement.symbols"), met: requirementsMet.symbols },
+            ]}
+          />
+        )}
+        {newPassword.length > 0 && strength !== 0 && (
+          <PasswordStrengthMeter strength={strength} label={t(`auth.password.strength.${strength}`)} />
+        )}
         {errors.newPassword && <p className="text-sm text-destructive">{errors.newPassword.message}</p>}
       </div>
 

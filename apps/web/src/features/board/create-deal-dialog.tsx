@@ -112,11 +112,15 @@ export function CreateDealDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      {/* max-h+overflow — с доп. полями (custom fields) диалог мог растянуться выше вьюпорта
+          (недостижимая кнопка "Создать"); скроллим содержимое, header/footer остаются на месте. */}
+      <DialogContent className="flex max-h-[85vh] flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>{t("board.create.title")}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          {/* Скроллится только область полей — footer с кнопками остаётся закреплён снизу. */}
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="deal-title" required>{t("board.create.name")}</Label>
             <Input
@@ -226,7 +230,8 @@ export function CreateDealDialog({
           ) : (
             <ManageFieldsHint workspaceId={workspaceId} />
           )}
-          <DialogFooter>
+          </div>
+          <DialogFooter className="shrink-0">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={create.isPending}>
               {t("board.create.cancel")}
             </Button>

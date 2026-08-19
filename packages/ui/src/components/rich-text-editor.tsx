@@ -15,6 +15,7 @@ import {
 import { TableKit } from "@tiptap/extension-table";
 import Placeholder from "@tiptap/extension-placeholder";
 import Mention from "@tiptap/extension-mention";
+import Heading from "@tiptap/extension-heading";
 import StarterKit from "@tiptap/starter-kit";
 import { Bold, FileText, Heading2, Italic, Link2, List, ListOrdered, Paperclip, Search, Table as TableIcon } from "lucide-react";
 import type { SuggestionKeyDownProps, SuggestionProps } from "@tiptap/suggestion";
@@ -349,6 +350,21 @@ function AttachmentPickerButton({
   );
 }
 
+// ProseMirror-дефолт на Enter внутри блока — splitBlock: делит узел на два ТОГО ЖЕ типа (heading
+// → heading+heading), а не выходит в paragraph. Выход происходит только у ПУСТОГО блока (второй
+// Enter) — с виду баг ("заголовок не деактивируется"), хотя это штатное поведение ProseMirror.
+// Переопределяем Enter внутри heading — всегда сразу параграф, как в Notion/Confluence.
+const HeadingExitOnEnter = Heading.extend({
+  addKeyboardShortcuts() {
+    return {
+      Enter: () => {
+        if (!this.editor.isActive("heading")) return false;
+        return this.editor.chain().focus().splitBlock().setNode("paragraph").run();
+      },
+    };
+  },
+});
+
 // Заголовки/списки/таблица/bold/italic — ровно то, что просит FR-PG-1 ("headings/lists/tables"),
 // НЕ весь StarterKit-набор: blockquote/codeBlock/horizontalRule выключены — нет запроса на них,
 // заводить площадь редактора "на всякий случай" незачем (CLAUDE.md — не создавать спекулятивно).
@@ -391,11 +407,12 @@ export function RichTextEditor({
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        heading: { levels: [1, 2, 3] },
+        heading: false, // выключен здесь — свой HeadingExitOnEnter ниже, тот же levels-конфиг
         blockquote: false,
         codeBlock: false,
         horizontalRule: false,
       }),
+      HeadingExitOnEnter.configure({ levels: [1, 2, 3] }),
       TableKit.configure({ table: { resizable: false } }),
       // Плейсхолдер на пустом документе (не на каждом пустом параграфе — showOnlyWhenEditable
       // + дефолтный emptyNodeClass достаточно для "первая строка пуста", того же приёма, что уже

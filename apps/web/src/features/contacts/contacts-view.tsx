@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { Plus, Users, X } from "lucide-react";
+import { Plus, Users } from "lucide-react";
 import type { Audience, CompanyResponse, ContactResponse, DedupHint as DedupHintData } from "@helix/api-schemas";
 import { Button, Card, cn } from "@helix/ui";
 import { useCan } from "../../shared/auth/ability";
@@ -72,31 +72,22 @@ export function ContactsView({
   return (
     <div className="flex flex-col gap-4">
       {showSearch ? (
-        <div className="flex flex-col items-start gap-2">
-          <ContactSearch
-            orgId={orgId}
-            excludeIds={excludeIds}
-            onLinkExisting={(contact) => {
-              linkExisting(contact);
-              setSearching(false);
-            }}
-            onCreated={(contact, hint) => {
-              handleCreated(contact, hint);
-              setSearching(false);
-            }}
-            company={company}
-          />
-          {contacts.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setSearching(false)}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-3 w-3" />
-              {t("contacts.search.cancel")}
-            </button>
-          )}
-        </div>
+        <ContactSearch
+          orgId={orgId}
+          excludeIds={excludeIds}
+          onLinkExisting={(contact) => {
+            linkExisting(contact);
+            setSearching(false);
+          }}
+          onCreated={(contact, hint) => {
+            handleCreated(contact, hint);
+            setSearching(false);
+          }}
+          // Закрывать нечем, если контактов ещё нет — поиск тогда единственный путь, скрывать
+          // его некуда (см. showSearch: contacts.length === 0 || searching).
+          onCancel={contacts.length > 0 ? () => setSearching(false) : undefined}
+          company={company}
+        />
       ) : (
         canLink && (
           <Button type="button" variant="outline" size="sm" className="w-fit" onClick={() => setSearching(true)}>

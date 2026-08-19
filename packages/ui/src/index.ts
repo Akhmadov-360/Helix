@@ -126,3 +126,5 @@ export {
   SheetDescription,
 } from "./components/sheet";
 export { Skeleton } from "./components/skeleton";
+export { PasswordStrengthMeter, type PasswordStrengthMeterProps } from "./components/password-strength-meter";
+export { PasswordRequirementsList, type PasswordRequirement } from "./components/password-requirements-list";
