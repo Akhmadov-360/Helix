@@ -72,9 +72,9 @@ export const envSchema = z.object({
   // этой организации" (ai-chat.md §12) — ключей может не быть вовсе, если AI никто не включал.
   ANTHROPIC_API_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(), // также обслуживает embeddingProvider="openai" (ADR, decisions.md — Anthropic без embeddings endpoint)
-  // Единый ключ Google AI Studio — обслуживает и gemini chat (gemini-2.0-flash), и gemini embeddings
+  // Единый ключ Google AI Studio — обслуживает и gemini chat (gemini-3.6-flash), и gemini embeddings
   // (gemini-embedding-001, Matryoshka-усечение до 1536 под нашу vector-колонку). Бесплатный tier
-  // (15 rpm / 250k tpm) на демо-нагрузку избыточен, ai-chat.md §11 Фаза 3.
+  // на демо-нагрузку избыточен, ai-chat.md §11 Фаза 3.
   GOOGLE_AI_API_KEY: z.string().optional(),
   AWS_BEDROCK_REGION: z.string().optional(), // Bedrock — default credential provider chain (IAM role), тот же паттерн, что SES_REGION
 });

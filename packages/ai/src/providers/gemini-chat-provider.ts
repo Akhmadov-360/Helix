@@ -1,11 +1,13 @@
 import { GoogleGenAI, type FunctionCall, type Part } from "@google/genai";
 import type { AiChatProvider, ChatMessage, ChatStreamEvent, ToolSchema } from "../types";
 
-// gemini-2.0-flash — бесплатный tier в Google AI Studio (15 rpm / 250k tpm, ai-chat.md §11 Фаза
-// 3), 1M-контекст. Идёт как chat-провайдер под тем же контрактом, что Anthropic/OpenAI —
-// маппинг: Google называет ассистентскую роль "model" (не "assistant"), а system prompt подаётся
-// отдельным полем config.systemInstruction, а не сообщением в contents[].
-const DEFAULT_MODEL = "gemini-2.0-flash";
+// gemini-3.6-flash — бесплатный tier в Google AI Studio, 1M-контекст. Идёт как chat-провайдер
+// под тем же контрактом, что Anthropic/OpenAI — маппинг: Google называет ассистентскую роль
+// "model" (не "assistant"), а system prompt подаётся отдельным полем config.systemInstruction,
+// а не сообщением в contents[]. NB: gemini-2.0-flash был deprecated Google'ом (404 на живом
+// запросе, 2026-08-19) — если снова упадёт с 404 про "no longer available", обновить название
+// модели тут (Google меняет их каждые несколько месяцев).
+const DEFAULT_MODEL = "gemini-3.6-flash";
 
 export class GeminiChatProvider implements AiChatProvider {
   private readonly client: GoogleGenAI;
