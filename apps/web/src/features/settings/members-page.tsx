@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Plus, Trash2, Users } from "lucide-react";
-import type { OrgMemberResponse, Role } from "@helix/api-schemas";
+import { canGrantRole, canManageMember, type OrgMemberResponse, type Role } from "@helix/api-schemas";
 import {
   Button,
   Select,
@@ -83,9 +83,14 @@ export function MembersPage({ orgId }: { orgId: string }) {
             </TableRow>
           ) : (
             members.map((member) => {
-              // Нельзя понизить/удалить последнего OWNER — сервер уже отказывает (LastOwnerError),
-              // но заранее блокируем очевидный случай "я тут один OWNER" для UX (не единственный guard).
+              // Иерархия: actor может редактировать только СТРОГО младших (Admin не трогает Admin/
+              // Owner), и в списке ролей — только ≤ своего ранга (Admin не может промоут'нуть до
+              // Owner). Self-исключение: собственное membership редактировать/удалять можно всегда
+              // (передача ownership'а, выход из орги) — совпадает с бэковой логикой в
+              // OrganizationsService (canManageMember + isSelf-байпас).
               const isSelf = member.userId === me.id;
+              const canManageThis = canUpdate && (isSelf || canManageMember(me.role, member.role));
+              const canDeleteThis = canDelete && (isSelf || canManageMember(me.role, member.role));
               return (
                 <TableRow key={member.userId}>
                   <TableCell className="font-medium text-foreground">
@@ -94,7 +99,7 @@ export function MembersPage({ orgId }: { orgId: string }) {
                   </TableCell>
                   <TableCell className="text-muted-foreground">{member.email}</TableCell>
                   <TableCell>
-                    {canUpdate ? (
+                    {canManageThis ? (
                       <Select
                         value={member.role}
                         onValueChange={(role) => changeRole.mutate({ userId: member.userId, role: role as Role })}
@@ -104,7 +109,7 @@ export function MembersPage({ orgId }: { orgId: string }) {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {ROLES.map((role) => (
+                          {ROLES.filter((role) => canGrantRole(me.role, role)).map((role) => (
                             <SelectItem key={role} value={role}>
                               {t(`role.${role}`)}
                             </SelectItem>
@@ -116,7 +121,7 @@ export function MembersPage({ orgId }: { orgId: string }) {
                     )}
                   </TableCell>
                   <TableCell>
-                    {canDelete && (
+                    {canDeleteThis && (
                       <Button
                         type="button"
                         variant="ghost"

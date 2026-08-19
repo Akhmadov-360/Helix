@@ -117,6 +117,57 @@ describe("Organizations — membership management (Appendix B)", () => {
         .send({ role: "MEMBER" })
         .expect(403);
     });
+
+    // Иерархия (canManageMember/canGrantRole): CASL пропускает Admin'а как "Membership.update
+    // разрешён", но ранг target'а/новой роли должен быть строго < ранг actor'а. Без этих чеков
+    // Admin мог бы понизить Owner'а или промоут'нуть себя (обнаружено на живом демо, 2026-08-19).
+    it("ADMIN не может менять роль OWNER → 403", async () => {
+      const admin = await signUpAs(app, "ADMIN");
+      const owner = await signUpAs(app);
+      await addToOrg(admin.orgId, owner.userId, "OWNER");
+
+      await request(app.getHttpServer())
+        .patch(`/v1/organizations/members/${owner.userId}`)
+        .set("Authorization", `Bearer ${admin.token}`)
+        .send({ role: "MEMBER" })
+        .expect(403);
+    });
+
+    it("ADMIN не может менять роль другого ADMIN → 403 (canManageMember строго `>`)", async () => {
+      const admin = await signUpAs(app, "ADMIN");
+      const other = await signUpAs(app);
+      await addToOrg(admin.orgId, other.userId, "ADMIN");
+
+      await request(app.getHttpServer())
+        .patch(`/v1/organizations/members/${other.userId}`)
+        .set("Authorization", `Bearer ${admin.token}`)
+        .send({ role: "MEMBER" })
+        .expect(403);
+    });
+
+    it("ADMIN не может промоут'нуть MEMBER до OWNER → 403 (canGrantRole)", async () => {
+      const admin = await signUpAs(app, "ADMIN");
+      const member = await signUpAs(app);
+      await addToOrg(admin.orgId, member.userId, "MEMBER");
+
+      await request(app.getHttpServer())
+        .patch(`/v1/organizations/members/${member.userId}`)
+        .set("Authorization", `Bearer ${admin.token}`)
+        .send({ role: "OWNER" })
+        .expect(403);
+    });
+
+    it("ADMIN может менять MANAGER на MEMBER (валидный случай)", async () => {
+      const admin = await signUpAs(app, "ADMIN");
+      const manager = await signUpAs(app);
+      await addToOrg(admin.orgId, manager.userId, "MANAGER");
+
+      await request(app.getHttpServer())
+        .patch(`/v1/organizations/members/${manager.userId}`)
+        .set("Authorization", `Bearer ${admin.token}`)
+        .send({ role: "MEMBER" })
+        .expect(200);
+    });
   });
 
   describe("DELETE /v1/organizations/members/:userId — удаление участника", () => {
@@ -177,6 +228,29 @@ describe("Organizations — membership management (Appendix B)", () => {
       await request(app.getHttpServer())
         .delete(`/v1/organizations/members/${member.userId}`)
         .set("Authorization", `Bearer ${member.token}`)
+        .expect(403);
+    });
+
+    // Иерархия — тот же приём, что в PATCH выше (см. соседние 403-тесты про canManageMember).
+    it("ADMIN не может удалить OWNER → 403", async () => {
+      const admin = await signUpAs(app, "ADMIN");
+      const owner = await signUpAs(app);
+      await addToOrg(admin.orgId, owner.userId, "OWNER");
+
+      await request(app.getHttpServer())
+        .delete(`/v1/organizations/members/${owner.userId}`)
+        .set("Authorization", `Bearer ${admin.token}`)
+        .expect(403);
+    });
+
+    it("ADMIN не может удалить другого ADMIN → 403", async () => {
+      const admin = await signUpAs(app, "ADMIN");
+      const other = await signUpAs(app);
+      await addToOrg(admin.orgId, other.userId, "ADMIN");
+
+      await request(app.getHttpServer())
+        .delete(`/v1/organizations/members/${other.userId}`)
+        .set("Authorization", `Bearer ${admin.token}`)
         .expect(403);
     });
   });

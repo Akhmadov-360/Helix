@@ -63,14 +63,14 @@ export class OrganizationsController {
     @Param("userId") userId: string,
     @Body(new ZodValidationPipe(changeMemberRoleSchema)) dto: ChangeMemberRoleInput,
   ): Promise<null> {
-    await this.organizations.changeMemberRole(auth.activeOrgId, auth.userId, userId, dto.role);
+    await this.organizations.changeMemberRole(auth.activeOrgId, auth.userId, auth.role, userId, dto.role);
     return null;
   }
 
   @Delete("members/:userId")
   @CheckPolicy("delete", "Membership")
   async removeMember(@CurrentAuth() auth: AuthContext, @Param("userId") userId: string): Promise<null> {
-    await this.organizations.removeMember(auth.activeOrgId, auth.userId, userId);
+    await this.organizations.removeMember(auth.activeOrgId, auth.userId, auth.role, userId);
     return null;
   }
 

@@ -6,7 +6,7 @@ import type {
   InviteListResponse,
   InvitePreviewResponse,
 } from "@helix/api-schemas";
-import { canGrantRole } from "../../core/authz/role-hierarchy";
+import { canGrantRole } from "@helix/api-schemas";
 import {
   AlreadyOrgMemberError,
   InvalidInviteTokenError,

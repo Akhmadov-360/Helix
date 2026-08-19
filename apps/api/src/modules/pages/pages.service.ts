@@ -8,7 +8,7 @@ import type {
   UpdatePageInput,
 } from "@helix/api-schemas";
 import type { Prisma, Role } from "@helix/db";
-import { roleRank } from "../../core/authz/role-hierarchy";
+import { roleRank } from "@helix/api-schemas";
 import { ForbiddenActionError, ResourceNotFoundError } from "../../core/errors/domain-error";
 import { extractPlainText } from "../../core/lib/full-text-search";
 import { PrismaService } from "../../core/prisma/prisma.service";

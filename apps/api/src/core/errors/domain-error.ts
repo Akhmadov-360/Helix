@@ -271,6 +271,21 @@ export class ForbiddenActionError extends ForbiddenError {
 }
 
 /**
+ * Actor имеет право на действие вообще (CASL пропустил Membership.update/delete),
+ * но конкретно этого target'а тронуть не может: ранг target'а >= ранг actor'а.
+ * Отдельный код от FORBIDDEN — фронту нужно различать "тебе вообще эта фича закрыта"
+ * (спрятать action целиком) и "этой конкретной строки не тронешь" (показать соседние
+ * строки нормально, эту сделать read-only). См. `canManageMember` в role-hierarchy.
+ */
+export class InsufficientRoleRankError extends ForbiddenError {
+  readonly code = "INSUFFICIENT_ROLE_RANK";
+
+  constructor() {
+    super("Your role rank is not high enough to manage this member");
+  }
+}
+
+/**
  * Отдельный код от INVALID_TOKEN: фронту нужно различать «протух access —
  * сходи на /refresh» и «сессия мертва — показывай форму логина». Один код на
  * оба случая загнал бы клиент в цикл бесплодных refresh-запросов.

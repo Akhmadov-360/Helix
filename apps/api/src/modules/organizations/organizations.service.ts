@@ -1,16 +1,19 @@
 import { Injectable } from "@nestjs/common";
 import { Role } from "@helix/db";
-import type {
-  AuditLogListResponse,
-  AuditLogQuery,
-  MyOrgListResponse,
-  MyOrgResponse,
-  OrganizationSettings,
-  OrganizationSettingsResponse,
-  OrgMemberListResponse,
-  UpdateOrganizationSettingsInput,
+import {
+  canGrantRole,
+  canManageMember,
+  type AuditLogListResponse,
+  type AuditLogQuery,
+  type MyOrgListResponse,
+  type MyOrgResponse,
+  type OrganizationSettings,
+  type OrganizationSettingsResponse,
+  type OrgMemberListResponse,
+  type UpdateOrganizationSettingsInput,
 } from "@helix/api-schemas";
 import {
+  InsufficientRoleRankError,
   LastOwnerError,
   ResourceNotFoundError,
   SoleOrganizationMembershipError,
@@ -64,9 +67,25 @@ export class OrganizationsService {
    * Чужой/несуществующий userId → 404, не 403: IDOR-паттерн, тот же, что у Blueprint
    * (§6 blueprints.md) — не подтверждаем чужому запросу, существует ли membership.
    */
-  async changeMemberRole(orgId: string, actorId: string, targetUserId: string, role: Role): Promise<void> {
+  async changeMemberRole(
+    orgId: string,
+    actorId: string,
+    actorRole: Role,
+    targetUserId: string,
+    role: Role,
+  ): Promise<void> {
     const membership = await this.orgs.findMembership(orgId, targetUserId);
     if (!membership) throw new ResourceNotFoundError("Membership not found");
+
+    // Иерархия: actor может трогать target только со СТРОГО меньшим рангом (Admin не трогает
+    // Admin/Owner). Self-action — исключение: собственное membership можно менять всегда, ранг
+    // относительно самого себя тривиально равен (иначе не смогли бы понизить последнего Owner'а
+    // при передаче ownership'а — важный сценарий, покрыт тестом "есть второй OWNER — первого
+    // понизить можно"). canGrantRole всё равно применяется — включая self: MEMBER не может
+    // промоут'нуть себя, ADMIN не может себе OWNER'а выдать.
+    const isSelf = actorId === targetUserId;
+    if (!isSelf && !canManageMember(actorRole, membership.role)) throw new InsufficientRoleRankError();
+    if (!canGrantRole(actorRole, role)) throw new InsufficientRoleRankError();
 
     // Понижаем ПОСЛЕДНЕГО OWNER — орга осталась бы без единственной роли, которой
     // доступно это же действие (Appendix B), т.е. без возможности когда-либо
@@ -100,9 +119,15 @@ export class OrganizationsService {
    * смена роли, плюс третий: у User по auth.md §9.1 всегда ≥1 Membership — если это
    * членство единственное, удаление сломало бы резолюцию activeOrgId на логине.
    */
-  async removeMember(orgId: string, actorId: string, targetUserId: string): Promise<void> {
+  async removeMember(orgId: string, actorId: string, actorRole: Role, targetUserId: string): Promise<void> {
     const membership = await this.orgs.findMembership(orgId, targetUserId);
     if (!membership) throw new ResourceNotFoundError("Membership not found");
+
+    // Иерархия: тот же чек, что в changeMemberRole, с тем же self-исключением (self-remove =
+    // "покинуть организацию", валидный сценарий; инварианты "последний Owner" и "единственная
+    // орга" ниже — реальные ограничители).
+    const isSelf = actorId === targetUserId;
+    if (!isSelf && !canManageMember(actorRole, membership.role)) throw new InsufficientRoleRankError();
 
     if (membership.role === "OWNER" && (await this.orgs.countOwners(orgId)) <= 1) {
       throw new LastOwnerError();

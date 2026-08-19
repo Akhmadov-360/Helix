@@ -19,7 +19,7 @@ import {
   ResourceNotFoundError,
   ToolCallNotPendingError,
 } from "../../core/errors/domain-error";
-import { roleRank } from "../../core/authz/role-hierarchy";
+import { roleRank } from "@helix/api-schemas";
 import { defineAbilityForRole } from "../../core/authz/app-ability";
 import { ActivityRepository } from "../activity/activity.repository";
 import { PrismaService } from "../../core/prisma/prisma.service";
