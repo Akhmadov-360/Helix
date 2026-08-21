@@ -2,10 +2,15 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useMutation } from "@tanstack/react-query";
 import { forgotPasswordSchema, type ForgotPasswordInput } from "@helix/api-schemas";
+import { useEffect, useState } from "react";
+import { MailCheck } from "lucide-react";
 import { z } from "zod";
 import { Button, Input, Label } from "@helix/ui";
 import { request } from "../../shared/api";
 import { useT } from "../../shared/i18n";
+import { StatusCard } from "./status-card";
+
+const RESEND_COOLDOWN_SECONDS = 30;
 
 export function ForgotPasswordForm() {
   const t = useT();
@@ -20,9 +25,16 @@ export function ForgotPasswordForm() {
   });
 
   // Ответ ВСЕГДА успешен независимо от того, существует ли email (PasswordResetService,
-  // не оракул существования аккаунта) — форма показывает одно и то же сообщение на любой ввод.
+  // не оракул существования аккаунта) — success-карточка показывает одну и ту же формулировку
+  // «if an account exists» на любой ввод.
   if (submit.isSuccess) {
-    return <p className="text-sm text-muted-foreground">{t("forgotPassword.success")}</p>;
+    return (
+      <ForgotPasswordSuccess
+        email={form.getValues("email")}
+        onResend={() => submit.mutate({ email: form.getValues("email") })}
+        resending={submit.isPending}
+      />
+    );
   }
 
   const { errors } = form.formState;
@@ -49,5 +61,59 @@ export function ForgotPasswordForm() {
         {submit.isPending ? t("forgotPassword.submitting") : t("forgotPassword.submit")}
       </Button>
     </form>
+  );
+}
+
+function ForgotPasswordSuccess({
+  email,
+  onResend,
+  resending,
+}: {
+  email: string;
+  onResend: () => void;
+  resending: boolean;
+}) {
+  const t = useT();
+  const [seconds, setSeconds] = useState(RESEND_COOLDOWN_SECONDS);
+
+  // Обратный отсчёт до разблокировки resend — единственный useEffect в форме, cleanup обязателен
+  // (react-strict-mode двойной mount развалит счётчик без него).
+  useEffect(() => {
+    if (seconds <= 0) return;
+    const id = window.setInterval(() => setSeconds((s) => (s > 0 ? s - 1 : 0)), 1000);
+    return () => window.clearInterval(id);
+  }, [seconds]);
+
+  const canResend = seconds === 0 && !resending;
+
+  return (
+    <StatusCard
+      tone="success"
+      icon={MailCheck}
+      title={t("forgotPassword.success.title")}
+      description={
+        <>
+          {t("forgotPassword.success.description.prefix")}{" "}
+          <span className="font-medium text-foreground">{email}</span>
+          {t("forgotPassword.success.description.suffix")}
+        </>
+      }
+    >
+      <Button
+        type="button"
+        variant="outline"
+        disabled={!canResend}
+        onClick={() => {
+          onResend();
+          setSeconds(RESEND_COOLDOWN_SECONDS);
+        }}
+      >
+        {resending
+          ? t("forgotPassword.submitting")
+          : seconds > 0
+            ? t("forgotPassword.success.resendIn", { seconds: String(seconds) })
+            : t("forgotPassword.success.resend")}
+      </Button>
+    </StatusCard>
   );
 }

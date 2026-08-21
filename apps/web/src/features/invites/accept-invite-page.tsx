@@ -2,11 +2,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
+import { CircleAlert } from "lucide-react";
 import { z } from "zod";
 import type { InvitePreviewResponse } from "@helix/api-schemas";
 import { passwordSchema } from "@helix/api-schemas";
-import { Button, Input, Label, PasswordInput } from "@helix/ui";
+import { Avatar, Button, Input, Label, PasswordInput, RoleBadge } from "@helix/ui";
 import { BrandLogo } from "../../app/brand/logo";
+import { StatusCard } from "../auth/status-card";
 import { useT } from "../../shared/i18n";
 import { ThemeToggle } from "../../shared/theme";
 import { acceptInviteErrorKey, useAcceptInvite } from "./mutations";
@@ -42,29 +44,52 @@ export function AcceptInvitePage({ token }: { token: string }) {
 function InvalidInvite() {
   const t = useT();
   return (
-    <div className="flex flex-col gap-4">
-      <p className="text-sm text-destructive">{t("inviteAccept.error.invalidToken")}</p>
-      <Link to="/login" className="text-sm font-medium text-foreground underline underline-offset-4">
-        {t("login.title")}
+    <StatusCard
+      tone="error"
+      icon={CircleAlert}
+      title={t("inviteAccept.invalid.title")}
+      description={t("inviteAccept.invalid.description")}
+    >
+      <Link
+        to="/login"
+        className="inline-flex items-center justify-center text-sm font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+      >
+        {t("inviteAccept.invalid.backHome")}
       </Link>
+    </StatusCard>
+  );
+}
+
+// Шапка приглашения (avatar + role badge + «X invited you to Y» heading) — общая для обеих
+// веток REGISTER/ACCEPT. Делит визуальную ответственность с формой: header отвечает «кто и куда
+// зовёт», форма отвечает «что делать» (создать аккаунт или подтвердить).
+function InviteHeader({ preview }: { preview: InvitePreviewResponse }) {
+  const t = useT();
+  const firstName = preview.inviterName.trim().split(/\s+/)[0] ?? preview.inviterName;
+  return (
+    <div className="flex flex-col gap-4 border-b border-border pb-6">
+      <div className="flex items-start justify-between gap-3">
+        <Avatar name={preview.inviterName} size="lg" />
+        <RoleBadge role={preview.role} label={t(`role.${preview.role}`)} />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+          {t("inviteAccept.header.title", { inviterFirstName: firstName, orgName: preview.orgName })}
+        </h1>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          {t("inviteAccept.header.subtitle.prefix")}{" "}
+          <span className="font-medium text-foreground">{preview.email}</span>
+          {t("inviteAccept.header.subtitle.suffix", { orgName: preview.orgName })}
+        </p>
+      </div>
     </div>
   );
 }
 
 function AcceptInviteContent({ token, preview }: { token: string; preview: InvitePreviewResponse }) {
-  const t = useT();
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Helix</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {t("inviteAccept.subtitle", {
-            inviterName: preview.inviterName,
-            orgName: preview.orgName,
-            role: t(`role.${preview.role}`),
-          })}
-        </p>
-      </div>
+      <InviteHeader preview={preview} />
       {preview.acceptMode === "REGISTER" ? (
         <RegisterBranch token={token} />
       ) : (
