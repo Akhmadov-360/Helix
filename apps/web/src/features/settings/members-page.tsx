@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { LogOut, MoreHorizontal, Plus, UserMinus, Users } from "lucide-react";
+import { LogOut, MailWarning, MoreHorizontal, Plus, UserMinus, Users } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import {
   canManageMember,
   type OrgMemberDetailedResponse,
@@ -9,6 +10,8 @@ import {
 import {
   Avatar,
   Button,
+  buttonVariants,
+  cn,
   DataTable,
   type DataTableColumn,
   DropdownMenu,
@@ -21,14 +24,15 @@ import { useCan } from "../../shared/auth/ability";
 import { useMe } from "../../shared/auth/session";
 import { useT } from "../../shared/i18n";
 import { useChangeMemberRole } from "./mutations";
-import { orgMembersDetailedQueryOptions } from "./queries";
+import { orgInvitesQueryOptions, orgMembersDetailedQueryOptions } from "./queries";
 import { InviteMemberDialog } from "./invite-member-dialog";
-import { PendingInvitesSection } from "./pending-invites-section";
 import { RemoveMemberDialog } from "./remove-member-dialog";
 import { RolePopover } from "./role-popover";
 
 // Appendix B «Manage members & roles» = O/A only — canUpdate/canDelete гейтят элементы
 // управления, но сервер (@CheckPolicy("update"/"delete", "Membership")) — единственный энфорсер.
+// Layout: h-full flex-col — DataTable внутри занимает всю доступную вертикаль (табличная карточка
+// как «полотно»), пагинация всегда прибита к низу, sticky <thead> при скролле.
 export function MembersPage({ orgId }: { orgId: string }) {
   const t = useT();
   const me = useMe();
@@ -47,12 +51,14 @@ export function MembersPage({ orgId }: { orgId: string }) {
       {
         key: "person",
         header: t("settings.members.column.person"),
+        hideable: false,
         cell: (m) => <PersonCell member={m} isSelf={m.userId === me.id} youLabel={t("settings.members.you")} />,
       },
       {
         key: "role",
         header: t("settings.members.column.role"),
         className: "w-44",
+        hideable: false,
         cell: (m) => (
           <RoleCell
             member={m}
@@ -67,13 +73,13 @@ export function MembersPage({ orgId }: { orgId: string }) {
       {
         key: "leads",
         header: t("settings.members.column.leads"),
-        className: "w-24 text-right",
+        className: "w-32 text-right",
         cell: (m) => <span className="tabular-nums text-foreground">{m.assignedLeadsCount}</span>,
       },
       {
         key: "tasks",
         header: t("settings.members.column.tasks"),
-        className: "w-24 text-right",
+        className: "w-32 text-right",
         cell: (m) => <span className="tabular-nums text-foreground">{m.openTasksCount}</span>,
       },
     ],
@@ -86,16 +92,7 @@ export function MembersPage({ orgId }: { orgId: string }) {
   };
 
   return (
-    <div className="flex flex-col gap-8">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            {t("settings.members.title")}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">{t("settings.members.subtitle")}</p>
-        </div>
-      </header>
-
+    <div className="flex h-full min-h-0 flex-col">
       <DataTable
         columns={columns}
         data={members}
@@ -110,18 +107,28 @@ export function MembersPage({ orgId }: { orgId: string }) {
           </span>
         }
         actions={
-          canInvite && (
-            <Button type="button" onClick={() => setInviteOpen(true)}>
-              <Plus className="h-4 w-4" aria-hidden="true" />
-              {t("settings.members.invite.trigger")}
-            </Button>
-          )
+          <>
+            {canReadInvites && <PendingInvitesLink orgId={orgId} />}
+            {canInvite && (
+              <Button type="button" onClick={() => setInviteOpen(true)}>
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                {t("settings.members.invite.trigger")}
+              </Button>
+            )}
+          </>
         }
         search={{
           value: search,
           onChange: setSearch,
           placeholder: t("settings.members.searchPlaceholder"),
           matches,
+        }}
+        controlLabels={{
+          fields: t("dataTable.fields"),
+          rowHeight: t("dataTable.rowHeight"),
+          rowHeightCompact: t("dataTable.rowHeight.compact"),
+          rowHeightComfortable: t("dataTable.rowHeight.comfortable"),
+          rowHeightSpacious: t("dataTable.rowHeight.spacious"),
         }}
         rowActions={(m) => (
           <MemberActions
@@ -164,8 +171,6 @@ export function MembersPage({ orgId }: { orgId: string }) {
         }}
       />
 
-      {canReadInvites && <PendingInvitesSection orgId={orgId} />}
-
       <RemoveMemberDialog
         orgId={orgId}
         member={removeTarget}
@@ -179,6 +184,21 @@ export function MembersPage({ orgId }: { orgId: string }) {
 }
 
 // ── Cell components ─────────────────────────────────────────────────────────
+
+function PendingInvitesLink({ orgId }: { orgId: string }) {
+  const t = useT();
+  // useSuspenseQuery — прогретый кэш через loader, никакого loading state; счётчик рендерится
+  // сразу при заходе на Members.
+  const invites = useSuspenseQuery(orgInvitesQueryOptions(orgId)).data;
+  // Наш Button не поддерживает asChild (без Radix Slot), поэтому Link стилизуем через
+  // buttonVariants — точный визуальный клон Button variant="outline".
+  return (
+    <Link to="/settings/pending-invites" className={cn(buttonVariants({ variant: "outline" }))}>
+      <MailWarning className="h-4 w-4" aria-hidden="true" />
+      {t("settings.members.pendingInvitesLink", { count: String(invites.length) })}
+    </Link>
+  );
+}
 
 function PersonCell({
   member,
@@ -221,8 +241,6 @@ function RoleCell({
   onChangeRole: (role: Role) => void;
 }) {
   const t = useT();
-  // Смена роли: строго младший + isSelf-ветка только для OWNER (совпадает с
-  // OrganizationsService.changeMemberRole). Иначе — static badge.
   const mayChangeRole = canUpdate && (isSelf ? actorRole === "OWNER" : canManageMember(actorRole, member.role));
   if (mayChangeRole) {
     return (
@@ -252,7 +270,6 @@ function MemberActions({
   onRemove: () => void;
 }) {
   const t = useT();
-  // Удаление: строго младший + isSelf-ветка для любой роли (leave org).
   const mayRemove = canDelete && (isSelf || canManageMember(actorRole, member.role));
   if (!mayRemove) return null;
   return (

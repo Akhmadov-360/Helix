@@ -1,13 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { orgInvitesQueryOptions } from "../../../features/settings/queries";
+import { orgInvitesQueryOptions, orgMembersDetailedQueryOptions } from "../../../features/settings/queries";
 import { MembersPage } from "../../../features/settings/members-page";
-import { orgMembersQueryOptions } from "../../../shared/org/queries";
 import { meQueryOptions, useMe } from "../../../shared/auth/session";
 
 export const Route = createFileRoute("/_authenticated/settings/members")({
   loader: async ({ context }) => {
     const me = await context.queryClient.ensureQueryData(meQueryOptions);
-    await context.queryClient.ensureQueryData(orgMembersQueryOptions(me.activeOrgId));
+    await context.queryClient.ensureQueryData(orgMembersDetailedQueryOptions(me.activeOrgId));
     // Invite.read = O/A only (invites.md §5), а MembersPage открыта всем ролям — прогреваем
     // только если разрешено, иначе suspense-запрос 403-нет прямо на загрузке страницы.
     if (me.capabilities.includes("Invite.read")) {

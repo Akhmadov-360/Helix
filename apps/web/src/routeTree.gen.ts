@@ -28,6 +28,7 @@ import { Route as AuthenticatedProjectsProjectIdRouteImport } from './routes/_au
 import { Route as AuthenticatedSettingsAuditLogRouteImport } from './routes/_authenticated/settings/audit-log'
 import { Route as AuthenticatedSettingsGeneralRouteImport } from './routes/_authenticated/settings/general'
 import { Route as AuthenticatedSettingsMembersRouteImport } from './routes/_authenticated/settings/members'
+import { Route as AuthenticatedSettingsPendingInvitesRouteImport } from './routes/_authenticated/settings/pending-invites'
 import { Route as AuthenticatedWorkspacesIndexRouteImport } from './routes/_authenticated/workspaces/index'
 import { Route as AuthenticatedProjectsProjectIdIndexRouteImport } from './routes/_authenticated/projects/$projectId/index'
 import { Route as AuthenticatedProjectsProjectIdActivityRouteImport } from './routes/_authenticated/projects/$projectId/activity'
@@ -142,6 +143,12 @@ const AuthenticatedSettingsMembersRoute =
     path: '/settings/members',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedSettingsPendingInvitesRoute =
+  AuthenticatedSettingsPendingInvitesRouteImport.update({
+    id: '/settings/pending-invites',
+    path: '/settings/pending-invites',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedWorkspacesIndexRoute =
   AuthenticatedWorkspacesIndexRouteImport.update({
     id: '/workspaces/',
@@ -218,6 +225,7 @@ export interface FileRoutesByFullPath {
   '/settings/audit-log': typeof AuthenticatedSettingsAuditLogRoute
   '/settings/general': typeof AuthenticatedSettingsGeneralRoute
   '/settings/members': typeof AuthenticatedSettingsMembersRoute
+  '/settings/pending-invites': typeof AuthenticatedSettingsPendingInvitesRoute
   '/companies/': typeof AuthenticatedCompaniesIndexRoute
   '/contacts/': typeof AuthenticatedContactsIndexRoute
   '/kb/': typeof AuthenticatedKbIndexRoute
@@ -246,6 +254,7 @@ export interface FileRoutesByTo {
   '/settings/audit-log': typeof AuthenticatedSettingsAuditLogRoute
   '/settings/general': typeof AuthenticatedSettingsGeneralRoute
   '/settings/members': typeof AuthenticatedSettingsMembersRoute
+  '/settings/pending-invites': typeof AuthenticatedSettingsPendingInvitesRoute
   '/companies': typeof AuthenticatedCompaniesIndexRoute
   '/contacts': typeof AuthenticatedContactsIndexRoute
   '/kb': typeof AuthenticatedKbIndexRoute
@@ -278,6 +287,7 @@ export interface FileRoutesById {
   '/_authenticated/settings/audit-log': typeof AuthenticatedSettingsAuditLogRoute
   '/_authenticated/settings/general': typeof AuthenticatedSettingsGeneralRoute
   '/_authenticated/settings/members': typeof AuthenticatedSettingsMembersRoute
+  '/_authenticated/settings/pending-invites': typeof AuthenticatedSettingsPendingInvitesRoute
   '/_authenticated/companies/': typeof AuthenticatedCompaniesIndexRoute
   '/_authenticated/contacts/': typeof AuthenticatedContactsIndexRoute
   '/_authenticated/kb/': typeof AuthenticatedKbIndexRoute
@@ -309,6 +319,7 @@ export interface FileRouteTypes {
     | '/settings/audit-log'
     | '/settings/general'
     | '/settings/members'
+    | '/settings/pending-invites'
     | '/companies/'
     | '/contacts/'
     | '/kb/'
@@ -337,6 +348,7 @@ export interface FileRouteTypes {
     | '/settings/audit-log'
     | '/settings/general'
     | '/settings/members'
+    | '/settings/pending-invites'
     | '/companies'
     | '/contacts'
     | '/kb'
@@ -368,6 +380,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/audit-log'
     | '/_authenticated/settings/general'
     | '/_authenticated/settings/members'
+    | '/_authenticated/settings/pending-invites'
     | '/_authenticated/companies/'
     | '/_authenticated/contacts/'
     | '/_authenticated/kb/'
@@ -524,6 +537,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsMembersRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/settings/pending-invites': {
+      id: '/_authenticated/settings/pending-invites'
+      path: '/settings/pending-invites'
+      fullPath: '/settings/pending-invites'
+      preLoaderRoute: typeof AuthenticatedSettingsPendingInvitesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/workspaces/': {
       id: '/_authenticated/workspaces/'
       path: '/workspaces'
@@ -653,6 +673,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedSettingsAuditLogRoute: typeof AuthenticatedSettingsAuditLogRoute
   AuthenticatedSettingsGeneralRoute: typeof AuthenticatedSettingsGeneralRoute
   AuthenticatedSettingsMembersRoute: typeof AuthenticatedSettingsMembersRoute
+  AuthenticatedSettingsPendingInvitesRoute: typeof AuthenticatedSettingsPendingInvitesRoute
   AuthenticatedCompaniesIndexRoute: typeof AuthenticatedCompaniesIndexRoute
   AuthenticatedContactsIndexRoute: typeof AuthenticatedContactsIndexRoute
   AuthenticatedKbIndexRoute: typeof AuthenticatedKbIndexRoute
@@ -673,6 +694,8 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedSettingsAuditLogRoute: AuthenticatedSettingsAuditLogRoute,
   AuthenticatedSettingsGeneralRoute: AuthenticatedSettingsGeneralRoute,
   AuthenticatedSettingsMembersRoute: AuthenticatedSettingsMembersRoute,
+  AuthenticatedSettingsPendingInvitesRoute:
+    AuthenticatedSettingsPendingInvitesRoute,
   AuthenticatedCompaniesIndexRoute: AuthenticatedCompaniesIndexRoute,
   AuthenticatedContactsIndexRoute: AuthenticatedContactsIndexRoute,
   AuthenticatedKbIndexRoute: AuthenticatedKbIndexRoute,

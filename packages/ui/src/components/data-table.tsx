@@ -1,21 +1,25 @@
+import { Rows3 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
+import { Button } from "./button";
 import { cn } from "../lib/cn";
+import { ColumnsMenu } from "./columns-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./dropdown-menu";
 import { Pagination } from "./pagination";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableToolbar } from "./table";
 
 // Композиция поверх низкоуровневого <Table>: тулбар (title + search + actions) в шапке карточки,
-// sticky <thead> при скролле, client-side пагинация, per-row action-слот, empty state. Заведён
-// потому, что три+ страницы (Members, Contacts, Companies) повторяли одну и ту же разметку с
-// расхождениями (row-height, где-то был поиск, где-то нет) — примитив унифицирует и убирает
-// копипасту.
+// ряд control-чипов (Fields visibility + Row height), sticky <thead>, client-side пагинация
+// (постоянно видна если задана), per-row action-слот, empty state. Заведён потому, что три+
+// страницы (Members, Contacts, Companies) повторяли одну и ту же разметку с расхождениями
+// (row-height, где-то был поиск, где-то нет) — примитив унифицирует и убирает копипасту.
 //
-// V1 намеренно ограничен: search + rowActions + client-pagination + emptyState. Sort/filter chips/
-// Fields menu добавляются когда появится второй потребитель, которому это реально нужно (правило
-// "3+ потребителя → фича примитива", CLAUDE.md).
+// Занимает полную высоту родителя (`min-h-0 flex-1` на внутреннем скролл-контейнере) — таблица
+// становится «полотном на всю доступную область», как в референсе с торговой лентой; пагинация
+// всегда прибита к низу. Родитель обязан быть `flex flex-col` с ограниченной высотой.
 
 export interface DataTableColumn<T> {
-  /** Стабильный идентификатор (react key + опция для columns-menu в будущем). */
+  /** Стабильный идентификатор (react key + опция для columns-menu). */
   key: string;
   header: ReactNode;
   cell: (row: T) => ReactNode;
@@ -23,6 +27,10 @@ export interface DataTableColumn<T> {
   className?: string;
   /** Тот же класс на <td>. По дефолту наследует от `className`. */
   cellClassName?: string;
+  /** Можно ли скрыть колонку через Fields-меню. По умолчанию true. false = всегда видна. */
+  hideable?: boolean;
+  /** Локализованное имя для чекбокса в Fields-меню (fallback: `header`, если это строка). */
+  menuLabel?: ReactNode;
 }
 
 export type DataTableRowHeight = "compact" | "comfortable" | "spacious";
@@ -48,12 +56,22 @@ export interface DataTablePaginationLabels {
   nextLabel: string;
 }
 
+export interface DataTableControlLabels {
+  /** Триггер Fields-меню («Fields», «Колонки», «Ustunlar»). */
+  fields: string;
+  /** Триггер Row-height-меню («Row height», «Плотность»). */
+  rowHeight: string;
+  rowHeightCompact: string;
+  rowHeightComfortable: string;
+  rowHeightSpacious: string;
+}
+
 export interface DataTableProps<T> {
   columns: DataTableColumn<T>[];
   data: readonly T[];
   getRowKey: (row: T) => string;
 
-  // Toolbar slots (все опциональны — если ничего нет, toolbar не рендерится)
+  // Toolbar slots
   title?: ReactNode;
   actions?: ReactNode;
   search?: DataTableSearchProps<T>;
@@ -64,19 +82,20 @@ export interface DataTableProps<T> {
 
   // States / layout
   emptyState?: ReactNode;
-  rowHeight?: DataTableRowHeight;
+  /** Дефолтная плотность рядов; если задан controlLabels, юзер может переключить в меню. */
+  defaultRowHeight?: DataTableRowHeight;
   /** Липкий <thead> при скролле контейнера. По умолчанию on. */
   stickyHeader?: boolean;
-  /** Client-side пагинация. Undefined = без пагинации (показываем всё). Требует labels. */
+  /** Client-side пагинация. Undefined = без пагинации. Задан = всегда виден footer, даже если 1 стр. */
   pagination?: {
     initialPageSize: number;
     pageSizeOptions?: number[];
     labels: DataTablePaginationLabels;
   };
+  /** Локализация Fields/RowHeight-чипов. Без него — чипы не рендерятся (backward compat). */
+  controlLabels?: DataTableControlLabels;
   /** Aria-label на <table> — важно для скринридеров, всегда указывать. */
   ariaLabel: string;
-  /** Внешний контейнер (напр. min-h-0 flex-1 для скролла в высоком лэйауте). */
-  containerClassName?: string;
   className?: string;
 }
 
@@ -90,15 +109,22 @@ export function DataTable<T>({
   rowActions,
   onRowClick,
   emptyState,
-  rowHeight = "comfortable",
+  defaultRowHeight = "comfortable",
   stickyHeader = true,
   pagination,
+  controlLabels,
   ariaLabel,
-  containerClassName,
   className,
 }: DataTableProps<T>) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(pagination?.initialPageSize ?? 0);
+  const [hidden, setHidden] = useState<Set<string>>(() => new Set());
+  const [rowHeight, setRowHeight] = useState<DataTableRowHeight>(defaultRowHeight);
+
+  const visibleColumns = useMemo(
+    () => columns.filter((c) => !hidden.has(c.key)),
+    [columns, hidden],
+  );
 
   const filtered = useMemo(() => {
     if (!search || !search.value.trim()) return data;
@@ -107,8 +133,6 @@ export function DataTable<T>({
   }, [data, search]);
 
   const totalPages = pageSize > 0 ? Math.max(1, Math.ceil(filtered.length / pageSize)) : 1;
-  // Клэмп: удаление/фильтр может сделать текущую страницу пустой — откатываемся в допустимый
-  // диапазон вместо render'а пустого экрана.
   const currentPage = Math.min(page, totalPages);
   const paginated = useMemo(() => {
     if (pageSize <= 0) return filtered;
@@ -133,25 +157,60 @@ export function DataTable<T>({
 
   const showEmpty = filtered.length === 0 && emptyState !== undefined;
 
+  // Chip-row: Fields + Row-height. Виден только если задан controlLabels и хотя бы одна фича
+  // реально применима (есть hideable колонки для Fields; row-height всегда).
+  const columnsMenuColumns = useMemo(
+    () =>
+      columns.map((c) => ({
+        key: c.key,
+        label: c.menuLabel ?? c.header,
+        toggleable: c.hideable !== false,
+      })),
+    [columns],
+  );
+  const hasHideableColumns = columnsMenuColumns.some((c) => c.toggleable !== false);
+  const showChipRow = controlLabels !== undefined;
+
   return (
-    <div className={cn("flex flex-col gap-3", className)}>
+    <div className={cn("flex min-h-0 flex-1 flex-col gap-3", className)}>
+      {showChipRow && (
+        <div className="flex flex-wrap items-center gap-2">
+          {hasHideableColumns && (
+            <ColumnsMenu
+              columns={columnsMenuColumns}
+              isVisible={(key) => !hidden.has(key)}
+              onToggle={(key) => {
+                setHidden((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(key)) next.delete(key);
+                  else next.add(key);
+                  return next;
+                });
+              }}
+              triggerLabel={controlLabels.fields}
+            />
+          )}
+          <RowHeightMenu value={rowHeight} onChange={setRowHeight} labels={controlLabels} />
+        </div>
+      )}
+
       <Table
         toolbar={toolbar}
-        containerClassName={containerClassName}
+        containerClassName="min-h-0 flex-1"
         aria-label={ariaLabel}
         className="w-full"
       >
         {showEmpty ? (
           <TableBody>
             <TableRow>
-              <TableCell colSpan={columns.length + (rowActions ? 1 : 0)}>{emptyState}</TableCell>
+              <TableCell colSpan={visibleColumns.length + (rowActions ? 1 : 0)}>{emptyState}</TableCell>
             </TableRow>
           </TableBody>
         ) : (
           <>
             <TableHeader className={cn(stickyHeader && "sticky top-0 z-10")}>
               <TableRow header>
-                {columns.map((c) => (
+                {visibleColumns.map((c) => (
                   <TableHead key={c.key} className={c.className}>
                     {c.header}
                   </TableHead>
@@ -170,7 +229,7 @@ export function DataTable<T>({
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
                   className={cn(ROW_HEIGHT_CLASS[rowHeight], onRowClick && "cursor-pointer")}
                 >
-                  {columns.map((c) => (
+                  {visibleColumns.map((c) => (
                     <TableCell key={c.key} className={c.cellClassName ?? c.className}>
                       {c.cell(row)}
                     </TableCell>
@@ -183,7 +242,7 @@ export function DataTable<T>({
         )}
       </Table>
 
-      {pagination && pageSize > 0 && filtered.length > pageSize && (
+      {pagination && pageSize > 0 && (
         <Pagination
           page={currentPage}
           hasPrev={currentPage > 1}
@@ -203,5 +262,45 @@ export function DataTable<T>({
         />
       )}
     </div>
+  );
+}
+
+function RowHeightMenu({
+  value,
+  onChange,
+  labels,
+}: {
+  value: DataTableRowHeight;
+  onChange: (v: DataTableRowHeight) => void;
+  labels: DataTableControlLabels;
+}) {
+  const options: Array<{ key: DataTableRowHeight; label: string }> = [
+    { key: "compact", label: labels.rowHeightCompact },
+    { key: "comfortable", label: labels.rowHeightComfortable },
+    { key: "spacious", label: labels.rowHeightSpacious },
+  ];
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button type="button" variant="outline" size="sm">
+          <Rows3 className="h-3.5 w-3.5" />
+          {labels.rowHeight}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {options.map((o) => (
+          <DropdownMenuItem
+            key={o.key}
+            onSelect={(e) => {
+              e.preventDefault();
+              onChange(o.key);
+            }}
+            className={value === o.key ? "font-medium" : undefined}
+          >
+            {o.label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

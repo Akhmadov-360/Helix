@@ -1,5 +1,6 @@
-import { Mail, MoreHorizontal, Undo2 } from "lucide-react";
+import { ArrowLeft, Mail, MoreHorizontal, Undo2 } from "lucide-react";
 import { useSuspenseQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import type { InviteResponse } from "@helix/api-schemas";
 import {
   DropdownMenu,
@@ -15,11 +16,11 @@ import { formatRelative } from "../../shared/lib/format-relative";
 import { useRevokeInvite } from "./mutations";
 import { orgInvitesQueryOptions } from "./queries";
 
-// Отдельная секция, не строки в таблице участников (§ решение): pending-инвайт — не Membership,
-// у него другой набор действий (revoke, не смена роли/удаление) — смешение в одну таблицу
-// путало бы, что вообще можно сделать со строкой. Секция скрыта целиком при 0 инвайтов
-// (не "empty state") — актор увидит блок только когда есть что revoke'нуть.
-export function PendingInvitesSection({ orgId }: { orgId: string }) {
+// Pending-инвайт — не Membership: другой набор действий (revoke, не смена роли/удаления), другой
+// entity, отдельная страница (§ решение — раньше жило секцией под Members, что мешало Members-у
+// быть full-height таблицей). Список видит только O/A (invites.md §5) — canRevoke проверяется
+// на строке, сама страница защищена route-loader'ом.
+export function PendingInvitesPage({ orgId }: { orgId: string }) {
   const t = useT();
   const locale = useLocaleStore((state) => state.locale);
   const invites = useSuspenseQuery(orgInvitesQueryOptions(orgId)).data;
@@ -27,34 +28,56 @@ export function PendingInvitesSection({ orgId }: { orgId: string }) {
   const revoke = useRevokeInvite(orgId);
   const relativeFormatter = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
 
-  if (invites.length === 0) return null;
-
   return (
-    <section aria-labelledby="pending-invites-title" className="flex flex-col gap-3">
-      <div className="flex items-center gap-2.5">
-        <h2 id="pending-invites-title" className="text-lg font-semibold text-foreground">
-          {t("settings.members.pending.title")}
-        </h2>
-        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded border border-border bg-muted px-1.5 text-xs font-semibold tabular-nums text-muted-foreground">
-          {invites.length}
-        </span>
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-1">
+        <Link
+          to="/settings/members"
+          className="inline-flex w-fit items-center gap-1.5 text-xs font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+        >
+          <ArrowLeft className="h-3 w-3" aria-hidden="true" />
+          {t("settings.pendingInvites.backToMembers")}
+        </Link>
+        <div className="mt-2 flex items-center gap-2.5">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+            {t("settings.pendingInvites.title")}
+          </h1>
+          {invites.length > 0 && (
+            <span className="inline-flex h-6 min-w-6 items-center justify-center rounded border border-border bg-muted px-2 text-xs font-semibold tabular-nums text-muted-foreground">
+              {invites.length}
+            </span>
+          )}
+        </div>
+        <p className="mt-1 text-sm text-muted-foreground">{t("settings.pendingInvites.subtitle")}</p>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-border bg-card">
-        <ul className="divide-y divide-border">
-          {invites.map((invite) => (
-            <PendingRow
-              key={invite.id}
-              invite={invite}
-              canRevoke={canRevoke}
-              revokePending={revoke.isPending}
-              relativeTime={formatRelative(invite.createdAt, relativeFormatter)}
-              onRevoke={() => revoke.mutate({ id: invite.id })}
-            />
-          ))}
-        </ul>
-      </div>
-    </section>
+      {invites.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card py-16 text-center">
+          <span className="flex h-12 w-12 items-center justify-center rounded-xl border border-border bg-muted text-muted-foreground">
+            <Mail className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">{t("settings.pendingInvites.emptyTitle")}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{t("settings.pendingInvites.emptyBody")}</p>
+          </div>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-border bg-card">
+          <ul className="divide-y divide-border">
+            {invites.map((invite) => (
+              <PendingRow
+                key={invite.id}
+                invite={invite}
+                canRevoke={canRevoke}
+                revokePending={revoke.isPending}
+                relativeTime={formatRelative(invite.createdAt, relativeFormatter)}
+                onRevoke={() => revoke.mutate({ id: invite.id })}
+              />
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
   );
 }
 

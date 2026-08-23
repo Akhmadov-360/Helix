@@ -132,6 +132,7 @@ export { RoleBadge, type RoleBadgeProps, type Role as RoleBadgeRole } from "./co
 export {
   DataTable,
   type DataTableColumn,
+  type DataTableControlLabels,
   type DataTableProps,
   type DataTableRowHeight,
   type DataTableSearchProps,
