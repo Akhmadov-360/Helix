@@ -12,6 +12,7 @@ import {
   type MyOrgListResponse,
   type MyOrgResponse,
   type OrganizationSettingsResponse,
+  type OrgMemberDetailedListResponse,
   type OrgMemberListResponse,
   type UpdateOrganizationSettingsInput,
 } from "@helix/api-schemas";
@@ -32,8 +33,16 @@ import { OrganizationsService } from "./organizations.service";
 export class OrganizationsController {
   constructor(private readonly organizations: OrganizationsService) {}
 
+  // `?stats=true` — расширенная проекция для Settings > Members (joinedAt + assignedLeadsCount +
+  // openTasksCount). UI-пикеры (create-deal, assignee-panel и т.д.) ходят без флага и не платят
+  // за три extra groupBy, которые им не нужны. Разделение по query-param, не отдельный роут —
+  // тот же ресурс, другая проекция.
   @Get("members")
-  listMembers(@CurrentAuth() auth: AuthContext): Promise<OrgMemberListResponse> {
+  listMembers(
+    @CurrentAuth() auth: AuthContext,
+    @Query("stats") stats?: string,
+  ): Promise<OrgMemberListResponse | OrgMemberDetailedListResponse> {
+    if (stats === "true") return this.organizations.listMembersDetailed(auth.activeOrgId);
     return this.organizations.listMembers(auth.activeOrgId);
   }
 

@@ -9,6 +9,7 @@ import {
   type MyOrgResponse,
   type OrganizationSettings,
   type OrganizationSettingsResponse,
+  type OrgMemberDetailedListResponse,
   type OrgMemberListResponse,
   type UpdateOrganizationSettingsInput,
 } from "@helix/api-schemas";
@@ -34,6 +35,18 @@ export class OrganizationsService {
 
   listMembers(orgId: string): Promise<OrgMemberListResponse> {
     return this.orgs.listMembers(orgId);
+  }
+
+  async listMembersDetailed(orgId: string): Promise<OrgMemberDetailedListResponse> {
+    const rows = await this.orgs.listMembersWithStats(orgId);
+    return rows.map((r) => ({
+      userId: r.userId,
+      name: r.name,
+      email: r.email,
+      role: r.role,
+      assignedLeadsCount: r.assignedLeadsCount,
+      openTasksCount: r.openTasksCount,
+    }));
   }
 
   listMine(userId: string): Promise<MyOrgListResponse> {

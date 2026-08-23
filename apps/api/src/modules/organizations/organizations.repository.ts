@@ -109,6 +109,60 @@ export class OrganizationsRepository {
     return memberships.map((m) => ({ userId: m.user.id, name: m.user.name, email: m.user.email, role: m.role }));
   }
 
+  /**
+   * Ростер + workload-агрегаты под Settings > Members. Три параллельных запроса вместо N+1:
+   * memberships + groupBy Project.ownerId + groupBy Task.assigneeId. Prisma `_count` внутри
+   * `include` не подошёл бы — нужен where-фильтр по статусу/completedAt на related-записях,
+   * а он на _count не поддерживается. groupBy — один запрос на всю оргу, склейка в Map.
+   */
+  async listMembersWithStats(orgId: string): Promise<
+    {
+      userId: string;
+      name: string;
+      email: string;
+      role: Role;
+      assignedLeadsCount: number;
+      openTasksCount: number;
+    }[]
+  > {
+    const [memberships, leadCounts, taskCounts] = await Promise.all([
+      this.prisma.client.membership.findMany({
+        where: { orgId },
+        select: { role: true, user: { select: { id: true, name: true, email: true } } },
+        orderBy: { user: { name: "asc" } },
+      }),
+      // OPEN — единственный "живой" статус (WON/LOST — история, ARCHIVED — вообще без фазы).
+      // orgId в where не только для безопасности, но и для точного использования индекса
+      // (Project.orgId индексирован для tenant-фильтрации). `_count: { _all: true }` — Prisma-way
+      // получить число строк в группе, доступное через row._count._all (просто `_count: true`
+      // у groupBy типизируется как object, не работает).
+      this.prisma.client.project.groupBy({
+        by: ["ownerId"],
+        where: { orgId, status: "OPEN" },
+        _count: { _all: true },
+      }),
+      this.prisma.client.task.groupBy({
+        by: ["assigneeId"],
+        where: { orgId, done: false },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const leadsByUser = new Map<string, number>();
+    for (const row of leadCounts) if (row.ownerId) leadsByUser.set(row.ownerId, row._count._all);
+    const tasksByUser = new Map<string, number>();
+    for (const row of taskCounts) if (row.assigneeId) tasksByUser.set(row.assigneeId, row._count._all);
+
+    return memberships.map((m) => ({
+      userId: m.user.id,
+      name: m.user.name,
+      email: m.user.email,
+      role: m.role,
+      assignedLeadsCount: leadsByUser.get(m.user.id) ?? 0,
+      openTasksCount: tasksByUser.get(m.user.id) ?? 0,
+    }));
+  }
+
   // FR-ORG-2: список орг пользователя под org-switcher — та же таблица (Membership), другой срез
   // (по userId, не orgId), поэтому здесь же, не отдельным репозиторием (см. комментарий класса).
   async listOrgsForUser(userId: string): Promise<{ orgId: string; name: string; role: Role }[]> {

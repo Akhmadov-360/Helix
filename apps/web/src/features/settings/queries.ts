@@ -1,5 +1,10 @@
 import { queryOptions } from "@tanstack/react-query";
-import { auditLogListResponseSchema, inviteListResponseSchema, organizationSettingsResponseSchema } from "@helix/api-schemas";
+import {
+  auditLogListResponseSchema,
+  inviteListResponseSchema,
+  orgMemberDetailedListResponseSchema,
+  organizationSettingsResponseSchema,
+} from "@helix/api-schemas";
 import { queryKeys, request } from "../../shared/api";
 
 export interface AuditLogQuery {
@@ -16,6 +21,22 @@ export function auditLogQueryOptions(orgId: string, query: AuditLogQuery = {}) {
     queryKey: queryKeys.auditLog(orgId, query),
     queryFn: () => request({ path: "/v1/organizations/audit-log", searchParams: query, schema: auditLogListResponseSchema }),
     staleTime: 30_000,
+  });
+}
+
+// Расширенный ростер — только под Settings > Members: name/email/role + assignedLeadsCount +
+// openTasksCount (workload-метрики для админа). UI-пикеры продолжают жить на orgMembersQueryOptions
+// из shared/org/queries.ts (базовая schema без extra JOIN'ов).
+export function orgMembersDetailedQueryOptions(orgId: string) {
+  return queryOptions({
+    queryKey: queryKeys.orgMembersDetailed(orgId),
+    queryFn: () =>
+      request({
+        path: "/v1/organizations/members",
+        searchParams: { stats: "true" },
+        schema: orgMemberDetailedListResponseSchema,
+      }),
+    staleTime: 60_000,
   });
 }
 

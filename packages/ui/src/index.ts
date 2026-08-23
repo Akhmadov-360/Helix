@@ -129,3 +129,11 @@ export { Skeleton } from "./components/skeleton";
 export { PasswordStrengthMeter, type PasswordStrengthMeterProps } from "./components/password-strength-meter";
 export { PasswordRequirementsList, type PasswordRequirement } from "./components/password-requirements-list";
 export { RoleBadge, type RoleBadgeProps, type Role as RoleBadgeRole } from "./components/role-badge";
+export {
+  DataTable,
+  type DataTableColumn,
+  type DataTableProps,
+  type DataTableRowHeight,
+  type DataTableSearchProps,
+  type DataTablePaginationLabels,
+} from "./components/data-table";

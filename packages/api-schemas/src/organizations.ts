@@ -14,6 +14,22 @@ export type OrgMemberResponse = z.infer<typeof orgMemberResponseSchema>;
 export const orgMemberListResponseSchema = z.array(orgMemberResponseSchema);
 export type OrgMemberListResponse = z.infer<typeof orgMemberListResponseSchema>;
 
+// Расширенный вариант — под Settings > Members (админ смотрит workload). UI-пикеры
+// (assignee/co-worker/reassign) продолжают ходить в базовую schema — избегаем лишних
+// SQL-агрегатов, которые пикерам не нужны и вызываются часто. Разделение по endpoint-параметру
+// `?stats=true` в контроллере, не отдельный роут (та же ресурсная сущность, разный проекция).
+// Membership не имеет createdAt в schema.prisma — "joined at" колонку сюда добавим отдельным PR
+// с миграцией (Membership +createdAt @default(now()) @db.Timestamptz), это не блокирует остальные
+// две метрики.
+export const orgMemberDetailedResponseSchema = orgMemberResponseSchema.extend({
+  assignedLeadsCount: z.number().int().min(0), // Project.status === OPEN (не WON/LOST/ARCHIVED — те не workload)
+  openTasksCount: z.number().int().min(0), // Task.done === false
+});
+export type OrgMemberDetailedResponse = z.infer<typeof orgMemberDetailedResponseSchema>;
+
+export const orgMemberDetailedListResponseSchema = z.array(orgMemberDetailedResponseSchema);
+export type OrgMemberDetailedListResponse = z.infer<typeof orgMemberDetailedListResponseSchema>;
+
 // Список орг ТЕКУЩЕГО пользователя (FR-ORG-2) — под org-switcher. orgId ЕСТЬ в ответе (в отличие
 // от orgMemberResponseSchema): здесь список СПАН нескольких орг, скоуп по токену не подходит.
 export const myOrgResponseSchema = z.object({

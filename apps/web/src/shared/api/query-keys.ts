@@ -23,6 +23,9 @@ export const queryKeys = {
   projectAssignees: (orgId: string, projectId: string) =>
     ["org", orgId, "project", projectId, "assignees"] as const,
   orgMembers: (orgId: string) => ["org", orgId, "members"] as const,
+  // Расширенный ростер под Settings > Members. Отдельный подключ, но общий префикс с
+  // orgMembers — invalidate по префиксу ["org", orgId, "members"] чистит оба варианта.
+  orgMembersDetailed: (orgId: string) => ["org", orgId, "members", "detailed"] as const,
   orgInvites: (orgId: string) => ["org", orgId, "invites"] as const,
   orgSettings: (orgId: string) => ["org", orgId, "settings"] as const,
   // Typeahead-поиск (§13.1) — НЕ в loader (§4.2), короткоживущий, свой ключ под debounce-запрос.
