@@ -105,6 +105,10 @@ export function useCreateInvite(orgId: string) {
     onError: (error) => {
       const kind = toInviteError(error);
       if (kind === "permissionDenied") void queryClient.invalidateQueries({ queryKey: queryKeys.me() });
+      // alreadyMember/roleTooHigh — доменные fault'ы формы, dialog рендерит их inline-баннером
+      // рядом с полями; повторный toast был бы шумом. Остальные (permission/notFound/unexpected)
+      // — глобальные, показываем toast'ом (диалог мог быть закрыт к моменту ответа).
+      if (kind === "alreadyMember" || kind === "roleTooHigh") return;
       toast.error(t(inviteErrorKey(kind)));
     },
     onSuccess: () => {

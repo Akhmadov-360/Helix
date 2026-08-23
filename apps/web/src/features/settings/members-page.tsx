@@ -1,33 +1,17 @@
 import { useState } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { Plus, Trash2, Users } from "lucide-react";
-import { canGrantRole, canManageMember, type OrgMemberResponse, type Role } from "@helix/api-schemas";
-import {
-  Button,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-  TableToolbar,
-} from "@helix/ui";
+import { Plus, Users } from "lucide-react";
+import type { OrgMemberResponse } from "@helix/api-schemas";
+import { Button } from "@helix/ui";
 import { useCan } from "../../shared/auth/ability";
 import { useMe } from "../../shared/auth/session";
 import { useT } from "../../shared/i18n";
 import { useChangeMemberRole } from "./mutations";
 import { orgMembersQueryOptions } from "../../shared/org/queries";
 import { InviteMemberDialog } from "./invite-member-dialog";
+import { MemberRow } from "./member-row";
 import { PendingInvitesSection } from "./pending-invites-section";
 import { RemoveMemberDialog } from "./remove-member-dialog";
-
-const COLUMN_COUNT = 4;
-const ROLES: Role[] = ["OWNER", "ADMIN", "MANAGER", "MEMBER", "VIEWER"];
 
 // Appendix B «Manage members & roles» = O/A only — canUpdate/canDelete гейтят элементы
 // управления, но сервер (@CheckPolicy("update"/"delete", "Membership")) — единственный энфорсер.
@@ -43,110 +27,66 @@ export function MembersPage({ orgId }: { orgId: string }) {
   const [removeTarget, setRemoveTarget] = useState<OrgMemberResponse | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
 
-  const toolbar = (
-    <TableToolbar
-      title={t("settings.members.title")}
-      actions={
-        canInvite && (
-          <Button type="button" size="sm" onClick={() => setInviteOpen(true)}>
-            <Plus className="h-3.5 w-3.5" />
+  return (
+    <div className="flex flex-col gap-8">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+            {t("settings.members.title")}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">{t("settings.members.subtitle")}</p>
+        </div>
+        {canInvite && (
+          <Button type="button" onClick={() => setInviteOpen(true)}>
+            <Plus className="h-4 w-4" aria-hidden="true" />
             {t("settings.members.invite.trigger")}
           </Button>
-        )
-      }
-    />
-  );
+        )}
+      </header>
 
-  return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
-      <p className="text-sm text-muted-foreground">{t("settings.members.subtitle")}</p>
-      <Table toolbar={toolbar} containerClassName="min-h-0 flex-1" className="min-w-[560px]">
-        <TableHeader>
-          <TableRow header>
-            <TableHead>{t("settings.members.list.name")}</TableHead>
-            <TableHead>{t("settings.members.list.email")}</TableHead>
-            <TableHead className="w-44">{t("settings.members.list.role")}</TableHead>
-            <TableHead className="w-10">
-              <span className="sr-only">{t("settings.members.list.menu")}</span>
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {members.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={COLUMN_COUNT}>
-                <div className="flex flex-col items-center justify-center gap-2 py-16 text-muted-foreground">
-                  <Users className="h-8 w-8" />
-                  <p>{t("settings.members.empty")}</p>
-                </div>
-              </TableCell>
-            </TableRow>
-          ) : (
-            members.map((member) => {
-              // Иерархия: actor может редактировать только СТРОГО младших (Admin не трогает Admin/
-              // Owner), и в списке ролей — только ≤ своего ранга (Admin не может промоут'нуть до
-              // Owner). Self-исключение для СМЕНЫ РОЛИ — только Owner (сценарий передачи ownership'а);
-              // Admin, снимающий с себя роль, — не легитимный use case (совпадает с бэковой логикой
-              // в OrganizationsService.changeMemberRole). Self-исключение для УДАЛЕНИЯ остаётся
-              // всем ролям — "покинуть орг" — валидное действие, отличное от смены роли.
-              const isSelf = member.userId === me.id;
-              const canManageThis = canUpdate && (isSelf ? me.role === "OWNER" : canManageMember(me.role, member.role));
-              const canDeleteThis = canDelete && (isSelf || canManageMember(me.role, member.role));
-              return (
-                <TableRow key={member.userId}>
-                  <TableCell className="font-medium text-foreground">
-                    {member.name}
-                    {isSelf && <span className="ml-1.5 text-xs text-muted-foreground">{t("settings.members.you")}</span>}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{member.email}</TableCell>
-                  <TableCell>
-                    {canManageThis ? (
-                      <Select
-                        value={member.role}
-                        onValueChange={(role) => changeRole.mutate({ userId: member.userId, role: role as Role })}
-                        disabled={changeRole.isPending}
-                      >
-                        <SelectTrigger className="h-8">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {ROLES.filter((role) => canGrantRole(me.role, role)).map((role) => (
-                            <SelectItem key={role} value={role}>
-                              {t(`role.${role}`)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      t(`role.${member.role}`)
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {canDeleteThis && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                        aria-label={t("settings.members.list.remove")}
-                        onClick={() => setRemoveTarget(member)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              );
-            })
-          )}
-        </TableBody>
-      </Table>
+      <section
+        aria-label={t("settings.members.title")}
+        className="overflow-hidden rounded-xl border border-border bg-card"
+      >
+        {members.length === 0 ? (
+          <div className="flex flex-col items-center px-6 py-16 text-center">
+            <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-border bg-muted text-muted-foreground">
+              <Users className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <h2 className="text-lg font-semibold text-foreground">{t("settings.members.emptyTitle")}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{t("settings.members.emptyBody")}</p>
+            {canInvite && (
+              <Button type="button" className="mt-5" onClick={() => setInviteOpen(true)}>
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                {t("settings.members.invite.trigger")}
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {members.map((member) => (
+              <MemberRow
+                key={member.userId}
+                member={member}
+                actorRole={me.role}
+                isSelf={member.userId === me.id}
+                canUpdate={canUpdate}
+                canDelete={canDelete}
+                changeRolePending={changeRole.isPending}
+                onChangeRole={(role) => changeRole.mutate({ userId: member.userId, role })}
+                onRemove={() => setRemoveTarget(member)}
+              />
+            ))}
+          </div>
+        )}
+      </section>
 
       {canReadInvites && <PendingInvitesSection orgId={orgId} />}
 
       <RemoveMemberDialog
         orgId={orgId}
         member={removeTarget}
+        isSelf={removeTarget?.userId === me.id}
         open={removeTarget !== null}
         onOpenChange={(open) => !open && setRemoveTarget(null)}
       />
