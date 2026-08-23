@@ -42,6 +42,7 @@ export {
   SelectItem,
 } from "./components/select";
 export { Badge, badgeVariants, type BadgeProps } from "./components/badge";
+export { CountBadge } from "./components/count-badge";
 export { Checkbox } from "./components/checkbox";
 export { Popover, PopoverTrigger, PopoverContent, PopoverAnchor } from "./components/popover";
 export { Calendar } from "./components/calendar";

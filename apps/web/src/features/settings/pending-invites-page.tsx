@@ -3,6 +3,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import type { InviteResponse } from "@helix/api-schemas";
 import {
+  CountBadge,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -42,11 +43,7 @@ export function PendingInvitesPage({ orgId }: { orgId: string }) {
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             {t("settings.pendingInvites.title")}
           </h1>
-          {invites.length > 0 && (
-            <span className="inline-flex h-6 min-w-6 items-center justify-center rounded border border-border bg-muted px-2 text-xs font-semibold tabular-nums text-muted-foreground">
-              {invites.length}
-            </span>
-          )}
+          {invites.length > 0 && <CountBadge value={invites.length} />}
         </div>
         <p className="mt-1 text-sm text-muted-foreground">{t("settings.pendingInvites.subtitle")}</p>
       </div>

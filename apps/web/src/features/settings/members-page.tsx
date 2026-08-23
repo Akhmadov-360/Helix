@@ -12,6 +12,7 @@ import {
   Button,
   buttonVariants,
   cn,
+  CountBadge,
   DataTable,
   type DataTableColumn,
   DropdownMenu,
@@ -118,9 +119,7 @@ export function MembersPage({ orgId }: { orgId: string }) {
         title={
           <span className="flex items-center gap-2">
             {t("settings.members.title")}
-            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded border border-border bg-muted px-1.5 text-xs font-semibold tabular-nums text-muted-foreground">
-              {members.length}
-            </span>
+            <CountBadge value={members.length} />
           </span>
         }
         actions={
@@ -218,7 +217,8 @@ function PendingInvitesLink({ orgId }: { orgId: string }) {
   return (
     <Link to="/settings/pending-invites" className={cn(buttonVariants({ variant: "outline" }))}>
       <MailWarning className="h-4 w-4" aria-hidden="true" />
-      {t("settings.members.pendingInvitesLink", { count: String(invites.length) })}
+      {t("settings.members.pendingInvitesLink")}
+      <CountBadge value={invites.length} />
     </Link>
   );
 }

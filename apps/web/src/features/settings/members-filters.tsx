@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Check, ListFilter, Users } from "lucide-react";
+import { ListFilter, Users } from "lucide-react";
 import type { Role } from "@helix/api-schemas";
 import {
   Button,
-  cn,
+  CountBadge,
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
@@ -70,16 +70,14 @@ function RoleChip({
 }) {
   const t = useT();
   const active = selected.size > 0;
-  const label = active
-    ? t("settings.members.filter.rolesActive", { count: String(selected.size) })
-    : t("settings.members.filter.roles");
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button type="button" variant={active ? "secondary" : "outline"} size="sm">
           <Users className="h-3.5 w-3.5" />
-          {label}
+          {t("settings.members.filter.roles")}
+          {active && <CountBadge value={selected.size} />}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56">
@@ -147,7 +145,7 @@ function MinNumericChip({
           {active ? formatActive(value) : baseLabel}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-56 p-3">
+      <PopoverContent align="start" className="w-64 p-3">
         <form
           className="flex flex-col gap-2"
           onSubmit={(e) => {
@@ -166,7 +164,7 @@ function MinNumericChip({
             autoFocus
             className="h-9"
           />
-          <div className="mt-1 flex justify-between gap-2">
+          <div className="mt-1 flex items-center justify-between gap-2">
             <Button
               type="button"
               variant="ghost"
@@ -180,10 +178,7 @@ function MinNumericChip({
             >
               {t("settings.members.filter.clear")}
             </Button>
-            <Button type="submit" size="sm">
-              <Check className={cn("h-3.5 w-3.5")} />
-              {t("settings.members.filter.apply")}
-            </Button>
+            <Button type="submit" size="sm">{t("settings.members.filter.apply")}</Button>
           </div>
         </form>
       </PopoverContent>
