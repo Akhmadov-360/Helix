@@ -642,6 +642,7 @@
   "dataTable.rowHeight.spacious": "Spacious",
   "dataTable.perPage": "{size} per page",
   "dataTable.next": "Next",
+  "dataTable.paginationNav": "Pagination",
   "settings.members.filter.roles": "Role",
   "settings.members.filter.leads": "Leads",
   "settings.members.filter.leadsActive": "Leads ≥ {n}",

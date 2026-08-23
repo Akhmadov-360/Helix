@@ -642,6 +642,7 @@
   "dataTable.rowHeight.spacious": "Просторно",
   "dataTable.perPage": "{size} на странице",
   "dataTable.next": "Далее",
+  "dataTable.paginationNav": "Пагинация",
   "settings.members.filter.roles": "Роль",
   "settings.members.filter.leads": "Лиды",
   "settings.members.filter.leadsActive": "Лиды ≥ {n}",

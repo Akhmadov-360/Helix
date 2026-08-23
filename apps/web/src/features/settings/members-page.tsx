@@ -189,6 +189,7 @@ export function MembersPage({ orgId }: { orgId: string }) {
             prevLabel: t("table.pagination.prevPage"),
             nextLabel: t("dataTable.next"),
             pageAriaLabel: (p) => t("table.pagination.page", { page: String(p) }),
+            navAriaLabel: t("dataTable.paginationNav"),
           },
         }}
       />

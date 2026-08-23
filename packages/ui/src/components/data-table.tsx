@@ -55,6 +55,8 @@ export interface DataTablePaginationLabels {
   prevLabel: string;
   nextLabel: string;
   pageAriaLabel: (page: number) => string;
+  /** aria-label на <nav>-обёртке пагинации, локализованный. */
+  navAriaLabel: string;
 }
 
 export interface DataTableControlLabels {
@@ -83,6 +85,12 @@ export interface DataTableProps<T> {
   filterMatches?: (row: T) => boolean;
 
   // Row-level
+  /**
+   * Рендерер per-row action-слота (обычно kebab-menu). Если используется вместе с `onRowClick`,
+   * ВНУТРИ этого рендерера обязательно вызывать `e.stopPropagation()` на клике — иначе клик по
+   * кнопке всплывёт до строки и триггернёт row-click. React не даёт разделить event-регионы
+   * автоматически.
+   */
   rowActions?: (row: T) => ReactNode;
   onRowClick?: (row: T) => void;
 
@@ -271,6 +279,7 @@ export function DataTable<T>({
           prevLabel={pagination.labels.prevLabel}
           nextLabel={pagination.labels.nextLabel}
           pageAriaLabel={pagination.labels.pageAriaLabel}
+          navAriaLabel={pagination.labels.navAriaLabel}
         />
       )}
     </div>

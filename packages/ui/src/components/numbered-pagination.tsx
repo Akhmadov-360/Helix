@@ -21,6 +21,8 @@ export interface NumberedPaginationProps {
   prevLabel: string;
   nextLabel: string;
   pageAriaLabel: (page: number) => string;
+  /** aria-label на <nav>-обёртке ("Pagination" / "Пагинация" / "Sahifalash"). */
+  navAriaLabel: string;
   className?: string;
 }
 
@@ -35,6 +37,7 @@ export function NumberedPagination({
   prevLabel,
   nextLabel,
   pageAriaLabel,
+  navAriaLabel,
   className,
 }: NumberedPaginationProps) {
   const items = paginationItems(page, pageCount);
@@ -54,11 +57,7 @@ export function NumberedPagination({
         </SelectContent>
       </Select>
 
-      <nav
-        role="navigation"
-        aria-label="Pagination"
-        className="flex items-center gap-1"
-      >
+      <nav aria-label={navAriaLabel} className="flex items-center gap-1">
         <Button
           type="button"
           variant="outline"

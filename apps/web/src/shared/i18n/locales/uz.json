@@ -642,6 +642,7 @@
   "dataTable.rowHeight.spacious": "Keng",
   "dataTable.perPage": "Sahifada {size} ta",
   "dataTable.next": "Keyingi",
+  "dataTable.paginationNav": "Sahifalash",
   "settings.members.filter.roles": "Rol",
   "settings.members.filter.leads": "Lidlar",
   "settings.members.filter.leadsActive": "Lidlar ≥ {n}",
