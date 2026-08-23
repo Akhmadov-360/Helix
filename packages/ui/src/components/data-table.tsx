@@ -5,7 +5,7 @@ import { Button } from "./button";
 import { cn } from "../lib/cn";
 import { ColumnsMenu } from "./columns-menu";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./dropdown-menu";
-import { Pagination } from "./pagination";
+import { NumberedPagination } from "./numbered-pagination";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableToolbar } from "./table";
 
 // Композиция поверх низкоуровневого <Table>: тулбар (title + search + actions) в шапке карточки,
@@ -50,10 +50,11 @@ export interface DataTableSearchProps<T> {
 }
 
 export interface DataTablePaginationLabels {
-  pageSizeLabel: ReactNode;
-  pageLabel: (page: number, total: number) => ReactNode;
+  /** "10 per page" / "10 на странице" — динамически подставляем размер. */
+  perPageLabel: (size: number) => ReactNode;
   prevLabel: string;
   nextLabel: string;
+  pageAriaLabel: (page: number) => string;
 }
 
 export interface DataTableControlLabels {
@@ -75,6 +76,11 @@ export interface DataTableProps<T> {
   title?: ReactNode;
   actions?: ReactNode;
   search?: DataTableSearchProps<T>;
+  /** Слот для кастомных filter-чипов (Role, Assignee и т.п.) в chip-row до Fields/RowHeight. */
+  filterChips?: ReactNode;
+  /** Дополнительный предикат, применяется К каждой строке ПОСЛЕ search.matches. Если чип-фильтр
+   *  меняет своё состояние — родитель обновляет это значение (обычно useCallback от filter-state). */
+  filterMatches?: (row: T) => boolean;
 
   // Row-level
   rowActions?: (row: T) => ReactNode;
@@ -106,6 +112,8 @@ export function DataTable<T>({
   title,
   actions,
   search,
+  filterChips,
+  filterMatches,
   rowActions,
   onRowClick,
   emptyState,
@@ -127,10 +135,13 @@ export function DataTable<T>({
   );
 
   const filtered = useMemo(() => {
-    if (!search || !search.value.trim()) return data;
-    const q = search.value.trim();
-    return data.filter((row) => search.matches(row, q));
-  }, [data, search]);
+    const q = search?.value.trim() ?? "";
+    return data.filter((row) => {
+      if (q && search && !search.matches(row, q)) return false;
+      if (filterMatches && !filterMatches(row)) return false;
+      return true;
+    });
+  }, [data, search, filterMatches]);
 
   const totalPages = pageSize > 0 ? Math.max(1, Math.ceil(filtered.length / pageSize)) : 1;
   const currentPage = Math.min(page, totalPages);
@@ -169,13 +180,14 @@ export function DataTable<T>({
     [columns],
   );
   const hasHideableColumns = columnsMenuColumns.some((c) => c.toggleable !== false);
-  const showChipRow = controlLabels !== undefined;
+  const showChipRow = controlLabels !== undefined || filterChips !== undefined;
 
   return (
     <div className={cn("flex min-h-0 flex-1 flex-col gap-3", className)}>
       {showChipRow && (
         <div className="flex flex-wrap items-center gap-2">
-          {hasHideableColumns && (
+          {filterChips}
+          {controlLabels && hasHideableColumns && (
             <ColumnsMenu
               columns={columnsMenuColumns}
               isVisible={(key) => !hidden.has(key)}
@@ -190,7 +202,9 @@ export function DataTable<T>({
               triggerLabel={controlLabels.fields}
             />
           )}
-          <RowHeightMenu value={rowHeight} onChange={setRowHeight} labels={controlLabels} />
+          {controlLabels && (
+            <RowHeightMenu value={rowHeight} onChange={setRowHeight} labels={controlLabels} />
+          )}
         </div>
       )}
 
@@ -243,22 +257,20 @@ export function DataTable<T>({
       </Table>
 
       {pagination && pageSize > 0 && (
-        <Pagination
+        <NumberedPagination
           page={currentPage}
-          hasPrev={currentPage > 1}
-          hasNext={currentPage < totalPages}
-          onPrev={() => setPage((p) => Math.max(1, p - 1))}
-          onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+          pageCount={totalPages}
+          onPageChange={setPage}
           pageSize={pageSize}
           pageSizeOptions={pagination.pageSizeOptions}
           onPageSizeChange={(size) => {
             setPageSize(size);
             setPage(1);
           }}
-          pageLabel={(p) => pagination.labels.pageLabel(p, totalPages)}
-          pageSizeLabel={pagination.labels.pageSizeLabel}
+          perPageLabel={pagination.labels.perPageLabel}
           prevLabel={pagination.labels.prevLabel}
           nextLabel={pagination.labels.nextLabel}
+          pageAriaLabel={pagination.labels.pageAriaLabel}
         />
       )}
     </div>

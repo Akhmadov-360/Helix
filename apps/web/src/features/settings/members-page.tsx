@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { LogOut, MailWarning, MoreHorizontal, Plus, UserMinus, Users } from "lucide-react";
 import { Link } from "@tanstack/react-router";
@@ -26,6 +26,12 @@ import { useT } from "../../shared/i18n";
 import { useChangeMemberRole } from "./mutations";
 import { orgInvitesQueryOptions, orgMembersDetailedQueryOptions } from "./queries";
 import { InviteMemberDialog } from "./invite-member-dialog";
+import {
+  initialMembersFilter,
+  isMembersFilterActive,
+  type MembersFilterState,
+} from "./members-filter-state";
+import { MembersFilterChips } from "./members-filters";
 import { RemoveMemberDialog } from "./remove-member-dialog";
 import { RolePopover } from "./role-popover";
 
@@ -45,6 +51,17 @@ export function MembersPage({ orgId }: { orgId: string }) {
   const [removeTarget, setRemoveTarget] = useState<OrgMemberDetailedResponse | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [filters, setFilters] = useState<MembersFilterState>(initialMembersFilter);
+
+  const filterMatches = useCallback(
+    (m: OrgMemberDetailedResponse) => {
+      if (filters.roles.size > 0 && !filters.roles.has(m.role)) return false;
+      if (filters.minLeads !== null && m.assignedLeadsCount < filters.minLeads) return false;
+      if (filters.minTasks !== null && m.openTasksCount < filters.minTasks) return false;
+      return true;
+    },
+    [filters],
+  );
 
   const columns = useMemo<DataTableColumn<OrgMemberDetailedResponse>[]>(
     () => [
@@ -123,6 +140,8 @@ export function MembersPage({ orgId }: { orgId: string }) {
           placeholder: t("settings.members.searchPlaceholder"),
           matches,
         }}
+        filterChips={<MembersFilterChips state={filters} onChange={setFilters} />}
+        filterMatches={filterMatches}
         controlLabels={{
           fields: t("dataTable.fields"),
           rowHeight: t("dataTable.rowHeight"),
@@ -146,13 +165,17 @@ export function MembersPage({ orgId }: { orgId: string }) {
             </span>
             <div>
               <h2 className="text-lg font-semibold text-foreground">
-                {search.trim() ? t("settings.members.noResultsTitle") : t("settings.members.emptyTitle")}
+                {search.trim() || isMembersFilterActive(filters)
+                  ? t("settings.members.noResultsTitle")
+                  : t("settings.members.emptyTitle")}
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                {search.trim() ? t("settings.members.noResultsBody") : t("settings.members.emptyBody")}
+                {search.trim() || isMembersFilterActive(filters)
+                  ? t("settings.members.noResultsBody")
+                  : t("settings.members.emptyBody")}
               </p>
             </div>
-            {!search.trim() && canInvite && (
+            {!search.trim() && !isMembersFilterActive(filters) && canInvite && (
               <Button type="button" className="mt-2" onClick={() => setInviteOpen(true)}>
                 <Plus className="h-4 w-4" aria-hidden="true" />
                 {t("settings.members.invite.trigger")}
@@ -163,10 +186,10 @@ export function MembersPage({ orgId }: { orgId: string }) {
         pagination={{
           initialPageSize: 25,
           labels: {
-            pageSizeLabel: t("table.pagination.rowsPerPage"),
-            pageLabel: (p) => t("table.pagination.page", { page: String(p) }),
+            perPageLabel: (size) => t("dataTable.perPage", { size: String(size) }),
             prevLabel: t("table.pagination.prevPage"),
-            nextLabel: t("table.pagination.nextPage"),
+            nextLabel: t("dataTable.next"),
+            pageAriaLabel: (p) => t("table.pagination.page", { page: String(p) }),
           },
         }}
       />

@@ -57,6 +57,7 @@ export {
 } from "./components/table";
 export { Collapsible, CollapsibleTrigger, CollapsibleContent } from "./components/collapsible";
 export { Pagination } from "./components/pagination";
+export { NumberedPagination, type NumberedPaginationProps } from "./components/numbered-pagination";
 export { ColumnsMenu, type ColumnsMenuColumn } from "./components/columns-menu";
 export {
   Attachment,
