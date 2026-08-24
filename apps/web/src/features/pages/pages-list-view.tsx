@@ -1,15 +1,26 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { Download, FileText, Plus, Search, Trash2 } from "lucide-react";
-import { Button, Input } from "@helix/ui";
+import { Download, FileText, MoreHorizontal, Plus, Search, Trash2, Upload } from "lucide-react";
+import type { PageResponse } from "@helix/api-schemas";
+import {
+  Button,
+  cn,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  Input,
+} from "@helix/ui";
 import { useCan } from "../../shared/auth/ability";
 import { useLocaleStore, useT } from "../../shared/i18n";
-import { downloadMarkdown } from "../../shared/lib/content-to-markdown";
-import { extractSnippet } from "../../shared/lib/extract-snippet";
+import { extractExcerpt, extractSnippet } from "../../shared/lib/extract-snippet";
+import { formatRelative } from "../../shared/lib/format-relative";
 import { highlightMatch } from "../../shared/lib/highlight-match";
 import { CreatePageDialog } from "./create-page-dialog";
 import { DeletePageDialog } from "./delete-page-dialog";
+import { ExportPageDialog } from "./export-page-dialog";
+import { ImportPageDialog } from "./import/import-page-dialog";
 import { projectPagesQueryOptions } from "./queries";
 
 export function PagesListView({ orgId, projectId }: { orgId: string; projectId: string }) {
@@ -30,10 +41,16 @@ export function PagesListView({ orgId, projectId }: { orgId: string; projectId: 
   });
   const canCreate = useCan("Page.create");
   const canDelete = useCan("Page.delete");
-  const dateFormatter = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
+  const relativeFormatter = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+  const absoluteFormatter = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
+  // Export-dialog поднимается ЗДЕСЬ (не в PageCard): один инстанс на весь список — Radix Portal
+  // экономит DOM (иначе N карточек = N спрятанных диалогов), а per-page target передаётся через
+  // локальный state карточки → callback.
+  const [exportTarget, setExportTarget] = useState<{ title: string; content: unknown } | null>(null);
 
   return (
     <div className="flex flex-col gap-4">
@@ -48,10 +65,16 @@ export function PagesListView({ orgId, projectId }: { orgId: string; projectId: 
           />
         </div>
         {canCreate && (
-          <Button type="button" size="sm" className="ml-auto" onClick={() => setCreateOpen(true)}>
-            <Plus className="mr-1.5 h-4 w-4" />
-            {t("pages.list.create")}
-          </Button>
+          <div className="ml-auto flex gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+              <Upload className="mr-1.5 h-4 w-4" />
+              {t("pages.list.import")}
+            </Button>
+            <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              {t("pages.list.create")}
+            </Button>
+          </div>
         )}
       </div>
 
@@ -61,59 +84,38 @@ export function PagesListView({ orgId, projectId }: { orgId: string; projectId: 
           <p>{debounced ? t("pages.list.noResults") : t("pages.list.empty")}</p>
         </div>
       ) : (
-        <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
-          {pages.map((page) => {
-            const snippet = debounced ? extractSnippet(page.content, debounced) : null;
-            return (
-              <li key={page.id} className="group flex items-center justify-between gap-2 px-3 py-2.5">
-                <Link
-                  to="/pages/$pageId"
-                  params={{ pageId: page.id }}
-                  className="flex min-w-0 flex-1 items-center gap-2 text-sm hover:underline"
-                >
-                  <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate">{debounced ? highlightMatch(page.title, debounced) : page.title}</span>
-                    {/* Шаг B: подсветка совпадения внутри сниппета — тот же highlightMatch, что title. */}
-                    {snippet && (
-                      <span className="truncate text-xs font-normal text-muted-foreground no-underline">
-                        {highlightMatch(snippet, debounced)}
-                      </span>
-                    )}
-                  </span>
-                  <span className="shrink-0 text-xs text-muted-foreground">
-                    {dateFormatter.format(new Date(page.updatedAt))}
-                  </span>
-                </Link>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t("pages.detail.download")}
-                  className="opacity-0 group-hover:opacity-100"
-                  onClick={() => downloadMarkdown(page.title || t("pages.title.placeholder"), page.content)}
-                >
-                  <Download className="h-3.5 w-3.5" />
-                </Button>
-                {canDelete && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={t("pages.list.delete")}
-                    className="opacity-0 group-hover:opacity-100"
-                    onClick={() => setDeleteTarget({ id: page.id, title: page.title })}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                )}
-              </li>
-            );
-          })}
+        // Bento-grid (Figma-redesign): 1 колонка на mobile, 2 на десктопе. Карточка вмещает
+        // preview из 3 строк + relative time + kebab — читается плотнее чем divide-y список
+        // при 5+ страницах.
+        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {pages.map((page) => (
+            <PageCard
+              key={page.id}
+              page={page}
+              search={debounced}
+              relativeFormatter={relativeFormatter}
+              absoluteFormatter={absoluteFormatter}
+              canDelete={canDelete}
+              onExportClick={() =>
+                setExportTarget({
+                  title: page.title || t("pages.title.placeholder"),
+                  content: page.content,
+                })
+              }
+              onDeleteClick={() => setDeleteTarget({ id: page.id, title: page.title })}
+            />
+          ))}
         </ul>
       )}
 
       <CreatePageDialog orgId={orgId} projectId={projectId} open={createOpen} onOpenChange={setCreateOpen} />
+      <ImportPageDialog orgId={orgId} projectId={projectId} open={importOpen} onOpenChange={setImportOpen} />
+      <ExportPageDialog
+        title={exportTarget?.title ?? ""}
+        content={exportTarget?.content}
+        open={exportTarget !== null}
+        onOpenChange={(open) => !open && setExportTarget(null)}
+      />
       <DeletePageDialog
         orgId={orgId}
         projectId={projectId}
@@ -122,5 +124,99 @@ export function PagesListView({ orgId, projectId }: { orgId: string; projectId: 
         onOpenChange={(open) => !open && setDeleteTarget(null)}
       />
     </div>
+  );
+}
+
+// Page-card из Figma-разбора: colored icon-square + title + 3-line preview + relative time + kebab.
+// Клик по всей карточке → детали (Link оборачивает контент, kebab — вне линка, не всплывает).
+// Icon цвет — акцентный тон (accent/10 bg + accent icon), в Figma были разные цвета per-card но
+// они декоративные, не осмысленные: делаем один консистентный accent (без «randomness»-хаков).
+function PageCard({
+  page,
+  search,
+  relativeFormatter,
+  absoluteFormatter,
+  canDelete,
+  onExportClick,
+  onDeleteClick,
+}: {
+  page: PageResponse;
+  search: string;
+  relativeFormatter: Intl.RelativeTimeFormat;
+  absoluteFormatter: Intl.DateTimeFormat;
+  canDelete: boolean;
+  onExportClick: () => void;
+  onDeleteClick: () => void;
+}) {
+  const t = useT();
+  const preview = search ? extractSnippet(page.content, search) : extractExcerpt(page.content);
+  const relative = formatRelative(page.updatedAt, relativeFormatter);
+  const absolute = absoluteFormatter.format(new Date(page.updatedAt));
+
+  return (
+    <li className="relative">
+      <Link
+        to="/pages/$pageId"
+        params={{ pageId: page.id }}
+        className={cn(
+          "flex h-full flex-col gap-3 rounded-xl border border-border bg-card p-4 transition-colors",
+          "hover:border-border/80 hover:bg-muted/40",
+        )}
+      >
+        <div className="flex items-start gap-3">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-accent/10 text-accent">
+            <FileText className="h-4 w-4" />
+          </span>
+          <h3 className="min-w-0 flex-1 pt-1 text-sm font-semibold text-foreground">
+            {search ? highlightMatch(page.title, search) : page.title}
+          </h3>
+        </div>
+        {preview && (
+          <p className="line-clamp-3 text-sm text-muted-foreground">
+            {search ? highlightMatch(preview, search) : preview}
+          </p>
+        )}
+        <span
+          className="mt-auto shrink-0 text-xs text-muted-foreground"
+          title={absolute}
+        >
+          {relative}
+        </span>
+      </Link>
+
+      {/* Kebab-меню вне Link (позиционирование absolute) — клик не всплывает до карточки,
+          отдельная точка взаимодействия. Всегда видим, не hover-only. */}
+      <div className="absolute right-2 top-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              aria-label={t("pages.list.actions")}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={onExportClick}>
+              <Download className="h-3.5 w-3.5" />
+              {t("pages.export.trigger")}
+            </DropdownMenuItem>
+            {canDelete && (
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onSelect={onDeleteClick}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                {t("pages.list.delete")}
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </li>
   );
 }

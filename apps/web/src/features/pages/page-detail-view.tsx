@@ -9,9 +9,9 @@ import { useCan } from "../../shared/auth/ability";
 import { useT } from "../../shared/i18n";
 import { fetchDownloadUrl } from "../attachments/mutations";
 import { projectAttachmentsQueryOptions } from "../attachments/queries";
-import { downloadMarkdown } from "../../shared/lib/content-to-markdown";
 import { navigateToDownload } from "../../shared/lib/navigate-to-download";
 import { DeletePageDialog } from "./delete-page-dialog";
+import { ExportPageDialog } from "./export-page-dialog";
 import { useUpdatePage } from "./mutations";
 import { PageComments } from "./page-comments";
 import { PageVersionHistoryDialog } from "./page-version-history-dialog";
@@ -70,6 +70,7 @@ function PageEditor({
   const [title, setTitle] = useState(page.title);
   const [status, setStatus] = useState<SaveStatus>("idle");
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingRef = useRef<UpdatePageInput>({});
@@ -151,12 +152,14 @@ function PageEditor({
               </Button>
             )}
 
+            {/* Одна кнопка «Экспорт» → dialog с чекбоксами для выбора формата(-ов): user может
+                скачать за один клик и .docx, и .pdf, и .md. См. ExportPageDialog. */}
             <Button
               type="button"
               variant="ghost"
               size="icon-sm"
               aria-label={t("pages.detail.download")}
-              onClick={() => downloadMarkdown(title.trim() || t("pages.title.placeholder"), page.content)}
+              onClick={() => setExportOpen(true)}
             >
               <Download className="h-4 w-4" />
             </Button>
@@ -204,6 +207,12 @@ function PageEditor({
         <PageComments orgId={orgId} pageId={page.id} />
       </div>
 
+      <ExportPageDialog
+        title={title.trim() || t("pages.title.placeholder")}
+        content={page.content}
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+      />
       <DeletePageDialog
         orgId={orgId}
         projectId={projectId}
