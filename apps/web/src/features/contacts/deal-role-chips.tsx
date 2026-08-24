@@ -4,6 +4,28 @@ import { dealRoleSchema, validRolesFor, type Audience, type DealRole } from "@he
 import { Badge, Popover, PopoverContent, PopoverTrigger, cn } from "@helix/ui";
 import { useT } from "../../shared/i18n";
 
+// Семантический тон по роли — читается «в один взгляд»: кто двигает сделку (positive), ключевые
+// лица (accent), просто участники (neutral), кто тормозит (negative). Все чипы одинаковые по форме
+// и размеру, разница только в тинтах — избегаем «одна таксономия в трёх визуальных стилях», о чём
+// был design review (Stitch-мокап).
+type Tone = "positive" | "accent" | "neutral" | "negative";
+
+const ROLE_TONE: Record<DealRole, Tone> = {
+  CHAMPION: "positive",
+  DECISION_MAKER: "accent",
+  ECONOMIC_BUYER: "accent",
+  TECHNICAL_BUYER: "neutral",
+  INFLUENCER: "neutral",
+  BLOCKER: "negative",
+};
+
+const TONE_CLASSES: Record<Tone, string> = {
+  positive: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  accent: "border-primary/30 bg-primary/10 text-primary",
+  neutral: "border-border bg-muted text-muted-foreground",
+  negative: "border-destructive/30 bg-destructive/10 text-destructive",
+};
+
 // audience — recommendation model, НЕ фильтр (project-links.md §4, §13.1 frontend-architecture.md):
 // рекомендованные роли выделяются, остальные остаются кликабельными, не прячутся. Компактный вид
 // (redesign): на карточке видны только НАЗНАЧЕННЫЕ роли — полный список из 6 одинаковых чипов на
@@ -36,7 +58,10 @@ export function DealRoleChips({
           type="button"
           disabled={disabled}
           onClick={() => onToggle(role)}
-          className="group inline-flex items-center gap-1 rounded-full border border-primary bg-primary/10 py-0.5 pl-2 pr-1 text-xs text-primary transition-colors disabled:pointer-events-none"
+          className={cn(
+            "group inline-flex items-center gap-1 rounded-full border py-0.5 pl-2 pr-1 text-xs font-medium transition-colors disabled:pointer-events-none disabled:pr-2",
+            TONE_CLASSES[ROLE_TONE[role]],
+          )}
         >
           {t(`dealRole.${role}`)}
           {!disabled && <X className="h-3 w-3 opacity-60 transition-opacity group-hover:opacity-100" />}

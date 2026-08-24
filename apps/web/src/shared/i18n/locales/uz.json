@@ -255,6 +255,8 @@
   "contacts.search.placeholder": "Ism yoki email bo‘yicha qidirish…",
   "contacts.search.noResults": "Hech narsa topilmadi",
   "contacts.search.fromCompany": "{name} kompaniyasidagi kontaktlar",
+  "contacts.search.fromCompanyCount": "· {count} bog‘lash uchun tayyor",
+  "contacts.search.dialogDescription": "Mavjud kontaktni toping yoki yangisini yarating.",
   "contacts.search.createNew": "«{query}» yaratish va bog‘lash",
   "contacts.search.linkTrigger": "Kontakt bog‘lash",
   "contacts.search.cancel": "Bekor qilish",

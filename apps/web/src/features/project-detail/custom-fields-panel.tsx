@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Pencil } from "lucide-react";
+import { Pencil, SlidersHorizontal } from "lucide-react";
 import type { FieldDefinitionResponse } from "@helix/api-schemas";
 import { useCan } from "../../shared/auth/ability";
 import { useLocaleStore, useT } from "../../shared/i18n";
@@ -70,9 +70,12 @@ export function CustomFieldsPanel({
   }
 
   return (
-    <div className="flex flex-col gap-3 border-t border-border pt-3">
+    <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold">{t("projectDetail.sidebar.customFields")}</h2>
+        <div className="flex items-center gap-2">
+          <SlidersHorizontal className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+          <h2 className="text-sm font-semibold">{t("projectDetail.sidebar.customFields")}</h2>
+        </div>
         {canEdit && (
           <button
             type="button"

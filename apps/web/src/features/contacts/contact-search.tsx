@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Building2, Search, X } from "lucide-react";
+import { Search, Sparkles, X } from "lucide-react";
 import type { ContactResponse, DedupHint } from "@helix/api-schemas";
 import { Button, Card, cn, Input } from "@helix/ui";
 import { useT } from "../../shared/i18n";
@@ -95,10 +95,19 @@ export function ContactSearch({
         )}
       </div>
       {showingCompanySuggestions && results.length > 0 && (
-        <p className="flex items-center gap-1 text-xs text-muted-foreground">
-          <Building2 className="h-3 w-3" />
-          {t("contacts.search.fromCompany", { name: company?.name ?? "" })}
-        </p>
+        // Elevated callout вместо тонкой строки-подписи: сильнее сигналит «есть готовые кандидаты
+        // от компании этой сделки — можно привязать в один клик, не печатая». Sparkle-иконка +
+        // accent-border-left — визуальный «умный» hint, не просто заголовок раздела. count в
+        // тексте: юзер видит масштаб (2 или 20 контактов), не открывая список.
+        <div className="flex items-start gap-2 rounded-md border-l-2 border-accent bg-accent/5 px-3 py-2 text-xs">
+          <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" aria-hidden="true" />
+          <p className="min-w-0 text-foreground">
+            {t("contacts.search.fromCompany", { name: company?.name ?? "" })}{" "}
+            <span className="text-muted-foreground">
+              {t("contacts.search.fromCompanyCount", { count: results.length })}
+            </span>
+          </p>
+        </div>
       )}
       {(debounced.trim().length > 0 || (showingCompanySuggestions && results.length > 0)) && (
         <Card className="scroll-slim flex max-h-64 flex-col divide-y divide-border overflow-y-auto p-1">

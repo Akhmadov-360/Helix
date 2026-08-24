@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { Plus, X } from "lucide-react";
+import { Plus, Users, X } from "lucide-react";
 import { Avatar, Button, Popover, PopoverContent, PopoverTrigger } from "@helix/ui";
 import { useCan } from "../../shared/auth/ability";
 import { useT } from "../../shared/i18n";
@@ -40,7 +40,10 @@ export function AssigneesPanel({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold">{t("contacts.assignees.title")}</h2>
+        <div className="flex items-center gap-2">
+          <Users className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+          <h2 className="text-sm font-semibold">{t("contacts.assignees.title")}</h2>
+        </div>
         {canAssign && candidates.length > 0 && (
           <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>

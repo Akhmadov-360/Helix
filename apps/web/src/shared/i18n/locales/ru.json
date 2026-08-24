@@ -255,6 +255,8 @@
   "contacts.search.placeholder": "Найти контакт по имени или email…",
   "contacts.search.noResults": "Ничего не найдено",
   "contacts.search.fromCompany": "Список контактов из компании {name}",
+  "contacts.search.fromCompanyCount": "· {count} готовых к привязке",
+  "contacts.search.dialogDescription": "Найдите существующий контакт или создайте нового.",
   "contacts.search.createNew": "Создать «{query}» и привязать",
   "contacts.search.linkTrigger": "Привязать контакт",
   "contacts.search.cancel": "Отмена",

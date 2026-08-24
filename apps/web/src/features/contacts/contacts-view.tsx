@@ -1,8 +1,16 @@
 import { useState } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { Plus, Users } from "lucide-react";
+import { Building2, Mail, Phone, Plus, Users } from "lucide-react";
 import type { Audience, CompanyResponse, ContactResponse, DedupHint as DedupHintData } from "@helix/api-schemas";
-import { Button, Card, cn } from "@helix/ui";
+import {
+  Button,
+  cn,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@helix/ui";
 import { useCan } from "../../shared/auth/ability";
 import { useT } from "../../shared/i18n";
 import { ContactSearch } from "./contact-search";
@@ -42,7 +50,6 @@ export function ContactsView({
   // привязан, сворачиваем его за "+ Привязать контакт": постоянно видимая строка поиска+подсказки
   // компании раньше отнимала место на каждом лиде, даже когда все нужные контакты уже добавлены.
   const [searching, setSearching] = useState(false);
-  const showSearch = canLink && (contacts.length === 0 || searching);
 
   const excludeIds = new Set(contacts.map((c) => c.contactId));
   // Связь баннера с карточками ниже (UI-обзор): без этого пользователь сопоставляет текст баннера
@@ -69,33 +76,56 @@ export function ContactsView({
     if (hint.candidates.length > 0) setDedup({ hint, newContactId: contact.id });
   }
 
+  // Empty state (contacts.length === 0): ContactSearch inline — поиск ЕСТЬ основная задача,
+  // отдельный dialog поверх пустой панели избыточен, будет двойная обёртка.
+  // Populated state: список + «+ Привязать контакт» → открывает Dialog с той же ContactSearch —
+  // фокус-trap и явный dismiss (Esc/overlay) как дискретное действие, а не inline-раскрытие.
+  const inlineSearch = canLink && contacts.length === 0;
+  const dialogOpen = canLink && contacts.length > 0 && searching;
+
   return (
     <div className="flex flex-col gap-4">
-      {showSearch ? (
+      {inlineSearch && (
         <ContactSearch
           orgId={orgId}
           excludeIds={excludeIds}
-          onLinkExisting={(contact) => {
-            linkExisting(contact);
-            setSearching(false);
-          }}
-          onCreated={(contact, hint) => {
-            handleCreated(contact, hint);
-            setSearching(false);
-          }}
-          // Закрывать нечем, если контактов ещё нет — поиск тогда единственный путь, скрывать
-          // его некуда (см. showSearch: contacts.length === 0 || searching).
-          onCancel={contacts.length > 0 ? () => setSearching(false) : undefined}
+          onLinkExisting={linkExisting}
+          onCreated={handleCreated}
           company={company}
         />
-      ) : (
-        canLink && (
-          <Button type="button" variant="outline" size="sm" className="w-fit" onClick={() => setSearching(true)}>
-            <Plus className="h-3.5 w-3.5" />
-            {t("contacts.search.linkTrigger")}
-          </Button>
-        )
       )}
+      {!inlineSearch && canLink && (
+        <Button type="button" variant="outline" size="sm" className="w-fit" onClick={() => setSearching(true)}>
+          <Plus className="h-3.5 w-3.5" />
+          {t("contacts.search.linkTrigger")}
+        </Button>
+      )}
+      <Dialog open={dialogOpen} onOpenChange={(open) => setSearching(open)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{t("contacts.search.linkTrigger")}</DialogTitle>
+            <DialogDescription>{t("contacts.search.dialogDescription")}</DialogDescription>
+          </DialogHeader>
+          <ContactSearch
+            orgId={orgId}
+            excludeIds={excludeIds}
+            onLinkExisting={(contact) => {
+              linkExisting(contact);
+              setSearching(false);
+            }}
+            onCreated={(contact, hint) => {
+              handleCreated(contact, hint);
+              setSearching(false);
+            }}
+            // Внутри диалога autoFocus нужен (Radix переносит фокус на первый tabbable — это
+            // подойдёт, но `autoFocus={Boolean(onCancel)}` в ContactSearch завязан на этот проп).
+            // Dialog X-close и Esc уже дают путь наружу — свою inline-X от ContactSearch скрываем
+            // (передаём noop-onCancel), чтобы не дублировать dismiss внутри уже дискретного модала.
+            onCancel={() => setSearching(false)}
+            company={company}
+          />
+        </DialogContent>
+      </Dialog>
 
       {dedup && (
         <DedupHint
@@ -119,52 +149,81 @@ export function ContactsView({
           </div>
         )
       ) : (
-        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        // Flat-list с divide-y вместо per-row Card (design review): убираем card-in-card обёртки —
+        // один внешний контейнер + разделители между строками читаются плотнее и не рассыпаются
+        // на равнозначные плитки. dedup-подсветка теперь через мягкий фон строки, не ring вокруг.
+        <ul className="divide-y divide-border rounded-xl border border-border bg-card">
           {contacts.map((contact) => (
-            <li key={contact.contactId}>
-              <Card
-                className={cn(
-                  "flex flex-col gap-2 p-3",
-                  dedupHighlight?.has(contact.contactId) && "border-amber-500/50 ring-1 ring-amber-500/30",
-                )}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-medium">{contact.name}</p>
-                    {/* Строка всегда занимает место (redesign): без плейсхолдера карточки без
-                        email/компании были ниже соседних — сетка выглядела рваной. */}
-                    <p className="text-xs text-muted-foreground">
-                      {[contact.email, contact.phone, contact.companyName].filter(Boolean).join(" · ") || " "}
-                    </p>
-                  </div>
-                  {canUnlink && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-auto shrink-0 px-1.5 py-0.5 text-xs text-muted-foreground hover:text-destructive"
-                      onClick={() => unlink.mutate({ contactId: contact.contactId })}
-                    >
-                      {t("contacts.list.unlink")}
-                    </Button>
-                  )}
+            <li
+              key={contact.contactId}
+              className={cn(
+                "flex flex-col gap-2 px-4 py-3 transition-colors",
+                dedupHighlight?.has(contact.contactId) && "bg-amber-500/5",
+              )}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{contact.name}</p>
+                  {/* Иконки email/phone/company перед значением — при 3+ типах данных подряд одни
+                      разделители «·» плохо парсились глазом; иконка сразу говорит «это email». */}
+                  <ContactMeta email={contact.email} phone={contact.phone} companyName={contact.companyName} />
                 </div>
-                <DealRoleChips
-                  roles={contact.roles}
-                  audience={audience}
-                  disabled={!canEditRoles}
-                  onToggle={(role) => {
-                    const roles = contact.roles.includes(role)
-                      ? contact.roles.filter((r) => r !== role)
-                      : [...contact.roles, role];
-                    updateRoles.mutate({ contactId: contact.contactId, roles });
-                  }}
-                />
-              </Card>
+                {canUnlink && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto shrink-0 px-1.5 py-0.5 text-xs text-muted-foreground hover:text-destructive"
+                    onClick={() => unlink.mutate({ contactId: contact.contactId })}
+                  >
+                    {t("contacts.list.unlink")}
+                  </Button>
+                )}
+              </div>
+              <DealRoleChips
+                roles={contact.roles}
+                audience={audience}
+                disabled={!canEditRoles}
+                onToggle={(role) => {
+                  const roles = contact.roles.includes(role)
+                    ? contact.roles.filter((r) => r !== role)
+                    : [...contact.roles, role];
+                  updateRoles.mutate({ contactId: contact.contactId, roles });
+                }}
+              />
             </li>
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+// Мета-строка контакта: email/phone/company с иконками. Каждое поле опционально; ничего не
+// показывается если пусто (плейсхолдер пропадает — плотнее список). truncate на самой строке —
+// длинный email не должен ломать layout.
+function ContactMeta({
+  email,
+  phone,
+  companyName,
+}: {
+  email: string | null | undefined;
+  phone: string | null | undefined;
+  companyName: string | null | undefined;
+}) {
+  const items: Array<{ icon: typeof Mail; label: string }> = [];
+  if (email) items.push({ icon: Mail, label: email });
+  if (phone) items.push({ icon: Phone, label: phone });
+  if (companyName) items.push({ icon: Building2, label: companyName });
+  if (items.length === 0) return null;
+  return (
+    <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+      {items.map(({ icon: Icon, label }) => (
+        <span key={label} className="inline-flex min-w-0 items-center gap-1">
+          <Icon className="h-3 w-3 shrink-0" aria-hidden="true" />
+          <span className="truncate">{label}</span>
+        </span>
+      ))}
     </div>
   );
 }

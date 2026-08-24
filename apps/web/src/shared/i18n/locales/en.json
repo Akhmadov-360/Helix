@@ -255,6 +255,8 @@
   "contacts.search.placeholder": "Find a contact by name or email…",
   "contacts.search.noResults": "No results",
   "contacts.search.fromCompany": "Contacts from {name}",
+  "contacts.search.fromCompanyCount": "· {count} ready to attach",
+  "contacts.search.dialogDescription": "Find an existing contact or create a new one.",
   "contacts.search.createNew": "Create \"{query}\" and link",
   "contacts.search.linkTrigger": "Link a contact",
   "contacts.search.cancel": "Cancel",
