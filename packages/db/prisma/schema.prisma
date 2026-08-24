@@ -397,16 +397,31 @@ model AuditLog {
 // ──────────────────────────────── TASK ─────────────────────────────────────
 // High-level PM (FR-PRJ-4): чеклист, без сабтасков/зависимостей.
 
+// Плоский enum-словарь (Plane-style): NONE — «не задан», четыре ступени срочности.
+// Порядок — sort-friendly (URGENT сверху): полагаться на enum-order Postgres в raw SQL нельзя,
+// но в TypeScript/UI mapping через таблицу тонов делаем всегда явный ORDER-массив.
+enum TaskPriority {
+  URGENT
+  HIGH
+  MEDIUM
+  LOW
+  NONE
+}
+
 model Task {
-  id         String    @id @default(cuid())
+  id         String       @id @default(cuid())
   orgId      String
   projectId  String
   title      String
-  done       Boolean   @default(false)
+  done       Boolean      @default(false)
   assigneeId String? // nullable: таск без исполнителя легален (§3)
-  dueAt      DateTime? @db.Timestamptz // абсолютный момент (§4): overdue = dueAt < now(); НЕ календарный день
-  createdAt  DateTime  @default(now()) @db.Timestamptz
-  updatedAt  DateTime  @default(now()) @updatedAt @db.Timestamptz // оба: @default (initial) + @updatedAt (авто на write)
+  dueAt      DateTime?    @db.Timestamptz // абсолютный момент (§4): overdue = dueAt < now(); НЕ календарный день
+  // §3: приоритет опционален по смыслу (задача может быть без него), но чтобы не путать null vs
+  // «none» в UI/фильтрах — enum-значение NONE явно представляет отсутствие. Дефолт NONE делает
+  // миграцию safe (все существующие таски получают NONE).
+  priority   TaskPriority @default(NONE)
+  createdAt  DateTime     @default(now()) @db.Timestamptz
+  updatedAt  DateTime     @default(now()) @updatedAt @db.Timestamptz // оба: @default (initial) + @updatedAt (авто на write)
 
   org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   // composite-FK (projectId, orgId) — TENANT-МОСТ: гарантирует, что таск и проект в ОДНОЙ орге на

@@ -15,6 +15,15 @@ export interface AssignmentContext {
   assigneeEmail: string | null;
 }
 
+export interface TaskAssignedContext {
+  taskTitle: string;
+  dueAt: Date | null;
+  projectId: string;
+  projectTitle: string;
+  assigneeEmail: string | null;
+  actorName: string | null;
+}
+
 export interface PhaseChangedContext {
   projectTitle: string;
   ownerId: string | null;
@@ -51,6 +60,49 @@ export class NotificationsRepository {
       ownerEmail: project.owner?.email ?? null,
       assigneeEmails: project.assignees.map((a) => a.user.email),
       workspaceSettings: project.workspace.settings,
+    };
+  }
+
+  /**
+   * §3-паттерн: рефетч task+project+user на момент обработки. orgId в WHERE — defensive re-check.
+   * actorId опционален: если taskId уже удалён между enqueue и обработкой → null (тихо, не ошибка).
+   * actorName резолвится отдельно (может быть удалён, тогда null → шаблон покажет generic-вариант).
+   */
+  async findTaskAssignedContext(
+    orgId: string,
+    taskId: string,
+    assigneeId: string,
+    actorId: string | null,
+  ): Promise<TaskAssignedContext | null> {
+    const task = await this.prisma.client.task.findFirst({
+      where: { id: taskId, orgId },
+      select: {
+        title: true,
+        dueAt: true,
+        projectId: true,
+        project: { select: { title: true } },
+        // assignee может быть уже не тот, что в job.data (сменили за это время) — сравниваем
+        // явно в EmailWorker'е и не шлём если разошлись (иначе спам «вас назначили» тому, кого сняли).
+        assigneeId: true,
+      },
+    });
+    if (!task) return null;
+    if (task.assigneeId !== assigneeId) return null; // назначение отозвано за время в очереди
+
+    const [assignee, actor] = await Promise.all([
+      this.prisma.client.user.findUnique({ where: { id: assigneeId }, select: { email: true } }),
+      actorId
+        ? this.prisma.client.user.findUnique({ where: { id: actorId }, select: { name: true } })
+        : Promise.resolve(null),
+    ]);
+
+    return {
+      taskTitle: task.title,
+      dueAt: task.dueAt,
+      projectId: task.projectId,
+      projectTitle: task.project.title,
+      assigneeEmail: assignee?.email ?? null,
+      actorName: actor?.name ?? null,
     };
   }
 

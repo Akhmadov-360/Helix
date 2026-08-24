@@ -113,6 +113,23 @@ describe("Task CRUD (§2/§3/§8, unit 2)", () => {
       await patch(t.id, { done: true }).expect(400);
     });
 
+    it("priority: create default NONE; PATCH меняет; в ответе поле присутствует", async () => {
+      const t = (await create(projectId, { title: "P" }).expect(201)).body.data;
+      expect(t.priority).toBe("NONE"); // DB-default применён (не передавали)
+      const updated = (await patch(t.id, { priority: "URGENT" }).expect(200)).body.data;
+      expect(updated.priority).toBe("URGENT");
+    });
+
+    it("priority: create с явным значением сохраняет его", async () => {
+      const t = (await create(projectId, { title: "P", priority: "HIGH" }).expect(201)).body.data;
+      expect(t.priority).toBe("HIGH");
+    });
+
+    it("priority: невалидное enum-значение → 400", async () => {
+      const t = (await create(projectId, { title: "P" }).expect(201)).body.data;
+      await patch(t.id, { priority: "CRITICAL" }).expect(400);
+    });
+
     it("assigneeId чужой орги → 400", async () => {
       const t = (await create(projectId, { title: "T" }).expect(201)).body.data;
       const stranger = await signUp(app);

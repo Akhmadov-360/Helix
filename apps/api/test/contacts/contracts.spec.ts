@@ -56,10 +56,11 @@ describe("Contact / Company contracts (§3)", () => {
   });
 
   describe("contactQuerySchema", () => {
-    it("limit: дефолт 50, coerce, max 100", () => {
+    it("limit: дефолт 50, coerce, max 500 (bumped для frontend load-all pattern)", () => {
       expect(contactQuerySchema.parse({}).limit).toBe(50);
       expect(contactQuerySchema.parse({ limit: "20" }).limit).toBe(20);
-      expect(contactQuerySchema.safeParse({ limit: 101 }).success).toBe(false);
+      expect(contactQuerySchema.parse({ limit: 500 }).limit).toBe(500);
+      expect(contactQuerySchema.safeParse({ limit: 501 }).success).toBe(false);
     });
   });
 

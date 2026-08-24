@@ -1,4 +1,4 @@
-import type { TaskResponse } from "@helix/api-schemas";
+import type { TaskPriority, TaskResponse } from "@helix/api-schemas";
 
 // orgId в row не тащим в ответ (internal). dueAt/createdAt/updatedAt — Date из Prisma.
 export interface TaskRow {
@@ -8,6 +8,7 @@ export interface TaskRow {
   done: boolean;
   assigneeId: string | null;
   dueAt: Date | null;
+  priority: TaskPriority;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -22,6 +23,7 @@ export function toTaskResponse(t: TaskRow, now: Date = new Date()): TaskResponse
     done: t.done,
     assigneeId: t.assigneeId,
     dueAt: t.dueAt === null ? null : t.dueAt.toISOString(),
+    priority: t.priority,
     overdue: t.dueAt !== null && !t.done && t.dueAt.getTime() < now.getTime(),
     createdAt: t.createdAt.toISOString(),
     updatedAt: t.updatedAt.toISOString(),

@@ -1,11 +1,12 @@
-import { X } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import type { TaskResponse } from "@helix/api-schemas";
-import { Badge, Button, Checkbox, cn } from "@helix/ui";
+import type { TaskPriority, TaskResponse } from "@helix/api-schemas";
+import { Badge, Button, Checkbox, cn, Tooltip, TooltipContent, TooltipTrigger } from "@helix/ui";
 import { useT } from "../../shared/i18n";
 import { AssigneeField } from "./assignee-field";
 import { DueDateField } from "./due-date-field";
+import { PriorityField } from "./priority-field";
 
 export function TaskRow({
   task,
@@ -17,6 +18,7 @@ export function TaskRow({
   onRename,
   onDueAtChange,
   onAssigneeChange,
+  onPriorityChange,
 }: {
   task: TaskResponse;
   members: { userId: string; name: string }[];
@@ -27,6 +29,7 @@ export function TaskRow({
   onRename: (title: string) => void;
   onDueAtChange: (date: Date | null) => void;
   onAssigneeChange: (userId: string | null) => void;
+  onPriorityChange: (priority: TaskPriority) => void;
 }) {
   const t = useT();
   const [editing, setEditing] = useState(false);
@@ -93,19 +96,46 @@ export function TaskRow({
       )}
 
       <DueDateField value={task.dueAt ? new Date(task.dueAt) : null} onChange={onDueAtChange} disabled={!canUpdate} />
+      <PriorityField value={task.priority} onChange={onPriorityChange} disabled={!canUpdate} />
       <AssigneeField value={task.assigneeId} onChange={onAssigneeChange} members={members} disabled={!canUpdate} />
 
+      {/* Edit/Delete кнопки теперь постоянно видны (не opacity-0 group-hover) — user-request:
+          hover-only + touch-устройства = невозможно найти. Tooltip компенсирует отсутствие
+          text-label в узкой иконке. Клик по title тоже открывает edit — оставляем как второй
+          affordance, привычный пользователям Linear/Notion. */}
+      {canUpdate && !editing && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setEditing(true)}
+              aria-label={t("tasks.list.edit")}
+              className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{t("tasks.list.edit")}</TooltipContent>
+        </Tooltip>
+      )}
       {canDelete && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          onClick={onDelete}
-          aria-label={t("tasks.list.delete")}
-          className="h-6 w-6 shrink-0 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
-        >
-          <X className="h-3.5 w-3.5" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={onDelete}
+              aria-label={t("tasks.list.delete")}
+              className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{t("tasks.list.delete")}</TooltipContent>
+        </Tooltip>
       )}
     </li>
   );

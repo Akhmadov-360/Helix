@@ -70,7 +70,7 @@ export function useUpdateTask(orgId: string, projectId: string) {
     onMutate: async (vars) => {
       await queryClient.cancelQueries({ queryKey });
       const snapshot = queryClient.getQueryData<TaskResponse[]>(queryKey);
-      const { title, assigneeId, dueAt } = vars.input;
+      const { title, assigneeId, dueAt, priority } = vars.input;
       queryClient.setQueryData<TaskResponse[]>(
         queryKey,
         (current) =>
@@ -82,6 +82,7 @@ export function useUpdateTask(orgId: string, projectId: string) {
               ...task,
               ...(title !== undefined && { title }),
               ...(assigneeId !== undefined && { assigneeId }),
+              ...(priority !== undefined && { priority }),
               dueAt: nextDueAt,
               overdue: computeOverdue(nextDueAt, task.done),
             };

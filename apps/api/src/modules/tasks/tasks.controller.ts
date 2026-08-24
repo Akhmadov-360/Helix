@@ -34,7 +34,7 @@ export class TasksController {
     @Param("taskId") taskId: string,
     @Body(new ZodValidationPipe(updateTaskSchema)) dto: UpdateTaskInput,
   ): Promise<TaskResponse> {
-    return this.tasks.update(auth.activeOrgId, taskId, dto);
+    return this.tasks.update(auth.activeOrgId, auth.userId, taskId, dto);
   }
 
   @Delete(":taskId")

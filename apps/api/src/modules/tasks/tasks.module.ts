@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { AuthzModule } from "../../core/authz/authz.module";
 import { ActivityModule } from "../activity/activity.module";
 import { AuthModule } from "../auth/auth.module";
+import { NotificationsModule } from "../notifications/notifications.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { ProjectsModule } from "../projects/projects.module";
 import { UsersModule } from "../users/users.module";
@@ -21,6 +22,8 @@ import { TasksService } from "./tasks.service";
     ProjectsModule,
     ActivityModule,
     UsersModule,
+    // NotificationsService — для task.assigned письма при create-with-assignee и update-assignee.
+    NotificationsModule,
   ],
   controllers: [ProjectTasksController, TasksController],
   providers: [TasksService, TaskRepository],

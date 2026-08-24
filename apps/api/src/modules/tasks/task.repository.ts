@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import type { Prisma } from "@helix/db";
+import type { TaskPriority } from "@helix/api-schemas";
 import { PrismaService } from "../../core/prisma/prisma.service";
 import type { TaskRow } from "./task.mapper";
 
@@ -10,6 +11,7 @@ const TASK_SELECT = {
   done: true,
   assigneeId: true,
   dueAt: true,
+  priority: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -20,6 +22,8 @@ export interface CreateTaskData {
   title: string;
   dueAt?: Date | null;
   assigneeId?: string | null;
+  // Опционально: Prisma применит DB-дефолт NONE если не передано (тот же дефолт, что миграция).
+  priority?: TaskPriority;
 }
 
 @Injectable()
@@ -48,7 +52,12 @@ export class TaskRepository {
   // done меняется ТОЛЬКО через complete/reopen (не PATCH) → здесь его нет.
   updateFields(
     id: string,
-    data: { title?: string; dueAt?: Date | null; assigneeId?: string | null },
+    data: {
+      title?: string;
+      dueAt?: Date | null;
+      assigneeId?: string | null;
+      priority?: TaskPriority;
+    },
     tx?: Prisma.TransactionClient,
   ): Promise<TaskRow> {
     return (tx ?? this.prisma.client).task.update({ where: { id }, data, select: TASK_SELECT });

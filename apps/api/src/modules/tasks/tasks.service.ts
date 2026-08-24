@@ -4,6 +4,7 @@ import type { CreateTaskInput, TaskResponse, UpdateTaskInput } from "@helix/api-
 import { ResourceNotFoundError } from "../../core/errors/domain-error";
 import { PrismaService } from "../../core/prisma/prisma.service";
 import { ActivityRecorder } from "../activity/activity-recorder";
+import { NotificationsService } from "../notifications/notifications.service";
 import { OrganizationsRepository } from "../organizations/organizations.repository";
 import { ProjectsRepository } from "../projects/projects.repository";
 import { UsersRepository } from "../users/users.repository";
@@ -20,6 +21,7 @@ export class TasksService {
     private readonly orgs: OrganizationsRepository,
     private readonly users: UsersRepository,
     private readonly activity: ActivityRecorder,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async list(orgId: string, projectId: string): Promise<TaskResponse[]> {
@@ -42,27 +44,71 @@ export class TasksService {
 
     const row = await this.prisma.client.$transaction(async (tx) => {
       const created = await this.tasks.create(
-        { orgId, projectId, title: input.title, dueAt: input.dueAt, assigneeId: input.assigneeId },
+        {
+          orgId,
+          projectId,
+          title: input.title,
+          dueAt: input.dueAt,
+          assigneeId: input.assigneeId,
+          priority: input.priority,
+        },
         tx,
       );
       await this.recordTaskEvent(tx, "task.created", orgId, userId, created);
       return created;
     });
+    // Письмо назначенному ПОСЛЕ коммита (P4-порядок): не роняем create если Redis лёг.
+    // Self-assign не спамим — юзер сам себе назначил, письмо не нужно.
+    if (row.assigneeId && row.assigneeId !== userId) {
+      await this.notifications.enqueueTaskAssigned({
+        orgId,
+        taskId: row.id,
+        assigneeId: row.assigneeId,
+        actorId: userId,
+      });
+    }
     return toTaskResponse(row);
   }
 
-  // PATCH: title/dueAt/assignee (done — только complete/reopen, §2). null очищает dueAt/assignee.
-  async update(orgId: string, taskId: string, input: UpdateTaskInput): Promise<TaskResponse> {
-    if (!(await this.tasks.findByIdInOrg(taskId, orgId))) {
-      throw new ResourceNotFoundError("Task not found");
-    }
+  // PATCH: title/dueAt/assignee/priority (done — только complete/reopen, §2). null очищает
+  // dueAt/assignee (не priority — там NONE вместо null). При СМЕНЕ assignee на нового не-actor
+  // юзера шлём task.assigned письмо (одна карточка = один get-assignment сигнал).
+  async update(
+    orgId: string,
+    actorId: string,
+    taskId: string,
+    input: UpdateTaskInput,
+  ): Promise<TaskResponse> {
+    const existing = await this.tasks.findByIdInOrg(taskId, orgId);
+    if (!existing) throw new ResourceNotFoundError("Task not found");
     if (input.assigneeId != null) await assertOrgMember(this.orgs, input.assigneeId, orgId);
 
     const row = await this.tasks.updateFields(taskId, {
       title: input.title,
       dueAt: input.dueAt,
       assigneeId: input.assigneeId,
+      priority: input.priority,
     });
+
+    // Триггер письма — только при СМЕНЕ на нового не-actor'а. Скрытые no-op'ы:
+    // - assigneeId === undefined в input → поле не тронуто → пропустить;
+    // - assigneeId === null (снятие) → пропустить;
+    // - assigneeId === existing.assigneeId (тот же) → пропустить (Idempotency жёстче jobId'а);
+    // - assigneeId === actorId (self-assign) → пропустить (как в create).
+    const changedAssignee =
+      input.assigneeId !== undefined &&
+      input.assigneeId !== null &&
+      input.assigneeId !== existing.assigneeId &&
+      input.assigneeId !== actorId;
+    if (changedAssignee) {
+      await this.notifications.enqueueTaskAssigned({
+        orgId,
+        taskId: row.id,
+        assigneeId: input.assigneeId!,
+        actorId,
+      });
+    }
+
     return toTaskResponse(row);
   }
 

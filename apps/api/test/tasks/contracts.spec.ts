@@ -45,6 +45,7 @@ describe("Task contracts (§2/§7)", () => {
         done: false,
         assigneeId: null,
         dueAt: null,
+        priority: "NONE",
         overdue: false,
         orgId: "o1", // internal — отсекается
         createdAt: "2026-07-26T00:00:00.000Z",
