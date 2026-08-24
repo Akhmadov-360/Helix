@@ -1,62 +1,62 @@
-import { useEffect, useMemo, useState } from "react";
-import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useMemo, useState } from "react";
+import { useSuspenseQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowUpRight, Briefcase, Link2Off, MoreHorizontal, Pencil, Plus, Trash2, Users } from "lucide-react";
-import type { CompanyResponse, ContactResponse, DealLink, DedupHint as DedupHintData } from "@helix/api-schemas";
+import {
+  ArrowUpRight,
+  Briefcase,
+  Link2Off,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Trash2,
+  Users,
+} from "lucide-react";
+import type {
+  CompanyResponse,
+  ContactResponse,
+  DealLink,
+  DedupHint as DedupHintData,
+} from "@helix/api-schemas";
 import {
   Button,
-  ColumnsMenu,
+  CountBadge,
+  DataTable,
+  type DataTableColumn,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  Pagination,
   Popover,
   PopoverContent,
   PopoverTrigger,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  SortableTableHead,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-  TableToolbar,
 } from "@helix/ui";
 import { useCan } from "../../shared/auth/ability";
 import { useT } from "../../shared/i18n";
-import { useColumnVisibility } from "../../shared/lib/use-column-visibility";
-import { useCursorPagination } from "../../shared/lib/use-cursor-pagination";
-import { useTableSort, type TableSort } from "../../shared/lib/use-table-sort";
 import { ContactFormDialog } from "./contact-form-dialog";
+import {
+  initialContactsFilter,
+  isContactsFilterActive,
+  type ContactsFilterState,
+} from "./contacts-filter-state";
+import { ContactsFilterChips } from "./contacts-filters";
 import { DedupHint } from "./dedup-hint";
 import { DeleteContactDialog } from "./delete-contact-dialog";
 import { invalidateContactsList, useMergeContactGlobal, useUnlinkContact } from "./mutations";
 import { contactsListQueryOptions } from "./queries";
 
-type SortKey = "name" | "email" | "phone" | "company";
+// Load-all стратегия (M1-масштаб, cursor→client-side): один запрос limit=CONTACTS_LIMIT,
+// DataTable делает поиск/фильтр/пагинацию/сорт локально. При приближении к лимиту (hasMore=true)
+// нужен переход на offset-серверную пагинацию — TODO для M6, когда данные вырастут.
+const CONTACTS_LIMIT = 500;
 
 interface Row extends ContactResponse {
   companyName: string;
-}
-
-function sortRows(rows: Row[], sort: TableSort<SortKey>): Row[] {
-  const dir = sort.direction === "asc" ? 1 : -1;
-  return [...rows].sort((a, b) => {
-    const av = sort.key === "company" ? a.companyName : (a[sort.key] ?? "");
-    const bv = sort.key === "company" ? b.companyName : (b[sort.key] ?? "");
-    return av.localeCompare(bv) * dir;
-  });
+  dealsCount: number;
 }
 
 // Один пункт списка — своя инстанция useUnlinkContact(orgId, projectId): у разных строк/пунктов
-// разные projectId, а хук привязан к КОНКРЕТНОМУ проекту (как в contacts-view.tsx) — вызывать его
-// условно внутри .map() на родителе было бы нарушением правил хуков, отдельный компонент — нет.
+// разные projectId, а хук привязан к КОНКРЕТНОМУ проекту — вызывать его условно в .map() было бы
+// нарушением правил хуков.
 function DealRow({
   orgId,
   contactId,
@@ -98,10 +98,6 @@ function DealRow({
   );
 }
 
-// Единый Popover-триггер вместо ряда чипов (design review — тот же приём, что companies-view.tsx
-// DealsPopover): счётчик, клик открывает скроллящийся список сделок со ссылкой + красной
-// иконкой отвязки у каждой, вместо "нескольких badge подряд" (не читалось как одно целое,
-// не масштабировалось на много сделок).
 function DealsPopover({
   orgId,
   contactId,
@@ -133,15 +129,22 @@ function DealsPopover({
       </PopoverTrigger>
       <PopoverContent align="start" className="flex max-h-64 w-64 flex-col gap-0.5 overflow-y-auto p-2">
         {projects.map((project) => (
-          <DealRow key={project.id} orgId={orgId} contactId={contactId} project={project} canUnlink={canUnlink} onUnlinked={onUnlinked} />
+          <DealRow
+            key={project.id}
+            orgId={orgId}
+            contactId={contactId}
+            project={project}
+            canUnlink={canUnlink}
+            onUnlinked={onUnlinked}
+          />
         ))}
       </PopoverContent>
     </Popover>
   );
 }
 
-// companies приходит пропом (join companyId→name, п.6 архитектуры) — тот же приём, что audience
-// в contacts-view.tsx: features/* не импортируют друг друга напрямую, композиция на уровне routes/.
+// companies приходит пропом (join companyId→name) — тот же приём что audience в contacts-view.tsx:
+// features/* не импортируют друг друга напрямую, композиция на уровне routes/.
 export function GlobalContactsView({ orgId, companies }: { orgId: string; companies: CompanyResponse[] }) {
   const t = useT();
   const queryClient = useQueryClient();
@@ -153,85 +156,111 @@ export function GlobalContactsView({ orgId, companies }: { orgId: string; compan
   const merge = useMergeContactGlobal(orgId);
   const [dedup, setDedup] = useState<{ hint: DedupHintData; newContactId: string } | null>(null);
 
+  // Один запрос без cursor: DataTable делает поиск/фильтр/пагинацию клиентом.
+  const { contacts } = useSuspenseQuery(
+    contactsListQueryOptions(orgId, { limit: CONTACTS_LIMIT }),
+  ).data;
+
   const [search, setSearch] = useState("");
-  const [debounced, setDebounced] = useState("");
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(search.trim()), 300);
-    return () => clearTimeout(timer);
-  }, [search]);
-  const [companyFilter, setCompanyFilter] = useState<string | undefined>(undefined);
-  const [pageSize, setPageSize] = useState(25);
-  const pagination = useCursorPagination(`${debounced}|${companyFilter}|${pageSize}`);
-  const query = useMemo(
-    () => ({ q: debounced || undefined, companyId: companyFilter, cursorId: pagination.cursorId, limit: pageSize }),
-    [debounced, companyFilter, pagination.cursorId, pageSize],
-  );
-
-  // useQuery (не useSuspenseQuery): смена поискового запроса меняет query-key (queryKeys.
-  // contactsList), useSuspenseQuery на новом ключе снёс бы всю таблицу в fallback на каждую
-  // паузу дебаунса. placeholderData держит предыдущую страницу на экране, пока грузится новая
-  // (route-loader уже прогрел кэш пустого запроса — первый рендер без запроса всё равно мгновенный).
-  const { data, isFetching } = useQuery({ ...contactsListQueryOptions(orgId, query), placeholderData: keepPreviousData });
-  const contacts = useMemo(() => data?.contacts ?? [], [data]);
-  const hasMore = data?.hasMore ?? false;
-
-  const [sort, toggleSort] = useTableSort<SortKey>({ key: "name", direction: "asc" });
+  const [filters, setFilters] = useState<ContactsFilterState>(initialContactsFilter);
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<ContactResponse | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ContactResponse | null>(null);
 
   const companyNameById = useMemo(() => new Map(companies.map((c) => [c.id, c.name])), [companies]);
-  const rows = useMemo(() => {
-    const withCompany: Row[] = contacts.map((contact) => ({
-      ...contact,
-      companyName: contact.companyId ? (companyNameById.get(contact.companyId) ?? "") : "",
-    }));
-    return sortRows(withCompany, sort);
-  }, [contacts, companyNameById, sort]);
 
-  // Name и действия — всегда видны, остальное прячется через "Columns" (design review).
-  const columns = [
-    { key: "email", label: t("contacts.list.colEmail") },
-    { key: "phone", label: t("contacts.list.colPhone") },
-    { key: "company", label: t("contacts.list.colCompany") },
-    { key: "projects", label: t("contacts.list.colProjects") },
-  ];
-  const { isVisible, toggle: toggleColumn } = useColumnVisibility("contacts");
-  const columnCount = 2 + columns.filter((c) => isVisible(c.key)).length;
-
-  const toolbar = (
-    <TableToolbar
-      search={{ value: search, onChange: setSearch, placeholder: t("contacts.page.searchPlaceholder") }}
-      filters={
-        companies.length > 0 && (
-          <Select value={companyFilter ?? "all"} onValueChange={(value) => setCompanyFilter(value === "all" ? undefined : value)}>
-            <SelectTrigger className="h-9 w-[180px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t("contacts.filter.allCompanies")}</SelectItem>
-              {companies.map((company) => (
-                <SelectItem key={company.id} value={company.id}>
-                  {company.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )
-      }
-      actions={
-        <>
-          <ColumnsMenu columns={columns} isVisible={isVisible} onToggle={toggleColumn} triggerLabel={t("table.columns.trigger")} />
-          {canCreate && (
-            <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
-              <Plus className="h-3.5 w-3.5" />
-              {t("contacts.page.create.trigger")}
-            </Button>
-          )}
-        </>
-      }
-    />
+  const rows = useMemo<Row[]>(
+    () =>
+      contacts.map((contact) => ({
+        ...contact,
+        companyName: contact.companyId ? (companyNameById.get(contact.companyId) ?? "") : "",
+        dealsCount: contact.projects?.length ?? 0,
+      })),
+    [contacts, companyNameById],
   );
+
+  const filterMatches = useCallback(
+    (row: Row) => {
+      if (filters.companies.size > 0) {
+        if (!row.companyId || !filters.companies.has(row.companyId)) return false;
+      }
+      if (filters.minDeals !== null && row.dealsCount < filters.minDeals) return false;
+      return true;
+    },
+    [filters],
+  );
+
+  const matches = (row: Row, q: string) => {
+    const needle = q.toLowerCase();
+    return (
+      row.name.toLowerCase().includes(needle) ||
+      (row.email ?? "").toLowerCase().includes(needle) ||
+      (row.phone ?? "").toLowerCase().includes(needle) ||
+      row.companyName.toLowerCase().includes(needle)
+    );
+  };
+
+  const columns = useMemo<DataTableColumn<Row>[]>(
+    () => [
+      {
+        key: "name",
+        header: t("contacts.list.colName"),
+        hideable: false,
+        cell: (row) => (
+          <Link
+            to="/contacts/$contactId"
+            params={{ contactId: row.id }}
+            className="group inline-flex items-center gap-1 font-medium text-foreground hover:text-accent"
+          >
+            <span className="truncate">{row.name}</span>
+            <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60 transition-colors group-hover:text-accent" />
+          </Link>
+        ),
+      },
+      {
+        key: "email",
+        header: t("contacts.list.colEmail"),
+        cell: (row) => <span className="text-muted-foreground">{row.email ?? "—"}</span>,
+      },
+      {
+        key: "phone",
+        header: t("contacts.list.colPhone"),
+        cell: (row) => <span className="text-muted-foreground">{row.phone ?? "—"}</span>,
+      },
+      {
+        key: "company",
+        header: t("contacts.list.colCompany"),
+        cell: (row) =>
+          row.companyId ? (
+            <Link
+              to="/companies/$companyId"
+              params={{ companyId: row.companyId }}
+              className="text-muted-foreground hover:text-accent hover:underline"
+            >
+              {row.companyName || "—"}
+            </Link>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
+      },
+      {
+        key: "projects",
+        header: t("contacts.list.colProjects"),
+        cell: (row) => (
+          <DealsPopover
+            orgId={orgId}
+            contactId={row.id}
+            projects={row.projects ?? []}
+            canUnlink={canUnlink}
+            onUnlinked={() => invalidateContactsList(queryClient, orgId)}
+          />
+        ),
+      },
+    ],
+    [t, orgId, canUnlink, queryClient],
+  );
+
+  const canRowAction = canUpdate || canDelete;
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
@@ -246,126 +275,111 @@ export function GlobalContactsView({ orgId, companies }: { orgId: string; compan
           onDismiss={() => setDedup(null)}
         />
       )}
-      <Table toolbar={toolbar} containerClassName="min-h-0 flex-1" className="min-w-[820px]">
-        <TableHeader className="sticky top-0 z-10 bg-muted/80 backdrop-blur">
-          <TableRow header>
-            <SortableTableHead active={sort.key === "name"} direction={sort.direction} onClick={() => toggleSort("name")}>
-              {t("contacts.list.colName")}
-            </SortableTableHead>
-            {isVisible("email") && (
-              <SortableTableHead active={sort.key === "email"} direction={sort.direction} onClick={() => toggleSort("email")}>
-                {t("contacts.list.colEmail")}
-              </SortableTableHead>
-            )}
-            {isVisible("phone") && (
-              <SortableTableHead active={sort.key === "phone"} direction={sort.direction} onClick={() => toggleSort("phone")}>
-                {t("contacts.list.colPhone")}
-              </SortableTableHead>
-            )}
-            {isVisible("company") && (
-              <SortableTableHead active={sort.key === "company"} direction={sort.direction} onClick={() => toggleSort("company")}>
-                {t("contacts.list.colCompany")}
-              </SortableTableHead>
-            )}
-            {isVisible("projects") && <TableHead>{t("contacts.list.colProjects")}</TableHead>}
-            <TableHead className="w-10">
-              <span className="sr-only">{t("contacts.list.menu")}</span>
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={columnCount}>
-                <div className="flex flex-col items-center justify-center gap-2 py-16 text-muted-foreground">
-                  <Users className="h-8 w-8" />
-                  <p>{debounced || companyFilter ? t("contacts.page.noResults") : t("contacts.page.empty")}</p>
-                </div>
-              </TableCell>
-            </TableRow>
-          ) : (
-            rows.map((contact) => (
-                <TableRow key={contact.id}>
-                  <TableCell>
-                    <Link
-                      to="/contacts/$contactId"
-                      params={{ contactId: contact.id }}
-                      className="group inline-flex items-center gap-1 font-medium text-foreground hover:text-accent"
-                    >
-                      <span className="truncate">{contact.name}</span>
-                      <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60 transition-colors group-hover:text-accent" />
-                    </Link>
-                  </TableCell>
-                  {isVisible("email") && <TableCell className="text-muted-foreground">{contact.email ?? "—"}</TableCell>}
-                  {isVisible("phone") && <TableCell className="text-muted-foreground">{contact.phone ?? "—"}</TableCell>}
-                  {isVisible("company") && (
-                    <TableCell className="text-muted-foreground">
-                      {contact.companyId ? (
-                        <Link to="/companies/$companyId" params={{ companyId: contact.companyId }} className="hover:text-accent hover:underline">
-                          {contact.companyName || "—"}
-                        </Link>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                  )}
-                  {isVisible("projects") && (
-                    <TableCell>
-                      <DealsPopover
-                        orgId={orgId}
-                        contactId={contact.id}
-                        projects={contact.projects ?? []}
-                        canUnlink={canUnlink}
-                        onUnlinked={() => invalidateContactsList(queryClient, orgId)}
-                      />
-                    </TableCell>
-                  )}
-                  <TableCell>
-                    {(canUpdate || canDelete) && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" aria-label={t("contacts.list.menu")}>
-                            <MoreHorizontal className="h-3.5 w-3.5" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {canUpdate && (
-                            <DropdownMenuItem onSelect={() => setEditTarget(contact)}>
-                              <Pencil className="h-3.5 w-3.5" />
-                              {t("contacts.list.edit")}
-                            </DropdownMenuItem>
-                          )}
-                          {canDelete && (
-                            <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setDeleteTarget(contact)}>
-                              <Trash2 className="h-3.5 w-3.5" />
-                              {t("contacts.list.delete")}
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                  </TableCell>
-                </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-      <Pagination
-        className="shrink-0"
-        page={pagination.page}
-        hasPrev={pagination.hasPrev && !isFetching}
-        hasNext={hasMore && !isFetching}
-        onPrev={pagination.goPrev}
-        onNext={() => {
-          const lastId = contacts.at(-1)?.id;
-          if (lastId) pagination.goNext(lastId);
+      <DataTable
+        columns={columns}
+        data={rows}
+        getRowKey={(row) => row.id}
+        ariaLabel={t("contacts.page.title")}
+        title={
+          <span className="flex items-center gap-2">
+            {t("contacts.page.title")}
+            <CountBadge value={rows.length} />
+          </span>
+        }
+        actions={
+          canCreate && (
+            <Button type="button" onClick={() => setCreateOpen(true)}>
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              {t("contacts.page.create.trigger")}
+            </Button>
+          )
+        }
+        search={{
+          value: search,
+          onChange: setSearch,
+          placeholder: t("contacts.page.searchPlaceholder"),
+          matches,
         }}
-        pageSize={pageSize}
-        onPageSizeChange={setPageSize}
-        pageSizeLabel={t("table.pagination.rowsPerPage")}
-        pageLabel={(page) => t("table.pagination.page", { page })}
-        prevLabel={t("table.pagination.prevPage")}
-        nextLabel={t("table.pagination.nextPage")}
+        filterChips={<ContactsFilterChips state={filters} onChange={setFilters} companies={companies} />}
+        filterMatches={filterMatches}
+        controlLabels={{
+          fields: t("dataTable.fields"),
+          rowHeight: t("dataTable.rowHeight"),
+          rowHeightCompact: t("dataTable.rowHeight.compact"),
+          rowHeightComfortable: t("dataTable.rowHeight.comfortable"),
+          rowHeightSpacious: t("dataTable.rowHeight.spacious"),
+        }}
+        rowActions={
+          canRowAction
+            ? (row) => (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground"
+                      aria-label={t("contacts.list.menu")}
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {canUpdate && (
+                      <DropdownMenuItem onSelect={() => setEditTarget(row)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                        {t("contacts.list.edit")}
+                      </DropdownMenuItem>
+                    )}
+                    {canDelete && (
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onSelect={() => setDeleteTarget(row)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        {t("contacts.list.delete")}
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )
+            : undefined
+        }
+        emptyState={
+          <div className="flex flex-col items-center gap-3 py-16 text-center">
+            <span className="flex h-12 w-12 items-center justify-center rounded-xl border border-border bg-muted text-muted-foreground">
+              <Users className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">
+                {search.trim() || isContactsFilterActive(filters)
+                  ? t("contacts.noResultsTitle")
+                  : t("contacts.emptyTitle")}
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {search.trim() || isContactsFilterActive(filters)
+                  ? t("contacts.noResultsBody")
+                  : t("contacts.emptyBody")}
+              </p>
+            </div>
+            {!search.trim() && !isContactsFilterActive(filters) && canCreate && (
+              <Button type="button" className="mt-2" onClick={() => setCreateOpen(true)}>
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                {t("contacts.page.create.trigger")}
+              </Button>
+            )}
+          </div>
+        }
+        pagination={{
+          initialPageSize: 25,
+          labels: {
+            perPageLabel: (size) => t("dataTable.perPage", { size: String(size) }),
+            prevLabel: t("table.pagination.prevPage"),
+            nextLabel: t("dataTable.next"),
+            pageAriaLabel: (p) => t("table.pagination.page", { page: String(p) }),
+            navAriaLabel: t("dataTable.paginationNav"),
+          },
+        }}
       />
 
       <ContactFormDialog

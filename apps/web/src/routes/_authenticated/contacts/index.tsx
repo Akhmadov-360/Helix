@@ -11,7 +11,7 @@ export const Route = createFileRoute("/_authenticated/contacts/")({
   loader: async ({ context }) => {
     const me = await context.queryClient.ensureQueryData(meQueryOptions);
     await Promise.all([
-      context.queryClient.ensureQueryData(contactsListQueryOptions(me.activeOrgId)),
+      context.queryClient.ensureQueryData(contactsListQueryOptions(me.activeOrgId, { limit: 500 })),
       context.queryClient.ensureQueryData(companiesListQueryOptions(me.activeOrgId)),
     ]);
   },

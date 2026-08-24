@@ -43,7 +43,7 @@ export const contactQuerySchema = z.object({
   q: z.string().trim().min(1).optional(),
   companyId: z.string().min(1).optional(),
   cursorId: z.string().optional(),
-  limit: z.coerce.number().int().positive().max(100).default(50),
+  limit: z.coerce.number().int().positive().max(500).default(50),
 });
 export type ContactQuery = z.infer<typeof contactQuerySchema>;
 
