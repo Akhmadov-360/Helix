@@ -1,66 +1,63 @@
-import { useEffect, useMemo, useState } from "react";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useCallback, useMemo, useState } from "react";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowUpRight, Briefcase, Building2, Link2Off, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
-import type { CompanyDedupHint as CompanyDedupHintData, CompanyResponse, ContactLink, DealLink } from "@helix/api-schemas";
+import {
+  ArrowUpRight,
+  Briefcase,
+  Building2,
+  Link2Off,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react";
+import type {
+  CompanyDedupHint as CompanyDedupHintData,
+  CompanyResponse,
+  ContactLink,
+  DealLink,
+} from "@helix/api-schemas";
 import {
   Avatar,
   avatarVariants,
   Button,
   cn,
-  ColumnsMenu,
+  CountBadge,
+  DataTable,
+  type DataTableColumn,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  Pagination,
   Popover,
   PopoverContent,
   PopoverTrigger,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  SortableTableHead,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-  TableToolbar,
 } from "@helix/ui";
 import { useCan } from "../../shared/auth/ability";
 import { useT } from "../../shared/i18n";
-import { useColumnVisibility } from "../../shared/lib/use-column-visibility";
-import { useCursorPagination } from "../../shared/lib/use-cursor-pagination";
-import { useTableSort, type TableSort } from "../../shared/lib/use-table-sort";
 import { CompanyDedupHint } from "./company-dedup-hint";
 import { CompanyFormDialog } from "./company-form-dialog";
+import {
+  initialCompaniesFilter,
+  isCompaniesFilterActive,
+  type CompaniesFilterState,
+} from "./companies-filter-state";
+import { CompaniesFilterChips } from "./companies-filters";
 import { DeleteCompanyDialog } from "./delete-company-dialog";
 import { useUnlinkCompanyFromProject } from "./mutations";
 import { companiesListQueryOptions } from "./queries";
 
-// Тот же порог, что project-card.tsx MAX_VISIBLE_ASSIGNEES — единая граница "стек vs +N" везде,
-// где показываем аватарки-инициалы.
+// Тот же порог, что project-card.tsx MAX_VISIBLE_ASSIGNEES — единая граница «стек vs +N».
 const MAX_VISIBLE_CONTACTS = 3;
 
-type SortKey = "name" | "domain" | "industry";
+// Load-all стратегия (M1-масштаб): один запрос limit=500, DataTable гоняет поиск/фильтр/пагинацию
+// клиентом. При приближении к порогу — переход на offset-server, TODO для M6.
+const COMPANIES_LIMIT = 500;
 
-function sortCompanies(companies: CompanyResponse[], sort: TableSort<SortKey>): CompanyResponse[] {
-  const dir = sort.direction === "asc" ? 1 : -1;
-  return [...companies].sort((a, b) => {
-    const av = a[sort.key] ?? "";
-    const bv = b[sort.key] ?? "";
-    return av.localeCompare(bv) * dir;
-  });
+interface Row extends CompanyResponse {
+  dealsCount: number;
 }
 
-// Design review: не badge/чип в строке — единый Popover-триггер (счётчик), открывающий
-// скроллящийся список сделок со ссылкой + КРАСНОЙ иконкой отвязки у каждой (не hover-only —
-// явный, всегда видимый destructive-сигнал, раз это уже отдельное развёрнутое представление,
-// не плотная строка таблицы).
 function DealsPopover({
   projects,
   canUnlink,
@@ -90,7 +87,10 @@ function DealsPopover({
       </PopoverTrigger>
       <PopoverContent align="start" className="flex max-h-64 w-64 flex-col gap-0.5 overflow-y-auto p-2">
         {projects.map((project) => (
-          <div key={project.id} className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted">
+          <div
+            key={project.id}
+            className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+          >
             <Link
               to="/projects/$projectId/contacts"
               params={{ projectId: project.id }}
@@ -117,8 +117,6 @@ function DealsPopover({
   );
 }
 
-// Тот же avatar-стек, что project-card.tsx (доска) — сам стек и есть Popover-триггер, клик
-// открывает полный список имён (design review, п. Contacts column).
 function ContactsPopover({ contacts }: { contacts: ContactLink[] }) {
   const [open, setOpen] = useState(false);
 
@@ -163,206 +161,218 @@ export function CompaniesView({ orgId }: { orgId: string }) {
   const canUnlinkDeal = useCan("Project.update");
   const unlinkFromProject = useUnlinkCompanyFromProject(orgId);
 
+  const { companies } = useSuspenseQuery(
+    companiesListQueryOptions(orgId, { limit: COMPANIES_LIMIT }),
+  ).data;
+
   const [search, setSearch] = useState("");
-  const [debounced, setDebounced] = useState("");
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(search.trim()), 300);
-    return () => clearTimeout(timer);
-  }, [search]);
-  const [industryFilter, setIndustryFilter] = useState<string | undefined>(undefined);
-  const [pageSize, setPageSize] = useState(25);
-  const pagination = useCursorPagination(`${debounced}|${industryFilter}|${pageSize}`);
-  const query = useMemo(
-    () => ({ q: debounced || undefined, industry: industryFilter, cursorId: pagination.cursorId, limit: pageSize }),
-    [debounced, industryFilter, pagination.cursorId, pageSize],
-  );
-
-  // useQuery + placeholderData (не useSuspenseQuery) — тот же приём, что contacts/global-contacts-
-  // view.tsx: смена поиска меняет query-key, старая страница остаётся на экране, пока грузится новая.
-  const { data, isFetching } = useQuery({ ...companiesListQueryOptions(orgId, query), placeholderData: keepPreviousData });
-  const companies = useMemo(() => data?.companies ?? [], [data]);
-  const hasMore = data?.hasMore ?? false;
-
-  // Список значений для дропдауна "Индустрия" — нет отдельного /distinct-эндпоинта, поэтому
-  // берём отдельным (не завязанным на текущий поиск/фильтр/страницу) запросом первых 100 компаний
-  // орги: список опций не должен схлопываться до одного значения, когда сам фильтр уже применён.
-  const { data: industryOptionsData } = useQuery(companiesListQueryOptions(orgId, { limit: 100 }));
-  const industryOptions = useMemo(
-    () => [...new Set((industryOptionsData?.companies ?? []).map((c) => c.industry).filter((v): v is string => !!v))].sort(),
-    [industryOptionsData],
-  );
-
-  const [sort, toggleSort] = useTableSort<SortKey>({ key: "name", direction: "asc" });
+  const [filters, setFilters] = useState<CompaniesFilterState>(initialCompaniesFilter);
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<CompanyResponse | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CompanyResponse | null>(null);
   const [dedup, setDedup] = useState<{ hint: CompanyDedupHintData; newCompanyId: string } | null>(null);
 
-  const rows = useMemo(() => sortCompanies(companies, sort), [companies, sort]);
-  // Связь баннера со строками ниже — тот же приём, что contacts-view.tsx: подсвечиваем и новую
-  // компанию, и предложенных кандидатов, чтобы не заставлять сопоставлять текст с таблицей вручную.
-  const dedupHighlight = dedup
-    ? new Set([dedup.newCompanyId, ...dedup.hint.candidates.map((c) => c.id)])
-    : null;
-
-  // Name и колонка действий — всегда видны (toggleable: false), остальное можно спрятать через
-  // "Columns" (design review): один источник правды и для меню, и для colSpan пустого состояния.
-  const columns = [
-    { key: "domain", label: t("companies.list.domain") },
-    { key: "industry", label: t("companies.list.industry") },
-    { key: "deals", label: t("companies.list.colDeals") },
-    { key: "contacts", label: t("companies.list.colContacts") },
-  ];
-  const { isVisible, toggle: toggleColumn } = useColumnVisibility("companies");
-  const columnCount = 2 + columns.filter((c) => isVisible(c.key)).length;
-
-  const toolbar = (
-    <TableToolbar
-      search={{ value: search, onChange: setSearch, placeholder: t("companies.page.searchPlaceholder") }}
-      filters={
-        industryOptions.length > 0 && (
-          <Select value={industryFilter ?? "all"} onValueChange={(value) => setIndustryFilter(value === "all" ? undefined : value)}>
-            <SelectTrigger className="h-9 w-[160px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t("companies.filter.allIndustries")}</SelectItem>
-              {industryOptions.map((industry) => (
-                <SelectItem key={industry} value={industry}>
-                  {industry}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )
-      }
-      actions={
-        <>
-          <ColumnsMenu columns={columns} isVisible={isVisible} onToggle={toggleColumn} triggerLabel={t("table.columns.trigger")} />
-          {canCreate && (
-            <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
-              <Plus className="h-3.5 w-3.5" />
-              {t("companies.create.trigger")}
-            </Button>
-          )}
-        </>
-      }
-    />
+  const rows = useMemo<Row[]>(
+    () => companies.map((c) => ({ ...c, dealsCount: c.projects?.length ?? 0 })),
+    [companies],
   );
+
+  // Опции для фильтра "Индустрия" — из общего load-all-набора, без учёта поиска (иначе список
+  // схлопнется как только применил фильтр — типичный UX-баг «нет ничего кроме уже выбранного»).
+  const industryOptions = useMemo(
+    () => [...new Set(companies.map((c) => c.industry).filter((v): v is string => !!v))].sort(),
+    [companies],
+  );
+
+  const filterMatches = useCallback(
+    (row: Row) => {
+      if (filters.industries.size > 0) {
+        if (!row.industry || !filters.industries.has(row.industry)) return false;
+      }
+      if (filters.minDeals !== null && row.dealsCount < filters.minDeals) return false;
+      return true;
+    },
+    [filters],
+  );
+
+  const matches = (row: Row, q: string) => {
+    const needle = q.toLowerCase();
+    return (
+      row.name.toLowerCase().includes(needle) ||
+      (row.domain ?? "").toLowerCase().includes(needle) ||
+      (row.industry ?? "").toLowerCase().includes(needle)
+    );
+  };
+
+  // Подсветка dedup-строк — новая компания + предложенные кандидаты (тот же приём, что раньше).
+  const dedupHighlight = useMemo(
+    () =>
+      dedup ? new Set([dedup.newCompanyId, ...dedup.hint.candidates.map((c) => c.id)]) : null,
+    [dedup],
+  );
+
+  const columns = useMemo<DataTableColumn<Row>[]>(
+    () => [
+      {
+        key: "name",
+        header: t("companies.list.name"),
+        hideable: false,
+        cell: (row) => (
+          <Link
+            to="/companies/$companyId"
+            params={{ companyId: row.id }}
+            className="group inline-flex items-center gap-1 font-medium text-foreground hover:text-accent"
+          >
+            <span className="truncate">{row.name}</span>
+            <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60 transition-colors group-hover:text-accent" />
+          </Link>
+        ),
+      },
+      {
+        key: "domain",
+        header: t("companies.list.domain"),
+        cell: (row) => <span className="text-muted-foreground">{row.domain ?? "—"}</span>,
+      },
+      {
+        key: "industry",
+        header: t("companies.list.industry"),
+        cell: (row) => <span className="text-muted-foreground">{row.industry ?? "—"}</span>,
+      },
+      {
+        key: "deals",
+        header: t("companies.list.colDeals"),
+        cell: (row) => (
+          <DealsPopover
+            projects={row.projects ?? []}
+            canUnlink={canUnlinkDeal}
+            onUnlink={(projectId) => unlinkFromProject.mutate({ projectId })}
+            pending={unlinkFromProject.isPending}
+          />
+        ),
+      },
+      {
+        key: "contacts",
+        header: t("companies.list.colContacts"),
+        cell: (row) => <ContactsPopover contacts={row.contacts ?? []} />,
+      },
+    ],
+    [t, canUnlinkDeal, unlinkFromProject],
+  );
+
+  const canRowAction = canUpdate || canDelete;
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
       {dedup && <CompanyDedupHint hint={dedup.hint} onDismiss={() => setDedup(null)} />}
 
-      <Table toolbar={toolbar} containerClassName="min-h-0 flex-1" className="min-w-[560px]">
-        <TableHeader className="sticky top-0 z-10 bg-muted/80 backdrop-blur">
-          <TableRow header>
-            <SortableTableHead active={sort.key === "name"} direction={sort.direction} onClick={() => toggleSort("name")}>
-              {t("companies.list.name")}
-            </SortableTableHead>
-            {isVisible("domain") && (
-              <SortableTableHead active={sort.key === "domain"} direction={sort.direction} onClick={() => toggleSort("domain")}>
-                {t("companies.list.domain")}
-              </SortableTableHead>
-            )}
-            {isVisible("industry") && (
-              <SortableTableHead active={sort.key === "industry"} direction={sort.direction} onClick={() => toggleSort("industry")}>
-                {t("companies.list.industry")}
-              </SortableTableHead>
-            )}
-            {isVisible("deals") && <TableHead>{t("companies.list.colDeals")}</TableHead>}
-            {isVisible("contacts") && <TableHead>{t("companies.list.colContacts")}</TableHead>}
-            <TableHead className="w-10">
-              <span className="sr-only">{t("companies.list.menu")}</span>
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={columnCount}>
-                <div className="flex flex-col items-center justify-center gap-2 py-16 text-muted-foreground">
-                  <Building2 className="h-8 w-8" />
-                  <p>{debounced || industryFilter ? t("companies.page.noResults") : t("companies.page.empty")}</p>
-                </div>
-              </TableCell>
-            </TableRow>
-          ) : (
-            rows.map((company) => (
-              <TableRow key={company.id} className={cn(dedupHighlight?.has(company.id) && "bg-amber-500/5")}>
-                <TableCell>
-                  <Link
-                    to="/companies/$companyId"
-                    params={{ companyId: company.id }}
-                    className="group inline-flex items-center gap-1 font-medium text-foreground hover:text-accent"
-                  >
-                    <span className="truncate">{company.name}</span>
-                    <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60 transition-colors group-hover:text-accent" />
-                  </Link>
-                </TableCell>
-                {isVisible("domain") && <TableCell className="text-muted-foreground">{company.domain ?? "—"}</TableCell>}
-                {isVisible("industry") && <TableCell className="text-muted-foreground">{company.industry ?? "—"}</TableCell>}
-                {isVisible("deals") && (
-                  <TableCell>
-                    <DealsPopover
-                      projects={company.projects ?? []}
-                      canUnlink={canUnlinkDeal}
-                      onUnlink={(projectId) => unlinkFromProject.mutate({ projectId })}
-                      pending={unlinkFromProject.isPending}
-                    />
-                  </TableCell>
-                )}
-                {isVisible("contacts") && (
-                  <TableCell>
-                    <ContactsPopover contacts={company.contacts ?? []} />
-                  </TableCell>
-                )}
-                <TableCell>
-                  {(canUpdate || canDelete) && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" aria-label={t("companies.list.menu")}>
-                          <MoreHorizontal className="h-3.5 w-3.5" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {canUpdate && (
-                          <DropdownMenuItem onSelect={() => setEditTarget(company)}>
-                            <Pencil className="h-3.5 w-3.5" />
-                            {t("companies.list.edit")}
-                          </DropdownMenuItem>
-                        )}
-                        {canDelete && (
-                          <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setDeleteTarget(company)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                            {t("companies.list.delete")}
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-      <Pagination
-        className="shrink-0"
-        page={pagination.page}
-        hasPrev={pagination.hasPrev && !isFetching}
-        hasNext={hasMore && !isFetching}
-        onPrev={pagination.goPrev}
-        onNext={() => {
-          const lastId = companies.at(-1)?.id;
-          if (lastId) pagination.goNext(lastId);
+      <DataTable
+        columns={columns}
+        data={rows}
+        getRowKey={(row) => row.id}
+        ariaLabel={t("companies.page.title")}
+        title={
+          <span className="flex items-center gap-2">
+            {t("companies.page.title")}
+            <CountBadge value={rows.length} />
+          </span>
+        }
+        actions={
+          canCreate && (
+            <Button type="button" onClick={() => setCreateOpen(true)}>
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              {t("companies.create.trigger")}
+            </Button>
+          )
+        }
+        search={{
+          value: search,
+          onChange: setSearch,
+          placeholder: t("companies.page.searchPlaceholder"),
+          matches,
         }}
-        pageSize={pageSize}
-        onPageSizeChange={setPageSize}
-        pageSizeLabel={t("table.pagination.rowsPerPage")}
-        pageLabel={(page) => t("table.pagination.page", { page })}
-        prevLabel={t("table.pagination.prevPage")}
-        nextLabel={t("table.pagination.nextPage")}
+        filterChips={
+          <CompaniesFilterChips state={filters} onChange={setFilters} industries={industryOptions} />
+        }
+        filterMatches={filterMatches}
+        controlLabels={{
+          fields: t("dataTable.fields"),
+          rowHeight: t("dataTable.rowHeight"),
+          rowHeightCompact: t("dataTable.rowHeight.compact"),
+          rowHeightComfortable: t("dataTable.rowHeight.comfortable"),
+          rowHeightSpacious: t("dataTable.rowHeight.spacious"),
+        }}
+        rowClassName={(row) => (dedupHighlight?.has(row.id) ? "bg-amber-500/5" : undefined)}
+        rowActions={
+          canRowAction
+            ? (row) => (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground"
+                      aria-label={t("companies.list.menu")}
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {canUpdate && (
+                      <DropdownMenuItem onSelect={() => setEditTarget(row)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                        {t("companies.list.edit")}
+                      </DropdownMenuItem>
+                    )}
+                    {canDelete && (
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onSelect={() => setDeleteTarget(row)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        {t("companies.list.delete")}
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )
+            : undefined
+        }
+        emptyState={
+          <div className="flex flex-col items-center gap-3 py-16 text-center">
+            <span className="flex h-12 w-12 items-center justify-center rounded-xl border border-border bg-muted text-muted-foreground">
+              <Building2 className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">
+                {search.trim() || isCompaniesFilterActive(filters)
+                  ? t("companies.noResultsTitle")
+                  : t("companies.emptyTitle")}
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {search.trim() || isCompaniesFilterActive(filters)
+                  ? t("companies.noResultsBody")
+                  : t("companies.emptyBody")}
+              </p>
+            </div>
+            {!search.trim() && !isCompaniesFilterActive(filters) && canCreate && (
+              <Button type="button" className="mt-2" onClick={() => setCreateOpen(true)}>
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                {t("companies.create.trigger")}
+              </Button>
+            )}
+          </div>
+        }
+        pagination={{
+          initialPageSize: 25,
+          labels: {
+            perPageLabel: (size) => t("dataTable.perPage", { size: String(size) }),
+            prevLabel: t("table.pagination.prevPage"),
+            nextLabel: t("dataTable.next"),
+            pageAriaLabel: (p) => t("table.pagination.page", { page: String(p) }),
+            navAriaLabel: t("dataTable.paginationNav"),
+          },
+        }}
       />
 
       <CompanyFormDialog
@@ -374,7 +384,12 @@ export function CompaniesView({ orgId }: { orgId: string }) {
           if (hint.candidates.length > 0) setDedup({ hint, newCompanyId: created.id });
         }}
       />
-      <CompanyFormDialog orgId={orgId} company={editTarget} open={editTarget !== null} onOpenChange={(open) => !open && setEditTarget(null)} />
+      <CompanyFormDialog
+        orgId={orgId}
+        company={editTarget}
+        open={editTarget !== null}
+        onOpenChange={(open) => !open && setEditTarget(null)}
+      />
       <DeleteCompanyDialog
         orgId={orgId}
         company={deleteTarget}

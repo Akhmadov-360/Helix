@@ -6,7 +6,7 @@ import { meQueryOptions, useMe } from "../../../shared/auth/session";
 export const Route = createFileRoute("/_authenticated/companies/")({
   loader: async ({ context }) => {
     const me = await context.queryClient.ensureQueryData(meQueryOptions);
-    await context.queryClient.ensureQueryData(companiesListQueryOptions(me.activeOrgId));
+    await context.queryClient.ensureQueryData(companiesListQueryOptions(me.activeOrgId, { limit: 500 }));
   },
   component: CompaniesPage,
 });

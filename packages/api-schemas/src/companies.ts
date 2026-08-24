@@ -30,7 +30,7 @@ export const companyQuerySchema = z.object({
   // Точное совпадение (не text-search как q) — фильтр "Индустрия", не свободный поиск.
   industry: industrySchema.optional(),
   cursorId: z.string().optional(),
-  limit: z.coerce.number().int().positive().max(100).default(50),
+  limit: z.coerce.number().int().positive().max(500).default(50),
 });
 export type CompanyQuery = z.infer<typeof companyQuerySchema>;
 

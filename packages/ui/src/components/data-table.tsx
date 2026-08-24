@@ -93,6 +93,8 @@ export interface DataTableProps<T> {
    */
   rowActions?: (row: T) => ReactNode;
   onRowClick?: (row: T) => void;
+  /** Опциональный класс на <tr> — используется для подсветки конкретных строк (напр. dedup). */
+  rowClassName?: (row: T) => string | undefined;
 
   // States / layout
   emptyState?: ReactNode;
@@ -124,6 +126,7 @@ export function DataTable<T>({
   filterMatches,
   rowActions,
   onRowClick,
+  rowClassName,
   emptyState,
   defaultRowHeight = "comfortable",
   stickyHeader = true,
@@ -249,7 +252,11 @@ export function DataTable<T>({
                 <TableRow
                   key={getRowKey(row)}
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
-                  className={cn(ROW_HEIGHT_CLASS[rowHeight], onRowClick && "cursor-pointer")}
+                  className={cn(
+                    ROW_HEIGHT_CLASS[rowHeight],
+                    onRowClick && "cursor-pointer",
+                    rowClassName?.(row),
+                  )}
                 >
                   {visibleColumns.map((c) => (
                     <TableCell key={c.key} className={c.cellClassName ?? c.className}>
