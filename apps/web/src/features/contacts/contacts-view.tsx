@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@helix/ui";
 import { useCan } from "../../shared/auth/ability";
+import { EmptyState } from "../../shared/components/empty-state";
 import { useT } from "../../shared/i18n";
 import { ContactSearch } from "./contact-search";
 import { DealRoleChips } from "./deal-role-chips";
@@ -140,13 +141,12 @@ export function ContactsView({
       )}
 
       {contacts.length === 0 ? (
-        // Company suggestions в ContactSearch выше уже предлагают конкретное следующее действие —
-        // дублировать его нейтральным "не привязан ни один контакт" рядом излишне (design review).
-        !company && (
-          <div className="flex flex-col items-center gap-2 py-8 text-center text-muted-foreground">
-            <Users className="h-8 w-8" />
-            <p>{t("contacts.list.empty")}</p>
-          </div>
+        // ContactSearch выше уже даёт конкретное следующее действие (dedup-подсказка по компании
+        // включительно) — дублировать его нейтральной заглушкой излишне (design review). Ключим по
+        // inlineSearch, не по company: так же закрывает случай "есть company, но нет прав линковать"
+        // (canLink=false), который раньше не показывал вообще ничего.
+        !inlineSearch && (
+          <EmptyState icon={Users} title={t("contacts.list.empty")} description={t("contacts.list.emptyDescription")} />
         )
       ) : (
         // Flat-list с divide-y вместо per-row Card (design review): убираем card-in-card обёртки —

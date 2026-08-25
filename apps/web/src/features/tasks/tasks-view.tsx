@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { ListChecks } from "lucide-react";
 import type { TaskPriority } from "@helix/api-schemas";
@@ -6,6 +6,7 @@ import { Button, CountBadge, Input, cn } from "@helix/ui";
 import { useCan } from "../../shared/auth/ability";
 import { useT } from "../../shared/i18n";
 import { orgMembersQueryOptions } from "../../shared/org/queries";
+import { EmptyState } from "../../shared/components/empty-state";
 import { AssigneeField } from "./assignee-field";
 import { DueDateField } from "./due-date-field";
 import { useCompleteTask, useCreateTask, useDeleteTask, useReopenTask, useUpdateTask } from "./mutations";
@@ -62,6 +63,7 @@ export function TasksView({ orgId, projectId }: { orgId: string; projectId: stri
   const [assigneeId, setAssigneeId] = useState<string | null>(null);
   const [priority, setPriority] = useState<TaskPriority>("NONE");
   const [filters, setFilters] = useState<TasksFilterState>(initialTasksFilter);
+  const titleInputRef = useRef<HTMLInputElement>(null);
 
   // Фильтр ПЕРЕД bucketize: бакеты не должны считать «this week (0)» когда фильтр всё отсёк.
   // Пустые бакеты не рендерятся — если фильтр оставил только 1 задачу сегодня, увидим только
@@ -101,6 +103,7 @@ export function TasksView({ orgId, projectId }: { orgId: string; projectId: stri
         <form onSubmit={handleCreate} className="flex max-w-3xl items-center gap-2">
           <div className="relative flex-1">
             <Input
+              ref={titleInputRef}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder={t("tasks.quickAdd.placeholder")}
@@ -129,10 +132,18 @@ export function TasksView({ orgId, projectId }: { orgId: string; projectId: stri
       )}
 
       {tasks.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-8 text-center text-muted-foreground">
-          <ListChecks className="h-8 w-8" />
-          <p>{t("tasks.list.empty")}</p>
-        </div>
+        <EmptyState
+          icon={ListChecks}
+          title={t("tasks.list.empty")}
+          description={t("tasks.list.emptyDescription")}
+          action={
+            canCreate && (
+              <Button type="button" size="sm" onClick={() => titleInputRef.current?.focus()}>
+                {t("tasks.quickAdd.submit")}
+              </Button>
+            )
+          }
+        />
       ) : buckets.length === 0 ? (
         // Фильтр отсёк всё; показываем no-results с одной кнопкой «сбросить», а не пустоту с
         // непонятной причиной. Отделяем от общего empty-state (tasks.length===0) — там другой tone.

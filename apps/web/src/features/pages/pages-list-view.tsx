@@ -13,6 +13,7 @@ import {
   Input,
 } from "@helix/ui";
 import { useCan } from "../../shared/auth/ability";
+import { EmptyState } from "../../shared/components/empty-state";
 import { useLocaleStore, useT } from "../../shared/i18n";
 import { extractExcerpt, extractSnippet } from "../../shared/lib/extract-snippet";
 import { formatRelative } from "../../shared/lib/format-relative";
@@ -79,10 +80,26 @@ export function PagesListView({ orgId, projectId }: { orgId: string; projectId: 
       </div>
 
       {pages.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-8 text-center text-muted-foreground">
-          <FileText className="h-8 w-8" />
-          <p>{debounced ? t("pages.list.noResults") : t("pages.list.empty")}</p>
-        </div>
+        debounced ? (
+          <div className="flex flex-col items-center gap-2 py-8 text-center text-muted-foreground">
+            <FileText className="h-8 w-8" />
+            <p>{t("pages.list.noResults")}</p>
+          </div>
+        ) : (
+          <EmptyState
+            icon={FileText}
+            title={t("pages.list.empty")}
+            description={t("pages.list.emptyDescription")}
+            action={
+              canCreate && (
+                <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
+                  <Plus className="h-4 w-4" />
+                  {t("pages.list.create")}
+                </Button>
+              )
+            }
+          />
+        )
       ) : (
         // Bento-grid (Figma-redesign): 1 колонка на mobile, 2 на десктопе. Карточка вмещает
         // preview из 3 строк + relative time + kebab — читается плотнее чем divide-y список
