@@ -487,9 +487,11 @@ export function RichTextEditor({
         // sticky, не fixed — держится за ближайшего скроллящегося предка (design review: "тело
         // документа не влезает на экран в большинстве случаев, тулбар не должен уезжать вместе с
         // ним"), какой бы это ни был — lg:overflow-y-auto колонка PageDetailView/KbDetailView или
-        // <main> AppShell на мобильном/KB, где своей scroll-колонки нет. bg-background — иначе
-        // текст, проскроллированный под тулбар, был бы виден сквозь него.
-        <div className="sticky top-0 z-10 bg-background">
+        // <main> AppShell на мобильном/KB, где своей scroll-колонки нет.
+        // top-2 + pb-2 (не top-0 впритык к краю) + рамка/тень/скругление — "парящая" пилюля
+        // (design review, ui-ux-pro-max: elevation-consistent), не плоская полоса, прибитая к
+        // самому верху. bg-card (не прозрачный) — текст под тулбаром при скролле не просвечивает.
+        <div className="sticky top-2 z-10 pb-2">
           <RichTextToolbar
             editor={editor}
             showPageLink={onNavigateToPage !== undefined}
@@ -531,7 +533,7 @@ function RichTextToolbar({
   });
 
   return (
-    <div className="flex flex-wrap items-center gap-0.5 border-b border-border pb-2">
+    <div className="flex w-fit flex-wrap items-center gap-0.5 rounded-xl border border-border bg-card p-1 shadow-sm">
       <ToolbarButton
         active={state.heading}
         label={labels.heading}

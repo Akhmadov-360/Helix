@@ -5,6 +5,7 @@ import type {
   PageCommentResponse,
   PageResponse,
   PageVersionResponse,
+  UpdatePageCommentInput,
   UpdatePageInput,
 } from "@helix/api-schemas";
 import type { Prisma, Role } from "@helix/db";
@@ -241,6 +242,26 @@ export class PagesService {
     await this.pages.deleteComment(commentId);
   }
 
+  /** Изменить текст — АВТОР-ONLY (в отличие от delete, Manager+ сюда не допущен): подменять чужие
+   * слова — другое действие, чем их убрать. mentionedUserIds на редактировании не пересчитываем —
+   * повторное уведомление о том же упоминании при правке опечатки было бы шумом, не ценностью. */
+  async updateComment(
+    orgId: string,
+    pageId: string,
+    commentId: string,
+    actorId: string,
+    dto: UpdatePageCommentInput,
+  ): Promise<PageCommentResponse> {
+    if (!(await this.pages.findById(pageId, orgId))) throw new ResourceNotFoundError("Page not found");
+
+    const comment = await this.pages.findCommentById(commentId);
+    if (!comment || comment.pageId !== pageId) throw new ResourceNotFoundError("Comment not found");
+    if (comment.authorId !== actorId) throw new ForbiddenActionError();
+
+    const updated = await this.pages.updateComment(commentId, dto.body);
+    return toPageCommentResponse(updated);
+  }
+
   /** §2 — self-mention не шлёт письмо; чужой/несуществующий id тихо пропускается (тенант-защита). */
   private async notifyMentions(
     orgId: string,
@@ -300,5 +321,6 @@ function toPageCommentResponse(row: PageCommentRow): PageCommentResponse {
     authorName: row.author?.name ?? null,
     body: row.body,
     createdAt: row.createdAt.toISOString(),
+    editedAt: row.editedAt?.toISOString() ?? null,
   };
 }

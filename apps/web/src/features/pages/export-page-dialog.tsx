@@ -3,7 +3,6 @@ import { Download, FileCode, FileText, FileType, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   Button,
-  Checkbox,
   cn,
   Dialog,
   DialogContent,
@@ -30,10 +29,10 @@ const FORMATS: readonly {
   { key: "pdf", icon: FileType, labelKey: "pages.export.pdf", hintKey: "pages.export.pdf.hint" },
 ];
 
-// Multi-select export: юзер отмечает нужные форматы (или все сразу), нажимает «Экспорт» — все
-// выбранные файлы скачиваются последовательно. Один клик по одному пункту в kebab заменяет
-// прежний dropdown из четырёх строк — тот пункт-меню плодил визуальный шум и не давал экспорт
-// нескольких форматов за раз (типичный запрос: «отправить клиенту и .docx, и .pdf»).
+// Single-select export (design review, Stitch-скрин): один формат за раз, радио вместо чекбоксов.
+// Раньше был multi-select — экономил повторное открытие диалога ради «и .docx, и .pdf», но это
+// частный кейс; для типового «скачать один файл» радио читается однозначнее (выбор, не список
+// вкл/выкл), решили в пользу простоты.
 export function ExportPageDialog({
   title,
   content,
@@ -46,32 +45,20 @@ export function ExportPageDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const t = useT();
-  // Дефолт — MD включён (самый частый), остальные пустые. Хранение в useState (не useMemo/effect)
-  // — простая mutable-selection, ре-инициализация на каждое открытие через key на Dialog не
-  // нужна, у нас нет per-page состояния кроме этого.
-  const [selected, setSelected] = useState<Set<Format>>(() => new Set<Format>(["md"]));
+  // Дефолт — MD (самый частый). Хранение в useState — простой mutable-выбор, ре-инициализация на
+  // каждое открытие через key на Dialog не нужна, у нас нет per-page состояния кроме этого.
+  const [selected, setSelected] = useState<Format>("md");
   const [busy, setBusy] = useState(false);
 
-  function toggle(key: Format) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-
   async function handleExport() {
-    if (selected.size === 0) return;
     setBusy(true);
     try {
-      // Sequential — синхронные (md/html/pdf) и async (docx) в одном порядке; parallel порой
-      // ломает браузерные download-cascade (Chrome throttling при >5 одновременных).
-      if (selected.has("md")) downloadMarkdown(title, content);
-      if (selected.has("html")) downloadHtml(title, content);
-      if (selected.has("docx")) await downloadDocx(title, content);
-      if (selected.has("pdf")) downloadPdf(title, content);
-      toast.success(t("pages.export.success", { count: selected.size }));
+      // downloadDocx — единственный async вариант (html-docx-js-typescript), остальные синхронные.
+      if (selected === "md") downloadMarkdown(title, content);
+      else if (selected === "html") downloadHtml(title, content);
+      else if (selected === "docx") await downloadDocx(title, content);
+      else downloadPdf(title, content);
+      toast.success(t("pages.export.success"));
       onOpenChange(false);
     } catch (err) {
       console.error("[export] failed", err);
@@ -89,9 +76,9 @@ export function ExportPageDialog({
           <DialogDescription>{t("pages.export.description")}</DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1" role="radiogroup" aria-label={t("pages.export.title")}>
           {FORMATS.map(({ key, icon: Icon, labelKey, hintKey }) => {
-            const checked = selected.has(key);
+            const checked = selected === key;
             return (
               <label
                 key={key}
@@ -100,7 +87,14 @@ export function ExportPageDialog({
                   checked && "border-border bg-muted/60",
                 )}
               >
-                <Checkbox checked={checked} onCheckedChange={() => toggle(key)} disabled={busy} />
+                <input
+                  type="radio"
+                  name="export-format"
+                  checked={checked}
+                  onChange={() => setSelected(key)}
+                  disabled={busy}
+                  className="h-4 w-4 shrink-0 accent-primary"
+                />
                 <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-foreground">{t(labelKey)}</p>
@@ -120,13 +114,13 @@ export function ExportPageDialog({
           >
             {t("pages.import.cancel")}
           </Button>
-          <Button type="button" onClick={handleExport} disabled={busy || selected.size === 0}>
+          <Button type="button" onClick={handleExport} disabled={busy}>
             {busy ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
               <Download className="h-3.5 w-3.5" />
             )}
-            {t("pages.export.submit", { count: selected.size })}
+            {t("pages.export.download")}
           </Button>
         </DialogFooter>
       </DialogContent>

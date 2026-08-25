@@ -4,6 +4,7 @@ import {
   createPageCommentSchema,
   createPageSchema,
   listPagesQuerySchema,
+  updatePageCommentSchema,
   updatePageSchema,
   type CreatePageCommentInput,
   type CreatePageInput,
@@ -11,6 +12,7 @@ import {
   type PageCommentResponse,
   type PageResponse,
   type PageVersionListResponse,
+  type UpdatePageCommentInput,
   type UpdatePageInput,
 } from "@helix/api-schemas";
 import { CurrentAuth, type AuthContext } from "../../core/auth-context";
@@ -118,5 +120,16 @@ export class PagesController {
   ): Promise<null> {
     await this.pages.deleteComment(auth.activeOrgId, id, commentId, auth.userId, auth.role);
     return null;
+  }
+
+  // Автор-only (строже delete) — проверяется в сервисе, не CASL.
+  @Patch("pages/:id/comments/:commentId")
+  updateComment(
+    @CurrentAuth() auth: AuthContext,
+    @Param("id") id: string,
+    @Param("commentId") commentId: string,
+    @Body(new ZodValidationPipe(updatePageCommentSchema)) dto: UpdatePageCommentInput,
+  ): Promise<PageCommentResponse> {
+    return this.pages.updateComment(auth.activeOrgId, id, commentId, auth.userId, dto);
   }
 }

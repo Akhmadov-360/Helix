@@ -8,6 +8,7 @@ import {
   type CreatePageInput,
   type PageCommentResponse,
   type PageResponse,
+  type UpdatePageCommentInput,
   type UpdatePageInput,
 } from "@helix/api-schemas";
 import { queryKeys, request } from "../../shared/api";
@@ -159,6 +160,7 @@ export function useAddPageComment(orgId: string, pageId: string, me: { id: strin
         authorName: me.name,
         body: input.body,
         createdAt: new Date().toISOString(),
+        editedAt: null,
         pending: true,
       };
       queryClient.setQueryData<PendingPageComment[]>(queryKey, (current) => [...(current ?? []), optimistic]);
@@ -173,6 +175,35 @@ export function useAddPageComment(orgId: string, pageId: string, me: { id: strin
     onSuccess: (comment, _input, ctx) => {
       queryClient.setQueryData<PendingPageComment[]>(queryKey, (current) =>
         (current ?? []).map((c) => (c.id === ctx?.tempId ? comment : c)),
+      );
+    },
+  });
+}
+
+// Автор-only на бэке (строже delete) — сервер молча отклонит PATCH от не-автора 403'ей, кнопка
+// "Изменить" в UI вообще не показывается не-автору (см. page-comments.tsx), это лишь второй слой.
+export function useUpdatePageComment(orgId: string, pageId: string) {
+  const queryClient = useQueryClient();
+  const { queryKey } = pageCommentsQueryOptions(orgId, pageId);
+  const t = useT();
+
+  return useMutation({
+    mutationFn: (vars: { commentId: string; input: UpdatePageCommentInput }) =>
+      request({
+        method: "PATCH",
+        path: `/v1/pages/${pageId}/comments/${vars.commentId}`,
+        body: vars.input,
+        schema: pageCommentResponseSchema,
+      }),
+    onError: (error) => {
+      const kind = toPageError(error);
+      if (kind === "permissionDenied") void queryClient.invalidateQueries({ queryKey: queryKeys.me() });
+      toast.error(t(pageErrorKey(kind)));
+    },
+    onSuccess: (comment) => {
+      queryClient.setQueryData<PendingPageComment[]>(
+        queryKey,
+        (current) => current && current.map((c) => (c.id === comment.id ? comment : c)),
       );
     },
   });

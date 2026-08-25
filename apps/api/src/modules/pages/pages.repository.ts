@@ -50,6 +50,7 @@ export interface PageCommentRow {
   authorId: string | null;
   body: string;
   createdAt: Date;
+  editedAt: Date | null;
   author: { name: string } | null;
 }
 
@@ -59,6 +60,7 @@ const PAGE_COMMENT_SELECT = {
   authorId: true,
   body: true,
   createdAt: true,
+  editedAt: true,
   author: { select: { name: true } },
 } satisfies Prisma.PageCommentSelect;
 
@@ -179,6 +181,14 @@ export class PagesRepository {
 
   async deleteComment(id: string): Promise<void> {
     await this.prisma.client.pageComment.delete({ where: { id } });
+  }
+
+  updateComment(id: string, body: string): Promise<PageCommentRow> {
+    return this.prisma.client.pageComment.update({
+      where: { id },
+      data: { body, editedAt: new Date() },
+      select: PAGE_COMMENT_SELECT,
+    });
   }
 
   // §2 — mentionedUserIds резолвятся к email/name ЗДЕСЬ, отфильтрованные по orgId: тенант-защита

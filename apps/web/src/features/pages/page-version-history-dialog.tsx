@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@helix/ui";
+import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, cn } from "@helix/ui";
 import { History } from "lucide-react";
 import { useLocaleStore, useT } from "../../shared/i18n";
 import { formatRelative } from "../../shared/lib/format-relative";
@@ -62,7 +62,15 @@ export function PageVersionHistoryDialog({
         ) : (
           <ul className="scroll-slim flex max-h-80 flex-col gap-1 overflow-y-auto">
             {versions.map((version) => (
-              <li key={version.id} className="flex items-center justify-between gap-3 rounded-md px-2 py-2 hover:bg-muted">
+              <li
+                key={version.id}
+                className={cn(
+                  "flex items-center justify-between gap-3 rounded-md border-l-2 border-l-transparent px-2 py-2 hover:bg-muted",
+                  // Акцентная левая граница на строке под подтверждением (design review,
+                  // Stitch-скрин) — "это то, что сейчас затронет действие", а не обычный hover.
+                  confirmingId === version.id && "border-l-primary bg-muted",
+                )}
+              >
                 <div className="min-w-0">
                   <p className="truncate text-sm">{version.title || t("pages.title.placeholder")}</p>
                   <p className="text-xs text-muted-foreground">{formatRelative(version.createdAt, relativeFormatter)}</p>

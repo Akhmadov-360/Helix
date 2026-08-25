@@ -584,11 +584,12 @@ model Page {
 }
 
 model PageComment {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   pageId    String
   authorId  String?
   body      String // plain text с @упоминаниями как id-списком (не хранится в тексте, §2), не TipTap-документ
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
+  editedAt  DateTime? // null = не редактировался; проставляется на PATCH (author-only, см. PagesService)
 
   page   Page  @relation(fields: [pageId], references: [id], onDelete: Cascade)
   author User? @relation(fields: [authorId], references: [id], onDelete: SetNull)

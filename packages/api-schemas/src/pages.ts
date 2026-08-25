@@ -68,6 +68,13 @@ export const createPageCommentSchema = z.object({
 });
 export type CreatePageCommentInput = z.infer<typeof createPageCommentSchema>;
 
+// Редактирование текста — только автор (не Manager+, в отличие от delete): менять чужие слова —
+// не то же самое, что убрать их, тот же принцип, что Slack/Discord/Telegram.
+export const updatePageCommentSchema = z.object({
+  body: z.string().trim().min(1).max(5000),
+});
+export type UpdatePageCommentInput = z.infer<typeof updatePageCommentSchema>;
+
 export const pageCommentResponseSchema = z.object({
   id: z.string(),
   pageId: z.string(),
@@ -75,6 +82,7 @@ export const pageCommentResponseSchema = z.object({
   authorName: z.string().nullable(),
   body: z.string(),
   createdAt: z.iso.datetime(),
+  editedAt: z.iso.datetime().nullable(),
 });
 export type PageCommentResponse = z.infer<typeof pageCommentResponseSchema>;
 
