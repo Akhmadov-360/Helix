@@ -1,20 +1,21 @@
 # Render Blueprint — деплой apps/api (NestJS) как web-сервиса.
-# Postgres (Supabase), Redis (Upstash), S3, email (Resend) — все внешние, здесь не заводим.
+# Postgres (Supabase), Redis (Upstash), S3-совместимое хранилище, email — все внешние,
+# здесь не заводим.
 #
 # Как применить:
 #   1. Render Dashboard → New → Blueprint → выбрать этот репозиторий (ветка main).
 #   2. Render найдёт этот файл и создаст сервис helix-api.
 #   3. Значения с "sync: false" Render НЕ подставит сам — впишешь их вручную в
 #      Dashboard → helix-api → Environment (это секреты, поэтому их нет в этом файле).
-#      Бери значения из текущего Railway-проекта — 1-в-1, кроме пары нюансов (см. ниже).
+#      Бери значения из текущего Railway-проекта 1-в-1 (все переменные ниже совпадают
+#      по именам с тем, что было на Railway) — кроме пары нюансов (см. ниже).
 #
 # Нюансы переноса с Railway (см. packages/config/src/env.schema.ts — источник истины по env):
 #   - PORT не задаём: Render сам инжектит переменную PORT, apps/api/src/main.ts уже её читает.
 #   - JWT_SECRET — ОБЯЗАТЕЛЬНО то же значение, что было на Railway, иначе все текущие
 #     refresh-сессии в Supabase станут невалидны сразу после переезда.
 #   - S3_ACCESS_KEY/S3_SECRET_KEY — берём как обычные explicit-креды (Render, как и Railway,
-#     не AWS-инфра, IAM role здесь не резолвится, несмотря на комментарий в .env.example
-#     про "prod = IAM role" — тот путь актуален только если API реально крутится в AWS).
+#     не AWS-инфра, IAM role здесь не резолвится).
 #   - APP_URL/WEB_ORIGIN — публичный URL веб-приложения; меняем только если фронт тоже переезжает.
 
 services:
@@ -63,15 +64,29 @@ services:
       - key: APP_URL
         sync: false # публичный URL веб-приложения, для ссылок в письмах
 
-      # ── Email (Resend HTTP API — SMTP-порты на PaaS обычно блокируются) ────
+      # ── Email — значение MAIL_PROVIDER берём с Railway как есть (resend ИЛИ smtp,
+      # ── не угадываем): если там реально smtp с внешним хостом (не localhost/MailHog),
+      # ── SMTP_HOST/PORT/USER/PASS ниже обязательны, иначе можно оставить пустыми.
       - key: MAIL_PROVIDER
-        value: resend
+        sync: false
       - key: MAIL_FROM
         sync: false
       - key: RESEND_API_KEY
         sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
 
       # ── Files / S3 ────────────────────────────────────────────────────────
+      # S3_ENDPOINT задан на Railway → прод НЕ на голом AWS S3, а на S3-совместимом
+      # сервисе с явным endpoint'ом (R2/Backblaze/др.) — переносим как есть, не пропускаем.
+      - key: S3_ENDPOINT
+        sync: false
       - key: S3_BUCKET
         sync: false
       - key: S3_REGION
@@ -80,12 +95,7 @@ services:
         sync: false
       - key: S3_SECRET_KEY
         sync: false
-      # S3_ENDPOINT НЕ задаём — не задан = настоящий AWS S3 (как в проде на Railway).
 
-      # ── AI / RAG (опционально — впиши только те ключи, что реально включены) ─
-      - key: ANTHROPIC_API_KEY
-        sync: false
+      # ── AI / RAG ──────────────────────────────────────────────────────────
       - key: GOOGLE_AI_API_KEY
-        sync: false
-      - key: OPENAI_API_KEY
         sync: false
