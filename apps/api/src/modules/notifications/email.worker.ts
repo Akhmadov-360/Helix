@@ -14,6 +14,7 @@ import { renderOrgInviteEmail } from "./templates/org-invite-email";
 import { renderPasswordResetEmail } from "./templates/password-reset-email";
 import { renderPhaseChangedEmail } from "./templates/phase-changed-email";
 import { renderTaskAssignedEmail } from "./templates/task-assigned-email";
+import { renderWelcomeEmail } from "./templates/welcome-email";
 import { ASSIGNMENT_JOB, type AssignmentJobData } from "./assignment-job";
 import type { LeadCreatedJobData } from "./lead-created-job";
 import { MENTION_JOB, type MentionJobData } from "./mention-job";
@@ -21,6 +22,7 @@ import { ORG_INVITE_JOB, type OrgInviteJobData } from "./org-invite-job";
 import { PASSWORD_RESET_JOB, type PasswordResetJobData } from "./password-reset-job";
 import { PHASE_CHANGED_JOB, type PhaseChangedJobData } from "./phase-changed-job";
 import { TASK_ASSIGNED_JOB, type TaskAssignedJobData } from "./task-assigned-job";
+import { WELCOME_JOB, type WelcomeJobData } from "./welcome-job";
 
 type EmailJobData =
   | LeadCreatedJobData
@@ -29,7 +31,8 @@ type EmailJobData =
   | PhaseChangedJobData
   | OrgInviteJobData
   | MentionJobData
-  | TaskAssignedJobData;
+  | TaskAssignedJobData
+  | WelcomeJobData;
 
 /**
  * Консьюмер очереди `email` (§1). Живёт в том же Nest-приложении, не отдельным процессом —
@@ -75,6 +78,9 @@ export class EmailWorker extends WorkerHost {
     if (job.name === TASK_ASSIGNED_JOB) {
       return this.processTaskAssigned(job.data as TaskAssignedJobData);
     }
+    if (job.name === WELCOME_JOB) {
+      return this.processWelcome(job.data as WelcomeJobData);
+    }
     return this.processLeadCreated(job.data as LeadCreatedJobData);
   }
 
@@ -103,6 +109,11 @@ export class EmailWorker extends WorkerHost {
 
   private async processPasswordReset(data: PasswordResetJobData): Promise<void> {
     const email = renderPasswordResetEmail({ name: data.name, token: data.token, appUrl: this.env.APP_URL });
+    await this.mailer.send({ to: [data.email], ...email });
+  }
+
+  private async processWelcome(data: WelcomeJobData): Promise<void> {
+    const email = renderWelcomeEmail({ name: data.name, appUrl: this.env.APP_URL });
     await this.mailer.send({ to: [data.email], ...email });
   }
 

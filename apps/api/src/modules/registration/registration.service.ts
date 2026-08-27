@@ -5,6 +5,7 @@ import { AuthService, type IssuedAuth } from "../auth/auth.service";
 import { PasswordService } from "../auth/password.service";
 import type { SessionMetadata } from "../auth/sessions/refresh-session.service";
 import { PrismaService } from "../../core/prisma/prisma.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { OrganizationsRepository } from "../organizations/organizations.repository";
 import { UsersRepository } from "../users/users.repository";
 
@@ -33,6 +34,7 @@ export class RegistrationService {
     private readonly organizations: OrganizationsRepository,
     private readonly passwords: PasswordService,
     private readonly auth: AuthService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async register(input: RegisterInput, metadata?: SessionMetadata): Promise<IssuedAuth> {
@@ -43,8 +45,8 @@ export class RegistrationService {
     // Инвариант §9.1: не бывает User без Membership. Записи создаются атомарно —
     // при падении любой (напр. занятый email) не остаётся ни осиротевшей орги, ни юзера.
     // RefreshSession входит в ту же транзакцию: по §9.1 факты-состояния атомарны,
-    // побочные эффекты (welcome-email, дефолтный blueprint) пойдут после коммита.
-    return this.prisma.client.$transaction(async (tx) => {
+    // побочные эффекты (welcome-email, дефолтный blueprint) идут после коммита (P4).
+    const issued = await this.prisma.client.$transaction(async (tx) => {
       // Организация создаётся ПЕРВОЙ намеренно. Внутри транзакции порядок семантически
       // безразличен, но так падение на занятом email происходит ПОСЛЕ вставки орги —
       // и тест на атомарность становится наблюдаемым: без $transaction осталась бы
@@ -73,5 +75,11 @@ export class RegistrationService {
         tx,
       });
     });
+
+    // После коммита (P4) — регистрация уже необратима, письмо вторично; enqueueWelcome сам
+    // глотает свою ошибку (см. NotificationsService), падение сюда не всплывёт.
+    await this.notifications.enqueueWelcome({ email: input.email, name: input.name });
+
+    return issued;
   }
 }

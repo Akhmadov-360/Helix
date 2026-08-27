@@ -9,6 +9,7 @@ import { ORG_INVITE_JOB, type OrgInviteJobData } from "./org-invite-job";
 import { PASSWORD_RESET_JOB, type PasswordResetJobData } from "./password-reset-job";
 import { PHASE_CHANGED_JOB, type PhaseChangedJobData } from "./phase-changed-job";
 import { TASK_ASSIGNED_JOB, type TaskAssignedJobData } from "./task-assigned-job";
+import { WELCOME_JOB, type WelcomeJobData } from "./welcome-job";
 
 // §6: 5 попыток, экспоненциально от 30с (~30с/1мин/2мин/4мин/8мин) — покрывает транзиентные
 // отказы мейлера без агрессивного долбления. Исчерпал попытки → BullMQ failed-set (DLQ v1).
@@ -21,7 +22,8 @@ export type EmailJobData =
   | PhaseChangedJobData
   | OrgInviteJobData
   | MentionJobData
-  | TaskAssignedJobData;
+  | TaskAssignedJobData
+  | WelcomeJobData;
 
 /**
  * Тонкий фасад над BullMQ `Queue` (§1). Вызывается ПОСЛЕ коммита транзакции/записи создателем
@@ -110,6 +112,16 @@ export class NotificationsService {
     } catch (err) {
       // Комментарий уже закоммичен — письмо вторично, тот же остаточный риск, что project.assigned.
       this.logger.error(`Failed to enqueue page.mention for page ${data.pageId}`, err instanceof Error ? err.stack : err);
+    }
+  }
+
+  /** Вызывается ПОСЛЕ коммита транзакции регистрации (§9.1) — пользователь и личная орга уже
+   * созданы, письмо вторично к самому факту регистрации. */
+  async enqueueWelcome(data: WelcomeJobData): Promise<void> {
+    try {
+      await this.emailQueue.add(WELCOME_JOB, data, EMAIL_JOB_OPTIONS);
+    } catch (err) {
+      this.logger.error(`Failed to enqueue user.welcome for ${data.email}`, err instanceof Error ? err.stack : err);
     }
   }
 }
