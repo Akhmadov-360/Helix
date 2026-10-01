@@ -3,6 +3,7 @@ import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "@helix/db";
 import { createTestApp } from "../helpers/create-test-app";
+import { clearMailhog, waitForMailhogMessage, settleWelcomeEmail, type MailhogMessage } from "../helpers/mailhog";
 
 let counter = 0;
 
@@ -12,6 +13,7 @@ async function signUp(app: INestApplication): Promise<{ token: string; orgId: st
     .post("/v1/auth/register")
     .send({ email, name: "Founder", password: "correct horse battery staple" })
     .expect(201);
+  await settleWelcomeEmail(email);
   const token = res.body.data.accessToken as string;
   const claims = JSON.parse(Buffer.from(token.split(".")[1] ?? "", "base64url").toString());
   return { token, orgId: claims.activeOrgId, userId: claims.sub };
@@ -22,25 +24,6 @@ async function addOrgMember(orgId: string, role: "OWNER" | "ADMIN" | "MANAGER" |
   const user = await prisma.user.create({ data: { email: `orgmember${counter++}@example.com`, name: "Member", passwordHash: "x" } });
   await prisma.membership.create({ data: { orgId, userId: user.id, role } });
   return user.id;
-}
-
-async function clearMailhog(): Promise<void> {
-  await fetch("http://localhost:8025/api/v1/messages", { method: "DELETE" });
-}
-
-interface MailhogMessage {
-  Content: { Headers: Record<string, string[]>; Body: string };
-}
-
-async function waitForMailhogMessage(timeoutMs = 5000): Promise<MailhogMessage> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    const res = await fetch("http://localhost:8025/api/v2/messages");
-    const body = (await res.json()) as { items: MailhogMessage[] };
-    if (body.items.length > 0) return body.items[0]!;
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  throw new Error("Timed out waiting for MailHog message");
 }
 
 /**
@@ -98,7 +81,7 @@ describe("Invites (invites.md)", () => {
 
       await createInvite(owner.token, "newperson@example.com", "MEMBER").expect(201);
 
-      const msg = await waitForMailhogMessage();
+      const msg = await waitForMailhogMessage({ to: "newperson@example.com" });
       expect(msg.Content.Body).toContain("/invite/accept?token=");
       const rawToken = extractToken(msg);
       expect(rawToken.length).toBeGreaterThan(0);
@@ -134,12 +117,12 @@ describe("Invites (invites.md)", () => {
       const owner = await signUp(app);
 
       await createInvite(owner.token, "resend@example.com", "MEMBER").expect(201);
-      const first = await waitForMailhogMessage();
+      const first = await waitForMailhogMessage({ to: "resend@example.com" });
       const firstToken = extractToken(first);
 
       await clearMailhog();
       await createInvite(owner.token, "resend@example.com", "MEMBER").expect(201);
-      const second = await waitForMailhogMessage();
+      const second = await waitForMailhogMessage({ to: "resend@example.com" });
       const secondToken = extractToken(second);
 
       const firstPreview = await preview(firstToken);
@@ -154,7 +137,7 @@ describe("Invites (invites.md)", () => {
     it("REGISTER-ветка: email без User → acceptMode=REGISTER, accept создаёт User+Membership, БЕЗ личной организации", async () => {
       const owner = await signUp(app);
       await createInvite(owner.token, "brandnew@example.com", "MEMBER").expect(201);
-      const rawToken = extractToken(await waitForMailhogMessage());
+      const rawToken = extractToken(await waitForMailhogMessage({ to: "brandnew@example.com" }));
 
       const prev = await preview(rawToken).expect(200);
       expect(prev.body.data.acceptMode).toBe("REGISTER");
@@ -172,7 +155,7 @@ describe("Invites (invites.md)", () => {
     it("REGISTER-ветка без name/password → 400 (InviteAcceptRequiresProfileError)", async () => {
       const owner = await signUp(app);
       await createInvite(owner.token, "needsprofile@example.com", "MEMBER").expect(201);
-      const rawToken = extractToken(await waitForMailhogMessage());
+      const rawToken = extractToken(await waitForMailhogMessage({ to: "needsprofile@example.com" }));
 
       await accept(rawToken, {}).expect(400);
     });
@@ -180,9 +163,10 @@ describe("Invites (invites.md)", () => {
     it("ACCEPT-ветка: email с существующим User (в другой орге) → новая Membership, User не дублируется", async () => {
       const owner = await signUp(app);
       const other = await signUp(app); // существует в СВОЕЙ личной орге
+      const otherEmail = (await prisma.user.findUniqueOrThrow({ where: { id: other.userId } })).email;
 
-      await createInvite(owner.token, (await prisma.user.findUniqueOrThrow({ where: { id: other.userId } })).email, "MANAGER").expect(201);
-      const rawToken = extractToken(await waitForMailhogMessage());
+      await createInvite(owner.token, otherEmail, "MANAGER").expect(201);
+      const rawToken = extractToken(await waitForMailhogMessage({ to: otherEmail }));
 
       const prev = await preview(rawToken).expect(200);
       expect(prev.body.data.acceptMode).toBe("ACCEPT");
@@ -199,7 +183,7 @@ describe("Invites (invites.md)", () => {
     it("race-guard: конкурентный двойной accept одного токена → ровно один успевает, вторая Membership не создаётся", async () => {
       const owner = await signUp(app);
       await createInvite(owner.token, "racer@example.com", "MEMBER").expect(201);
-      const rawToken = extractToken(await waitForMailhogMessage());
+      const rawToken = extractToken(await waitForMailhogMessage({ to: "racer@example.com" }));
 
       const body = { name: "Racer", password: "correct horse battery staple" };
       const [first, second] = await Promise.all([accept(rawToken, body), accept(rawToken, body)]);
@@ -222,7 +206,7 @@ describe("Invites (invites.md)", () => {
 
       // отозванный
       await createInvite(owner.token, "torevoke@example.com", "MEMBER").expect(201);
-      const revokedToken = extractToken(await waitForMailhogMessage());
+      const revokedToken = extractToken(await waitForMailhogMessage({ to: "torevoke@example.com" }));
       const listed = (await listInvites(owner.token).expect(200)).body.data as { id: string; email: string }[];
       const toRevoke = listed.find((i) => i.email === "torevoke@example.com")!;
       await revokeInvite(owner.token, toRevoke.id).expect(200);
@@ -232,7 +216,7 @@ describe("Invites (invites.md)", () => {
       // уже принятый
       await clearMailhog();
       await createInvite(owner.token, "alreadyaccepted@example.com", "MEMBER").expect(201);
-      const acceptedToken = extractToken(await waitForMailhogMessage());
+      const acceptedToken = extractToken(await waitForMailhogMessage({ to: "alreadyaccepted@example.com" }));
       await accept(acceptedToken, { name: "X", password: "correct horse battery staple" }).expect(200);
       await preview(acceptedToken).expect(401);
       await accept(acceptedToken, {}).expect(401);
