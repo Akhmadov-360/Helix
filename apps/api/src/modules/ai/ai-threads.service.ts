@@ -29,6 +29,8 @@ import { AiProviderService } from "./ai-provider.service";
 import { toAiMessageResponse, toAiThreadResponse } from "./ai-thread.mapper";
 import { AiThreadsRepository, type MessageRow } from "./ai-threads.repository";
 import { EmbeddingChunkRepository, type RetrievedChunk } from "./embedding-chunk.repository";
+import { fitToTokenBudget } from "./prompt-budget";
+import { buildSystemPrompt } from "./system-prompt";
 import { ToolCallExecutor } from "./tool-call-executor";
 import { READ_ONLY_TOOL_NAMES, TOOL_POLICY, buildToolPermissionNotes, buildToolSchemas } from "./tool-schema";
 
@@ -37,6 +39,7 @@ const RETRIEVAL_TOP_K = 8;
 // Ограничивает объём истории, идущей в промпт — не архитектурная граница домена (Message-строк
 // в БД остаётся сколько угодно), просто не даём треду с сотнями сообщений раздувать каждый запрос.
 const HISTORY_MESSAGE_LIMIT = 20;
+const PROMPT_TOKEN_BUDGET = 16_000;
 // Число уникальных источников, попадающих в citations финального ответа (§1.3: citations —
 // снапшот того, что видел юзер, не обязано перечислять все top-K чанков, если несколько — из
 // одного источника).
@@ -247,8 +250,8 @@ export class AiThreadsService {
       await this.threads.touch(threadId);
     }
 
-    const messages = this.buildProviderMessages(retrieved, structuredContext, actorRole, priorHistory, dto.content);
-    const citations = toCitations(retrieved);
+    const { messages, usedChunks } = this.buildProviderMessages(retrieved, structuredContext, actorRole, priorHistory, dto.content);
+    const citations = toCitations(usedChunks);
 
     return {
       threadId,
@@ -335,43 +338,33 @@ export class AiThreadsService {
     return JSON.stringify(context);
   }
 
-  // priorHistory/currentQuestion разделены (не единый re-fetch после записи) — code review:
-  // prepareChat() теперь читает историю ДО того, как пишет текущий вопрос (см. комментарий там),
-  // поэтому текущий вопрос сюда приходит как отдельный параметр, не как последняя строка history.
   private buildProviderMessages(
     retrieved: RetrievedChunk[],
     structuredContext: string,
     actorRole: Role,
     priorHistory: MessageRow[],
     currentQuestion: string,
-  ): ChatMessage[] {
-    const excerpts =
-      retrieved.length > 0
-        ? retrieved.map((chunk, i) => `[${i + 1}] (${chunk.sourceType}) ${chunk.content}`).join("\n\n")
-        : "(no relevant documents found)";
+  ): { messages: ChatMessage[]; usedChunks: RetrievedChunk[] } {
     const permissionNotes = buildToolPermissionNotes(actorRole);
 
-    const systemPrompt = [
-      "You are Helix's AI assistant for this project. Answer using the context below when relevant.",
-      "Project context (JSON):",
-      structuredContext,
-      "Relevant document excerpts:",
-      excerpts,
-      permissionNotes,
-    ]
-      .filter(Boolean)
-      .join("\n\n");
-
     // -1 слот резервируется под currentQuestion, добавляемый отдельно ниже.
-    const recentHistory = priorHistory.slice(-(HISTORY_MESSAGE_LIMIT - 1)).map(
+    const history = priorHistory.slice(-(HISTORY_MESSAGE_LIMIT - 1)).map(
       (m): ChatMessage => ({ role: m.role === "USER" ? "user" : "assistant", content: m.content }),
     );
 
-    return [
-      { role: "system", content: systemPrompt },
-      ...recentHistory,
-      { role: "user", content: currentQuestion },
-    ];
+    const fitted = fitToTokenBudget({
+      budget: PROMPT_TOKEN_BUDGET,
+      fixed: [buildSystemPrompt({ structuredContext, excerpts: [], permissionNotes }), currentQuestion],
+      history,
+      excerpts: retrieved.map((chunk) => chunk.content),
+    });
+    const usedChunks = retrieved.slice(0, fitted.excerpts.length);
+
+    const systemPrompt = buildSystemPrompt({ structuredContext, excerpts: usedChunks, permissionNotes });
+    return {
+      messages: [{ role: "system", content: systemPrompt }, ...fitted.history, { role: "user", content: currentQuestion }],
+      usedChunks,
+    };
   }
 }
 
