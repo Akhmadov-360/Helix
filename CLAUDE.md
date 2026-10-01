@@ -179,6 +179,30 @@ telemetry, антивирусный скан файлов, сквозной по
 limiting, idempotency keys) и M6 (visibility=ASSIGNED, кастомные роли, `WorkspaceMember`-оверрайды, полный
 AuditLog, RLS, CI, AWS IaC, pino/Sentry/tracing/метрики, Secrets Manager).
 
+## Скиллы и инструменты (что и когда применять)
+
+Приоритет: `CLAUDE.md` и ADR важнее любого скилла; скилл подсказывает метод, а не решает за проект.
+
+- **Дизайн бэкенда:** `engineering:system-design` и `backend-architect` (границы сервисов, контракты API,
+  вебхуки, rate limiting, идемпотентность); решение фиксируем через `engineering:architecture` → ADR в
+  `docs/decisions.md`.
+- **БД:** `database-design` (схема, индексы, миграции) + `zizi-skills:database-optimization` (принципы;
+  его TypeORM-примеры к нам не относятся). Стек БД не пересматриваем: Postgres + Prisma. План запроса —
+  `EXPLAIN` через Supabase MCP (`execute_sql`, `get_advisors`).
+- **Frontend (`apps/web`, `packages/ui`):** `vercel-react-best-practices` — только правила про ререндеры,
+  бандл, списки (у нас Vite SPA: правила про Next.js/RSC не применять); `vercel-composition-patterns` —
+  для компонентов `packages/ui`; визуал — `ui-ux-pro-max`, `frontend-design`, `design:accessibility-review`.
+- **Тесты и отладка:** `superpowers:test-driven-development`, `engineering:testing-strategy`,
+  `superpowers:systematic-debugging`.
+- **Перед «готово»:** `superpowers:verification-before-completion`; ревью — `/code-review`, `/simplify`,
+  `/security-review` (особенно на тенантность и authz).
+- **Поведение при кодинге:** `karpathy-guidelines` — явные допущения, минимум кода, точечные правки,
+  проверяемые критерии успеха.
+- **Актуальная документация библиотек:** Context7 MCP (запрос + `use context7`) для NestJS, Prisma, Zod,
+  TanStack, BullMQ вместо ответа по памяти; Firecrawl — для страниц вне доков библиотек, если подключён.
+- **Не применять:** `zizi-skills:git-sync` (запрещает работу в `main`), `zizi-skills:frontend` и
+  `tabler-ui` (Vue/Tabler).
+
 ## Как работать (правила для агента — строго)
 
 Узкое место проекта — **не** скорость генерации, а успевает ли автор понять и защитить код.
