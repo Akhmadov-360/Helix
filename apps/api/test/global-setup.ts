@@ -1,7 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { Queue } from "bullmq";
 import { config as loadEnv } from "dotenv";
-import { EMAIL_QUEUE, INGEST_EMBEDDINGS_QUEUE, MAINTENANCE_QUEUE } from "../src/core/queue/queue.module";
 
 /**
  * Выполняется ОДИН раз за прогон (до всех тестовых файлов).
@@ -11,10 +9,9 @@ import { EMAIL_QUEUE, INGEST_EMBEDDINGS_QUEUE, MAINTENANCE_QUEUE } from "../src/
  * `migrate deploy`, а не `migrate dev`: только применяет существующие миграции,
  * никогда не генерирует новые и не спрашивает интерактивно — правильный режим для CI.
  */
-export default async function setup(): Promise<void> {
+export default function setup(): void {
   const env = loadEnv({ path: ".env.test" }).parsed ?? {};
   const databaseUrl = env.DATABASE_URL;
-  const redisUrl = env.REDIS_URL;
 
   if (!databaseUrl) {
     throw new Error("DATABASE_URL is missing in apps/api/.env.test");
@@ -33,23 +30,4 @@ export default async function setup(): Promise<void> {
     { env: { ...process.env, DATABASE_URL: databaseUrl }, stdio: "inherit", shell: true },
   );
 
-  await clearTestQueues(redisUrl);
-}
-
-// Очереди переживают прогон: недоработанные job'ы прошлых запусков подхватываются новым воркером
-// и шлют письма по уже стёртым TRUNCATE данным. Dev использует logical DB /0 с теми же именами
-// очередей (в т.ч. repeatable cleanup-job'ы) — туда не лезем.
-async function clearTestQueues(redisUrl: string | undefined): Promise<void> {
-  if (!redisUrl) {
-    throw new Error("REDIS_URL is missing in apps/api/.env.test");
-  }
-  if (!/\/[1-9]\d*$/.test(redisUrl)) {
-    throw new Error(`Refusing to clear queues: REDIS_URL must use a non-zero logical DB (dev uses /0), got: ${redisUrl}`);
-  }
-
-  for (const name of [EMAIL_QUEUE, INGEST_EMBEDDINGS_QUEUE, MAINTENANCE_QUEUE]) {
-    const queue = new Queue(name, { connection: { url: redisUrl } });
-    await queue.obliterate({ force: true });
-    await queue.close();
-  }
 }

@@ -3,6 +3,7 @@ import type { NestExpressApplication } from "@nestjs/platform-express";
 import { Test, type TestingModuleBuilder } from "@nestjs/testing";
 import cookieParser from "cookie-parser";
 import { AppModule } from "../../src/app.module";
+import { NotificationsService } from "../../src/modules/notifications/notifications.service";
 
 /**
  * Поднимает приложение с той же конфигурацией bootstrap, что и main.ts.
@@ -18,6 +19,7 @@ import { AppModule } from "../../src/app.module";
  */
 export async function createTestApp(
   configure?: (builder: TestingModuleBuilder) => TestingModuleBuilder,
+  { welcomeEmail = false }: { welcomeEmail?: boolean } = {},
 ): Promise<INestApplication> {
   let builder = Test.createTestingModule({ imports: [AppModule] });
   if (configure) builder = configure(builder);
@@ -30,5 +32,10 @@ export async function createTestApp(
   app.useBodyParser("json", { limit: "1mb" });
 
   await app.init();
+  if (!welcomeEmail) {
+    // Каждая регистрация шлёт письмо в общий MailHog асинхронно — для остальных тестов это шум
+    // и очередь задач, задерживающая нужные письма.
+    app.get(NotificationsService, { strict: false }).enqueueWelcome = async () => undefined;
+  }
   return app;
 }

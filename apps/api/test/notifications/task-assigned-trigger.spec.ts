@@ -3,7 +3,7 @@ import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "@helix/db";
 import { createTestApp } from "../helpers/create-test-app";
-import { clearMailhog, waitForMailhogMessage, countMailhogMessages, settleWelcomeEmail } from "../helpers/mailhog";
+import { clearMailhog, waitForMailhogMessage, countMailhogMessages } from "../helpers/mailhog";
 
 let counter = 0;
 
@@ -13,7 +13,6 @@ async function signUp(app: INestApplication): Promise<{ token: string; orgId: st
     .post("/v1/auth/register")
     .send({ email, name: "Founder", password: "correct horse battery staple" })
     .expect(201);
-  await settleWelcomeEmail(email);
   const token = res.body.data.accessToken as string;
   const claims = JSON.parse(Buffer.from(token.split(".")[1] ?? "", "base64url").toString());
   return { token, orgId: claims.activeOrgId, userId: claims.sub };

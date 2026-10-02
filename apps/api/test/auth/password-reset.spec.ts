@@ -2,7 +2,7 @@ import type { INestApplication } from "@nestjs/common";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 import { createTestApp } from "../helpers/create-test-app";
-import { clearMailhog, waitForMailhogMessage, settleWelcomeEmail } from "../helpers/mailhog";
+import { clearMailhog, waitForMailhogMessage } from "../helpers/mailhog";
 
 let counter = 0;
 
@@ -36,14 +36,13 @@ describe("POST /v1/auth/forgot-password + /v1/auth/reset-password (end-to-end)",
       .post("/v1/auth/register")
       .send({ email, name: "Founder", password: "correct horse battery staple" })
       .expect(201);
-    await settleWelcomeEmail(email);
 
     await request(app.getHttpServer())
       .post("/v1/auth/forgot-password")
       .send({ email })
       .expect(200);
 
-    const msg = await waitForMailhogMessage();
+    const msg = await waitForMailhogMessage({ to: email });
     const token = extractToken(msg.Content.Body);
 
     await request(app.getHttpServer())
@@ -75,12 +74,11 @@ describe("POST /v1/auth/forgot-password + /v1/auth/reset-password (end-to-end)",
       .post("/v1/auth/register")
       .send({ email, name: "Founder", password: "correct horse battery staple" })
       .expect(201);
-    await settleWelcomeEmail(email);
     const refreshCookie = registerRes.headers["set-cookie"] as string[] | undefined;
     if (!refreshCookie) throw new Error("register did not set a refresh cookie");
 
     await request(app.getHttpServer()).post("/v1/auth/forgot-password").send({ email }).expect(200);
-    const msg = await waitForMailhogMessage();
+    const msg = await waitForMailhogMessage({ to: email });
     const token = extractToken(msg.Content.Body);
 
     await request(app.getHttpServer())

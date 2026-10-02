@@ -2,7 +2,7 @@ import type { INestApplication } from "@nestjs/common";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createTestApp } from "../helpers/create-test-app";
-import { clearMailhog, waitForMailhogMessage, settleWelcomeEmail } from "../helpers/mailhog";
+import { clearMailhog, waitForMailhogMessage } from "../helpers/mailhog";
 
 let counter = 0;
 
@@ -12,7 +12,6 @@ async function signUp(app: INestApplication): Promise<{ token: string }> {
     .post("/v1/auth/register")
     .send({ email, name: "Founder", password: "correct horse battery staple" })
     .expect(201);
-  await settleWelcomeEmail(email);
   return { token: res.body.data.accessToken as string };
 }
 
