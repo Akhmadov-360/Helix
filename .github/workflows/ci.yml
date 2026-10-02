@@ -54,8 +54,8 @@ jobs:
 
       - name: Start test infrastructure
         run: |
-          docker compose -f docker-compose.dev.yml up -d --wait helix-test-db redis mailhog minio
-          docker compose -f docker-compose.dev.yml run --rm minio-init
+          docker compose -f docker-compose.dev.yml up -d --wait helix-test-db redis mailhog s3
+          docker compose -f docker-compose.dev.yml run --rm s3-init
 
       - name: Build workspace dependencies of the API
         run: pnpm turbo run build --filter="@helix/api^..."
