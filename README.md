@@ -14,7 +14,7 @@
 - Zod — единственный источник контрактов API (`packages/api-schemas`), без class-validator/DTO-классов
 - CASL — policy-guards для авторизации на каждом эндпоинте
 - Redis + BullMQ — асинхронные очереди (email, RAG-индексация, maintenance-джобы)
-- AWS S3 / MinIO — хранилище файлов через presigned URL
+- AWS S3 / RustFS (локально) — хранилище файлов через presigned URL
 
 **Frontend** (`apps/web`, с M1)
 - Vite + React
@@ -63,7 +63,7 @@ docs/
 ## Как поднять локально
 
 ```bash
-docker compose -f docker-compose.dev.yml up -d   # postgres (+pgvector) · redis · minio
+docker compose -f docker-compose.dev.yml up -d   # postgres (+pgvector) · redis · s3 (RustFS)
 pnpm install
 pnpm --filter @helix/db exec prisma migrate dev  # применить миграции
 pnpm --filter @helix/db exec prisma generate      # сгенерировать Prisma Client
@@ -76,7 +76,7 @@ pnpm dev                                          # все dev-серверы (t
 | Web | `5173` |
 | Postgres (dev) | `5433` |
 | Redis | `6379` |
-| MinIO | `9000` / `9001` |
+| S3 (RustFS) | `9000` / `9001` |
 | Postgres (тесты) | `5434` |
 | Prisma Studio | `5555` |
 
@@ -105,7 +105,7 @@ pnpm dev                                          # все dev-серверы (t
 | `pnpm dev` | Все dev-серверы параллельно |
 | `pnpm db:migrate` | Создать и применить Prisma-миграцию |
 | `pnpm db:seed` | Наполнить БД демо-данными |
-| `pnpm infra:up` / `pnpm infra:down` | Поднять/остановить Postgres, Redis, MinIO в Docker |
+| `pnpm infra:up` / `pnpm infra:down` | Поднять/остановить Postgres, Redis, S3 (RustFS), MailHog в Docker |
 
 Перед коммитом: `pnpm typecheck && pnpm lint && pnpm test && pnpm build`.
 

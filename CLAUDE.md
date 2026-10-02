@@ -38,7 +38,7 @@ Helix — AI-native project-based CRM: **каждый лид = проект-во
 - **Backend (apps/api):** NestJS + TypeScript **strict**
 - **DB/ORM:** Prisma + PostgreSQL 17 + pgvector
 - **Валидация/контракты:** **Zod** (`packages/api-schemas`) — НЕ class-validator (см. Конвенции)
-- **Authz:** CASL (policy guards) · **Async:** Redis + BullMQ · **Files:** S3 SDK (AWS S3 / MinIO)
+- **Authz:** CASL (policy guards) · **Async:** Redis + BullMQ · **Files:** S3 SDK (AWS S3 / RustFS локально)
 - **Mail:** `MAIL_PROVIDER` = `smtp` (MailHog в dev) · `ses` · `resend` (HTTP API, прод-путь)
 - **AI:** `packages/ai` — провайдеры Anthropic / OpenAI / Gemini, выбор per-org; Bedrock ещё не реализован
 - **Frontend (apps/web):** Vite + React, **TanStack Router** (ADR-FE-1 — отклонение от PRD-пина React
@@ -231,7 +231,7 @@ AuditLog, RLS, CI, AWS IaC, pino/Sentry/tracing/метрики, Secrets Manager)
 ## Development (как поднять)
 
 ```bash
-docker compose -f docker-compose.dev.yml up -d   # postgres(+pgvector) · redis · minio · mailhog
+docker compose -f docker-compose.dev.yml up -d   # postgres(+pgvector) · redis · s3 (RustFS) · mailhog
 pnpm install
 pnpm --filter @helix/db exec prisma migrate dev  # применить миграции
 pnpm --filter @helix/db exec prisma generate      # сгенерить client
@@ -240,7 +240,7 @@ pnpm build                                        # сборка
 ```
 
 Порты: api `3000` · web `5173` · **postgres `5433`** (не 5432 — избегаем конфликта с системным PG) ·
-redis `6379` · minio `9000/9001` · mailhog `1025/8025` · тестовая БД `5434` · prisma studio `5555`.
+redis `6379` · s3 `9000/9001` · mailhog `1025/8025` · тестовая БД `5434` · prisma studio `5555`.
 Env: `apps/api/.env` (DATABASE_URL, REDIS_URL, JWT-секреты, S3, mail) — валидируется через
 `packages/config` на старте; шаблон — `apps/api/.env.example`.
 
@@ -278,7 +278,7 @@ Env: `apps/api/.env` (DATABASE_URL, REDIS_URL, JWT-секреты, S3, mail) —
 
 | Команда | Что / когда |
 | --- | --- |
-| `pnpm infra:up` / `pnpm infra:down` | Поднять/остановить postgres(5433)+redis+minio+mailhog. `down` сохраняет тома. |
+| `pnpm infra:up` / `pnpm infra:down` | Поднять/остановить postgres(5433)+redis+s3+mailhog. `down` сохраняет тома. |
 | `docker compose -f docker-compose.dev.yml up -d helix-test-db` | Только тестовая БД (5434, эфемерная, tmpfs). |
 | `docker compose -f docker-compose.dev.yml ps` | Статус + health. |
 | `docker compose -f docker-compose.dev.yml down -v` | Снести **с томами** (чистый старт, стирает данные). |
@@ -340,7 +340,13 @@ Env: `apps/api/.env` (DATABASE_URL, REDIS_URL, JWT-секреты, S3, mail) —
    `MAIL_FROM` обязан быть на подтверждённом домене, sandbox-адрес шлёт только владельцу аккаунта.
 9. **CORS:** `credentials: include` требует точного origin (не wildcard) — `WEB_ORIGIN` на API должен
    совпадать с доменом Vercel.
-10. **Supabase:** маленький Disk IO budget на низких тарифах — письмо-предупреждение может приходить от
+10. **Docker-образы фиксируем по версии, не `latest`.** MinIO убрал публичные образы (Docker Hub, Quay) —
+    локально S3 обслуживает RustFS (`s3`/`s3-init` в compose). Кэш Docker скрывает такие потери: проверять
+    `docker compose up` на чистой машине, т.е. в CI.
+11. **Turbo-задача, которой нужен сгенерированный артефакт, обязана явно зависеть от задачи, которая его
+    создаёт** (`packages/db/turbo.json`: `typecheck` ждёт `build`, где `prisma generate`). Локально клиент
+    уже лежит в `node_modules`, и гонка не видна; воспроизводится только в чистом клоне.
+12. **Supabase:** маленький Disk IO budget на низких тарифах — письмо-предупреждение может приходить от
     штатных бэкапов и интроспекции, не от кода приложения (проверять `pg_stat_statements`).
 
 ## TS / код-конвенции

@@ -1,5 +1,6 @@
-import { afterAll, beforeEach } from "vitest";
+import { afterAll, beforeAll, beforeEach } from "vitest";
 import { prisma } from "@helix/db";
+import { clearTestQueues } from "./helpers/queues";
 
 /**
  * Изоляция между тестами — TRUNCATE, а НЕ транзакция с откатом.
@@ -14,6 +15,10 @@ import { prisma } from "@helix/db";
  * каждую новую модель. `_prisma_migrations` исключаем: снесём её — потеряем
  * применённые миграции, и следующий тест побежит по пустой схеме.
  */
+beforeAll(async () => {
+  await clearTestQueues(process.env.REDIS_URL);
+});
+
 beforeEach(async () => {
   const tables = await prisma.$queryRaw<Array<{ tablename: string }>>`
     SELECT tablename FROM pg_tables

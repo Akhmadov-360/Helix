@@ -2,27 +2,9 @@ import type { INestApplication } from "@nestjs/common";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 import { createTestApp } from "../helpers/create-test-app";
+import { clearMailhog, waitForMailhogMessage } from "../helpers/mailhog";
 
 let counter = 0;
-
-async function clearMailhog(): Promise<void> {
-  await fetch("http://localhost:8025/api/v1/messages", { method: "DELETE" });
-}
-
-interface MailhogMessage {
-  Content: { Headers: Record<string, string[]>; Body: string };
-}
-
-async function waitForMailhogMessage(timeoutMs = 5000): Promise<MailhogMessage> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    const res = await fetch("http://localhost:8025/api/v2/messages");
-    const body = (await res.json()) as { items: MailhogMessage[] };
-    if (body.items.length > 0) return body.items[0]!;
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  throw new Error("Timed out waiting for MailHog message");
-}
 
 function extractToken(body: string): string {
   // MailHog кодирует тело письма в quoted-printable — "=3D" это "=".
@@ -60,7 +42,7 @@ describe("POST /v1/auth/forgot-password + /v1/auth/reset-password (end-to-end)",
       .send({ email })
       .expect(200);
 
-    const msg = await waitForMailhogMessage();
+    const msg = await waitForMailhogMessage({ to: email });
     const token = extractToken(msg.Content.Body);
 
     await request(app.getHttpServer())
@@ -96,7 +78,7 @@ describe("POST /v1/auth/forgot-password + /v1/auth/reset-password (end-to-end)",
     if (!refreshCookie) throw new Error("register did not set a refresh cookie");
 
     await request(app.getHttpServer()).post("/v1/auth/forgot-password").send({ email }).expect(200);
-    const msg = await waitForMailhogMessage();
+    const msg = await waitForMailhogMessage({ to: email });
     const token = extractToken(msg.Content.Body);
 
     await request(app.getHttpServer())

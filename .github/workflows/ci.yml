@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Lint, typecheck, unit tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm turbo run lint typecheck build
+
+      - run: pnpm --filter @helix/api test:unit
+
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Start test infrastructure
+        run: |
+          docker compose -f docker-compose.dev.yml up -d --wait helix-test-db redis mailhog s3
+          docker compose -f docker-compose.dev.yml run --rm s3-init
+
+      - name: Build workspace dependencies of the API
+        run: pnpm turbo run build --filter="@helix/api^..."
+
+      - run: pnpm --filter @helix/api test:integration
+
+      - name: Infrastructure logs
+        if: failure()
+        run: docker compose -f docker-compose.dev.yml logs --no-color --tail=100
