@@ -6,13 +6,13 @@ import { clearMailhog, waitForMailhogMessage } from "../helpers/mailhog";
 
 let counter = 0;
 
-async function signUp(app: INestApplication): Promise<{ token: string }> {
+async function signUp(app: INestApplication): Promise<{ token: string; email: string }> {
   const email = `trigger${counter++}@example.com`;
   const res = await request(app.getHttpServer())
     .post("/v1/auth/register")
     .send({ email, name: "Founder", password: "correct horse battery staple" })
     .expect(201);
-  return { token: res.body.data.accessToken as string };
+  return { token: res.body.data.accessToken as string, email };
 }
 
 // Полный путь end-to-end (notifications.md §1): POST создаёт лид → ProjectsService.create()
@@ -34,7 +34,7 @@ describe("POST /v1/workspaces/:id/projects → lead.created email (end-to-end)",
   });
 
   it("новый лид без явного owner → письмо доходит создателю (дефолт-владельцу)", async () => {
-    const { token } = await signUp(app);
+    const { token, email } = await signUp(app);
     const board = await request(app.getHttpServer())
       .post("/v1/workspaces")
       .set("Authorization", `Bearer ${token}`)
@@ -47,7 +47,7 @@ describe("POST /v1/workspaces/:id/projects → lead.created email (end-to-end)",
       .send({ title: "Acme Corp deal" })
       .expect(201);
 
-    const msg = await waitForMailhogMessage();
+    const msg = await waitForMailhogMessage({ to: email, subject: "Acme Corp deal" });
     expect(msg.Content.Headers["Subject"]?.[0]).toContain("Acme Corp deal");
     expect(msg.Content.Body).toContain("/contacts");
   });

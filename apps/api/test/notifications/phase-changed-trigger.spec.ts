@@ -55,24 +55,18 @@ describe("POST /v1/projects/:id/move → project.phase_changed email (end-to-end
       .set("Authorization", `Bearer ${token}`)
       .send({ title: "Acme Corp deal" })
       .expect(201);
-    await waitForMailhogMessage(); // lead.created
-    await clearMailhog();
-
     await request(app.getHttpServer())
       .post(`/v1/projects/${project.body.data.id}/assignees`)
       .set("Authorization", `Bearer ${token}`)
       .send({ userId: co.id })
       .expect(201);
-    await waitForMailhogMessage(); // project.assigned
-    await clearMailhog(); // теперь интересует только won-письмо
-
     await request(app.getHttpServer())
       .post(`/v1/projects/${project.body.data.id}/move`)
       .set("Authorization", `Bearer ${token}`)
       .send({ toPhaseId: wonPhaseId })
       .expect(200);
 
-    const msg = await waitForMailhogMessage();
+    const msg = await waitForMailhogMessage({ to: co.email, subject: "Won" });
     expect(msg.To).toHaveLength(1); // owner === actor исключён, остаётся только assignee
     expect(msg.To[0]?.Mailbox).toBe(co.email.split("@")[0]);
     expect(msg.Content.Headers["Subject"]?.[0]).toContain("Won");
@@ -101,24 +95,18 @@ describe("POST /v1/projects/:id/move → project.phase_changed email (end-to-end
       .set("Authorization", `Bearer ${token}`)
       .send({ title: "Beta Inc deal" })
       .expect(201);
-    await waitForMailhogMessage(); // lead.created
-    await clearMailhog();
-
     await request(app.getHttpServer())
       .post(`/v1/projects/${project.body.data.id}/assignees`)
       .set("Authorization", `Bearer ${token}`)
       .send({ userId: co.id })
       .expect(201);
-    await waitForMailhogMessage(); // project.assigned
-    await clearMailhog();
-
     await request(app.getHttpServer())
       .post(`/v1/projects/${project.body.data.id}/move`)
       .set("Authorization", `Bearer ${token}`)
       .send({ toPhaseId: toPhase!.id })
       .expect(200);
 
-    const msg = await waitForMailhogMessage();
+    const msg = await waitForMailhogMessage({ to: co.email, subject: "Phase changed" });
     expect(msg.Content.Headers["Subject"]?.[0]).toContain("Phase changed");
     expect(msg.Content.Body).toContain(fromPhase!.name.en ?? "");
     expect(msg.Content.Body).toContain(toPhase!.name.en ?? "");
