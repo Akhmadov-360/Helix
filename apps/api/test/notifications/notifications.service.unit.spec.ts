@@ -1,7 +1,16 @@
+import { Logger } from "@nestjs/common";
 import type { Queue } from "bullmq";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LEAD_CREATED_JOB } from "../../src/modules/notifications/lead-created-job";
 import { NotificationsService, type EmailJobData } from "../../src/modules/notifications/notifications.service";
+
+beforeEach(() => {
+  vi.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 // §2 P4-порядок: enqueue вызывается ПОСЛЕ коммита мутации — падение здесь не должно
 // откатывать/проваливать создание лида. Проверяем контракт напрямую: сбой Queue.add
@@ -20,11 +29,13 @@ describe("NotificationsService.enqueueLeadCreated", () => {
     );
   });
 
-  it("queue.add бросает → enqueueLeadCreated не пробрасывает исключение", async () => {
+  it("queue.add бросает → enqueueLeadCreated не пробрасывает исключение, но логирует сбой", async () => {
     const add = vi.fn().mockRejectedValue(new Error("redis down"));
     const service = new NotificationsService({ add } as unknown as Queue<EmailJobData>);
 
     await expect(service.enqueueLeadCreated({ orgId: "org-1", projectId: "proj-1" })).resolves.toBeUndefined();
+
+    expect(Logger.prototype.error).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -29,4 +29,5 @@ export default function setup(): void {
     ["--filter", "@helix/db", "exec", "prisma", "migrate", "deploy"],
     { env: { ...process.env, DATABASE_URL: databaseUrl }, stdio: "inherit", shell: true },
   );
+
 }

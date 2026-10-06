@@ -65,40 +65,46 @@ services:
       - "1025:1025" # SMTP
       - "8025:8025" # Web UI
 
-  minio:
-    image: minio/minio:latest
+  # S3-совместимое хранилище. MinIO убрал публичные образы (Docker Hub, Quay), поэтому RustFS:
+  # те же порты и тот же S3 API, клиент (@aws-sdk/client-s3) не меняется. Версия зафиксирована.
+  s3:
+    image: rustfs/rustfs:1.0.0
     restart: unless-stopped
-    command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: helix
-      MINIO_ROOT_PASSWORD: helixsecret
+      RUSTFS_ACCESS_KEY: helix
+      RUSTFS_SECRET_KEY: helixsecret
     ports:
       - "9000:9000" # S3 API
       - "9001:9001" # web console
     volumes:
-      - miniodata:/data
+      - s3data:/data
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/health"]
       interval: 5s
       timeout: 5s
       retries: 10
 
-  # One-shot: ждёт MinIO и создаёт бакеты helix-uploads (dev) и helix-test (тесты, docs/specs/
-  # files.md §14 — тот же MinIO-контейнер, отдельный неймспейс, не отдельный сервис). Выходит по завершении.
-  minio-init:
-    image: minio/mc:latest
+  # One-shot: ждёт S3 и создаёт бакеты helix-uploads (dev) и helix-test (тесты, docs/specs/
+  # files.md §14 — тот же контейнер, отдельный неймспейс, не отдельный сервис). Идемпотентен.
+  s3-init:
+    image: amazon/aws-cli:2.37.7
     depends_on:
-      minio:
+      s3:
         condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID: helix
+      AWS_SECRET_ACCESS_KEY: helixsecret
+      AWS_DEFAULT_REGION: us-east-1
     entrypoint: >
       /bin/sh -c "
-      mc alias set local http://minio:9000 helix helixsecret &&
-      mc mb --ignore-existing local/helix-uploads &&
-      mc mb --ignore-existing local/helix-test &&
-      echo 'buckets helix-uploads, helix-test ready';
+      for bucket in helix-uploads helix-test; do
+      aws --endpoint-url http://s3:9000 s3api head-bucket --bucket $$bucket 2>/dev/null ||
+      aws --endpoint-url http://s3:9000 s3 mb s3://$$bucket;
+      done &&
+      echo 'buckets helix-uploads, helix-test ready'
       "
 
 volumes:
   pgdata:
   redisdata:
-  miniodata:
+  s3data:

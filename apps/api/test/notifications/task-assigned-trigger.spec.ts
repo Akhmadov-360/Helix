@@ -3,6 +3,7 @@ import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "@helix/db";
 import { createTestApp } from "../helpers/create-test-app";
+import { clearMailhog, waitForMailhogMessage, countMailhogMessages } from "../helpers/mailhog";
 
 let counter = 0;
 
@@ -15,32 +16,6 @@ async function signUp(app: INestApplication): Promise<{ token: string; orgId: st
   const token = res.body.data.accessToken as string;
   const claims = JSON.parse(Buffer.from(token.split(".")[1] ?? "", "base64url").toString());
   return { token, orgId: claims.activeOrgId, userId: claims.sub };
-}
-
-async function clearMailhog(): Promise<void> {
-  await fetch("http://localhost:8025/api/v1/messages", { method: "DELETE" });
-}
-
-interface MailhogMessage {
-  To: { Mailbox: string; Domain: string }[];
-  Content: { Headers: Record<string, string[]>; Body: string };
-}
-
-async function waitForMailhogMessage(timeoutMs = 5000): Promise<MailhogMessage> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    const res = await fetch("http://localhost:8025/api/v2/messages");
-    const body = (await res.json()) as { items: MailhogMessage[] };
-    if (body.items.length > 0) return body.items[0]!;
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  throw new Error("Timed out waiting for MailHog message");
-}
-
-async function countMailhogMessages(): Promise<number> {
-  const res = await fetch("http://localhost:8025/api/v2/messages");
-  const body = (await res.json()) as { total: number };
-  return body.total;
 }
 
 // End-to-end: TasksService.create/update с assigneeId ≠ actorId → NotificationsService.enqueueTaskAssigned
