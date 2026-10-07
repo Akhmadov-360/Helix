@@ -1,0 +1,31 @@
+name: Keep alive
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    name: Ping API and database
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      HEALTH_URL: ${{ vars.API_HEALTH_URL || 'https://helix-api-ms28.onrender.com/health' }}
+
+    steps:
+      - name: Call /health (runs SELECT 1 against the database)
+        run: |
+          body=""
+          for attempt in 1 2 3 4; do
+            if body=$(curl -fsS --max-time 90 "${HEALTH_URL}"); then
+              break
+            fi
+            echo "attempt ${attempt} failed"
+            body=""
+            sleep 15
+          done
+          echo "response: ${body}"
+          echo "${body}" | grep -q '"db":"up"'
