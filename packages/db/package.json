@@ -23,7 +23,9 @@
     "build": "prisma generate && tsc -p tsconfig.build.json",
     "dev": "tsc -p tsconfig.build.json --watch",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "vitest run",
+    "check-migrations": "tsx scripts/migration-guard/cli.ts"
   },
   "prisma": {
     "schema": "prisma/schema.prisma",
@@ -41,6 +43,7 @@
     "eslint": "^9.39.0",
     "prisma": "^6.16.2",
     "tsx": "^4.19.2",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
   }
 }
