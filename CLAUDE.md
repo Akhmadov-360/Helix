@@ -150,6 +150,11 @@ manual-migration-инварианты (ниже) обязательны — па
    `Unsupported("vector(1536)")`, Prisma не выражает ни extension, ни vector-индексы — raw SQL. Размерность
    фиксирована: смена embedding-модели на другую размерность = миграция колонки.
 
+**Migration guard** (`packages/db/scripts/migration-guard`, workflow `migration-guard.yml`) на каждом PR: правка/удаление
+уже применённой `migration.sql` и `DROP INDEX "phase_ws_order_unique"` — жёсткая ошибка; `DROP TABLE/COLUMN/TYPE`, смена типа,
+`RENAME`, `TRUNCATE`, `DELETE FROM` — красный CI, пока на PR нет метки `migration-reviewed` (план бэкфилла описан в PR).
+Локально: `pnpm --filter @helix/db check-migrations --base origin/main`; правила покрыты тестами (`pnpm --filter @helix/db test`).
+
 > Каждый `migrate dev` попутно генерит `DROP INDEX "phase_ws_order_unique"` (#1) — **вырезать вручную**
 > из миграции перед применением (см. decisions.md, gotcha #4). Если `migrate dev --create-only` упирается
 > в drift — писать `migration.sql` вручную, применять `prisma db execute --file`, затем
@@ -292,6 +297,8 @@ Env: `apps/api/.env` (DATABASE_URL, REDIS_URL, JWT-секреты, S3, mail) —
 | `pnpm --filter @helix/db exec prisma migrate status` | «БД в актуальном состоянии?». |
 | `pnpm --filter @helix/db migrate:deploy` | Только применить существующие (прод/CI, не создаёт новых). |
 | `pnpm --filter @helix/db studio` | GUI на данные (5555). |
+| `pnpm --filter @helix/db check-migrations --base origin/main` | Проверить миграции текущей ветки так же, как CI. |
+| `pnpm --filter @helix/db test` | Unit-тесты правил migration guard (без БД). |
 | `... prisma migrate dev --create-only --name X` | Пустая миграция под **manual-migration point** (raw SQL заполняем руками; НЕ давать prisma переген). |
 
 **apps/api (Nest):**

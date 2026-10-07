@@ -1,0 +1,53 @@
+name: Migration guard
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+    branches: [main]
+
+concurrency:
+  group: migration-guard-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  migration-guard:
+    name: Migration guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BASE_REF: ${{ github.base_ref }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect migration changes
+        id: touched
+        run: |
+          if git diff --quiet "origin/${BASE_REF}...HEAD" -- packages/db/prisma/migrations; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.touched.outputs.changed == 'true'
+        uses: pnpm/action-setup@v4
+
+      - if: steps.touched.outputs.changed == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - if: steps.touched.outputs.changed == 'true'
+        run: pnpm install --frozen-lockfile --filter "@helix/db..."
+
+      - name: Check migrations
+        if: steps.touched.outputs.changed == 'true'
+        env:
+          MIGRATION_APPROVED: ${{ contains(github.event.pull_request.labels.*.name, 'migration-reviewed') }}
+        run: pnpm --filter @helix/db check-migrations --base "origin/${BASE_REF}"

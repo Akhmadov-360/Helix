@@ -35,6 +35,8 @@ jobs:
 
       - run: pnpm --filter @helix/api test:unit
 
+      - run: pnpm --filter @helix/db test
+
   integration:
     name: Integration tests
     runs-on: ubuntu-latest
