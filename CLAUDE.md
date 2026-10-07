@@ -160,20 +160,24 @@ manual-migration-инварианты (ниже) обязательны — па
 > в drift — писать `migration.sql` вручную, применять `prisma db execute --file`, затем
 > `prisma migrate resolve --applied`.
 
-## Известные пробелы (бэклог на 2026-09-30 — перед задачей сверяй с кодом)
+## Известные пробелы (бэклог на 2026-10-07 — перед задачей сверяй с кодом)
 
-Сначала то, решение чего известно:
+Сделано и не относится к бэклогу: строгий grounding-промпт и лимит токенов на промпт (`system-prompt.ts`,
+`prompt-budget.ts`), CI (`ci.yml`), migration guard, защита `main`, разделение unit/integration тестов.
 
-- Resend: подтвердить свой домен и сменить `MAIL_FROM` (sandbox-адрес `onboarding@resend.dev` доставляет
-  только владельцу аккаунта — инвайты и уведомления другим людям не уходят).
-- RAG: строгий guardrail в system prompt (`ai-threads.service.ts`), лимит токенов на итоговый `messages[]`
-  (сейчас `HISTORY_MESSAGE_LIMIT` считает сообщения), гибридный retrieval (GIN `to_tsvector` на
-  `EmbeddingChunk.content` + RRF, `hnsw.ef_search`).
+Осознанно не делаем сейчас: свой домен в Resend и смена `MAIL_FROM` (реальных пользователей нет, домен платный;
+пока sandbox-адрес доставляет только владельцу аккаунта — инвайты и уведомления другим людям не уходят; вернуться
+перед первым внешним пользователем).
+
+Известно, как делать:
+
+- RAG: гибридный retrieval (GIN `to_tsvector` на `EmbeddingChunk.content` + RRF, `hnsw.ef_search`).
 - 30 внешних ключей без индексов (Supabase performance advisor), в основном составные `[xId, orgId]`.
 - Очереди: `drainDelay` 300, `stalledInterval`, `delayed:false`; миграция на pg-boss — только после
   пересмотра (Supabase Disk IO budget маленький).
 - `DELETE /organizations/:id` и удаление аккаунта (каскады в схеме готовы).
 - Сворачиваемый сайдбар; превью блюпринтов (thumbnail); Dockerfile для web + полный compose.
+- Тесты: оставшиеся e2e с «подожди и очисти» вне блока notifications (если появится нестабильность).
 
 Требуют дизайн-прохода (ADR): FR-WS-5/6 (автоматизации фаз, WIP-лимиты), export data / GDPR, вложения в
 KB и импорт файлов в Pages (общий корень — `Attachment.projectId`), FR-NOTIF-4 и due-date уведомления,
@@ -182,7 +186,7 @@ telemetry, антивирусный скан файлов, сквозной по
 
 Целиком не начато: M5 (API-ключи, `POST /v1/public/leads`, вебхуки с HMAC/retries/delivery log, rate
 limiting, idempotency keys) и M6 (visibility=ASSIGNED, кастомные роли, `WorkspaceMember`-оверрайды, полный
-AuditLog, RLS, CI, AWS IaC, pino/Sentry/tracing/метрики, Secrets Manager).
+AuditLog, RLS, AWS IaC, pino/Sentry/tracing/метрики, Secrets Manager).
 
 ## Скиллы и инструменты (что и когда применять)
 
@@ -355,6 +359,10 @@ Env: `apps/api/.env` (DATABASE_URL, REDIS_URL, JWT-секреты, S3, mail) —
     уже лежит в `node_modules`, и гонка не видна; воспроизводится только в чистом клоне.
 12. **Supabase:** маленький Disk IO budget на низких тарифах — письмо-предупреждение может приходить от
     штатных бэкапов и интроспекции, не от кода приложения (проверять `pg_stat_statements`).
+13. **Бесплатный Supabase засыпает после недели без активности** (пулер отвечает `tenant/user … not found`, деплой
+    Render падает на `prisma migrate deploy`). Лечится восстановлением проекта; профилактика — `keep-alive.yml`
+    (раз в сутки зовёт `/health`, он делает `SELECT 1`). Красный запуск workflow = API или БД недоступны.
+    Уже уснувший проект ping не разбудит. Scheduled workflows GitHub отключает после 60 дней без активности в репозитории.
 
 ## TS / код-конвенции
 
