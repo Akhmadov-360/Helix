@@ -54,17 +54,13 @@ describe("Task assignment → task.assigned email (end-to-end)", () => {
         .expect(201)
     ).body.data;
 
-    // Дождаться и убрать lead.created (project.created) письмо перед проверкой task.assigned
-    await waitForMailhogMessage();
-    await clearMailhog();
-
     await request(app.getHttpServer())
       .post(`/v1/projects/${project.id}/tasks`)
       .set("Authorization", `Bearer ${token}`)
       .send({ title: "Call the CTO", dueAt: "2026-09-20T12:00:00.000Z", assigneeId: co.id })
       .expect(201);
 
-    const msg = await waitForMailhogMessage();
+    const msg = await waitForMailhogMessage({ to: co.email });
     expect(msg.To[0]?.Mailbox).toBe(co.email.split("@")[0]);
     expect(msg.Content.Headers["Subject"]?.[0]).toContain("Call the CTO");
     // deep-link ведёт на Tasks-таб этого проекта
@@ -76,7 +72,11 @@ describe("Task assignment → task.assigned email (end-to-end)", () => {
   });
 
   it("self-assign (assigneeId === actorId) → письма НЕТ", async () => {
-    const { token, userId } = await signUp(app);
+    const { token, orgId, userId } = await signUp(app);
+    const sentinel = await prisma.user.create({
+      data: { email: `sentinel${counter++}@example.com`, name: "Sentinel", passwordHash: "x" },
+    });
+    await prisma.membership.create({ data: { orgId, userId: sentinel.id, role: "MEMBER" } });
     const ws = (
       await request(app.getHttpServer()).post("/v1/workspaces").set("Authorization", `Bearer ${token}`).send({ name: "B" }).expect(201)
     ).body.data;
@@ -88,19 +88,20 @@ describe("Task assignment → task.assigned email (end-to-end)", () => {
         .expect(201)
     ).body.data;
 
-    await waitForMailhogMessage(); // lead.created
-    await clearMailhog();
-
     await request(app.getHttpServer())
       .post(`/v1/projects/${project.id}/tasks`)
       .set("Authorization", `Bearer ${token}`)
       .send({ title: "My own task", assigneeId: userId })
       .expect(201);
+    await request(app.getHttpServer())
+      .post(`/v1/projects/${project.id}/tasks`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ title: "Sentinel task", assigneeId: sentinel.id })
+      .expect(201);
 
-    // Даём воркеру шанс обработать: если бы job был enqueued, за 1сек он бы уже отправил (mailhog inbox быстрый).
-    // Явное ожидание = window наблюдения: за это время НЕ должно появиться сообщений.
-    await new Promise((r) => setTimeout(r, 1000));
-    expect(await countMailhogMessages()).toBe(0);
+    await waitForMailhogMessage({ to: sentinel.email });
+
+    expect(await countMailhogMessages({ subject: "My own task" })).toBe(0);
   });
 
   it("PATCH: смена assignee с одного на другого → письмо новому", async () => {
@@ -125,12 +126,6 @@ describe("Task assignment → task.assigned email (end-to-end)", () => {
         .expect(201)
     ).body.data;
 
-    // Создание с assignee=Alice: письмо ей + lead.created — оба уйдут; ждём одно
-    await waitForMailhogMessage();
-    // Пропускаем оба (простой способ — ждём чуть больше и чистим)
-    await new Promise((r) => setTimeout(r, 500));
-    await clearMailhog();
-
     const task = (
       await request(app.getHttpServer())
         .post(`/v1/projects/${project.id}/tasks`)
@@ -139,9 +134,6 @@ describe("Task assignment → task.assigned email (end-to-end)", () => {
         .expect(201)
     ).body.data;
 
-    await new Promise((r) => setTimeout(r, 500));
-    await clearMailhog();
-
     // Переназначение на Bob
     await request(app.getHttpServer())
       .patch(`/v1/tasks/${task.id}`)
@@ -149,7 +141,7 @@ describe("Task assignment → task.assigned email (end-to-end)", () => {
       .send({ assigneeId: b.id })
       .expect(200);
 
-    const msg = await waitForMailhogMessage();
+    const msg = await waitForMailhogMessage({ to: b.email });
     expect(msg.To[0]?.Mailbox).toBe(b.email.split("@")[0]);
     expect(msg.Content.Headers["Subject"]?.[0]).toContain("Follow up");
   });

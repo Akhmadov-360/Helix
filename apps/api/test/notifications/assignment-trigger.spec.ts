@@ -53,16 +53,13 @@ describe("POST /v1/projects/:id/assignees → project.assigned email (end-to-end
       .send({ title: "Acme Corp deal" })
       .expect(201);
 
-    await waitForMailhogMessage(); // дожидаемся lead.created, отправленного созданием проекта, прежде чем чистить
-    await clearMailhog(); // теперь интересует только письмо о назначении
-
     await request(app.getHttpServer())
       .post(`/v1/projects/${project.body.data.id}/assignees`)
       .set("Authorization", `Bearer ${token}`)
       .send({ userId: co.id })
       .expect(201);
 
-    const msg = await waitForMailhogMessage();
+    const msg = await waitForMailhogMessage({ to: co.email });
     expect(msg.To[0]?.Mailbox).toBe(co.email.split("@")[0]);
     expect(msg.Content.Headers["Subject"]?.[0]).toContain("Acme Corp deal");
     expect(msg.Content.Body).toContain("/tasks");
