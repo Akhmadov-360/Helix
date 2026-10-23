@@ -147,6 +147,7 @@ model Membership {
   user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([orgId, userId])
+  @@index([userId])
 }
 
 // Приглашение по email (docs/specs/invites.md). НЕ Membership.pending (§12 спеки): Membership
@@ -197,6 +198,7 @@ model Workspace {
   // Открывает composite-FK для детей: гарантирует, что child.orgId == workspace.orgId
   // на уровне БД (тенант-инвариант, не надежда на сервис).
   @@unique([id, orgId])
+  @@index([orgId])
 }
 
 model WorkspaceMember {
@@ -210,6 +212,7 @@ model WorkspaceMember {
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([workspaceId, userId])
+  @@index([userId])
 }
 
 model Phase {
@@ -324,6 +327,7 @@ model ProjectAssignee {
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([projectId, userId])
+  @@index([userId])
 }
 
 // ──────────────────────────── CONTACT / COMPANY ────────────────────────────
@@ -432,6 +436,7 @@ model Task {
   assignee User?   @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
 
   @@index([projectId, done]) // список тасков сделки, разделение done/open
+  @@index([orgId])
 }
 
 // ──────────────────────────── ACTIVITY EVENT ───────────────────────────────
@@ -471,6 +476,7 @@ model Blueprint {
   createdAt  DateTime @default(now())
 
   org Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  @@index([orgId])
 }
 
 // ──────────────────────────── REFRESH SESSION (AUTH, M0) ───────────────────
@@ -550,6 +556,7 @@ model Attachment {
   uploadedBy User?        @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
 
   @@index([projectId])
+  @@index([orgId])
 }
 
 enum AttachmentScanStatus {
@@ -581,6 +588,7 @@ model Page {
   versions PageVersion[]
 
   @@index([projectId])
+  @@index([orgId])
 }
 
 model PageComment {
