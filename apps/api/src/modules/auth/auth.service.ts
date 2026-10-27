@@ -138,10 +138,14 @@ export class AuthService {
       throw new InvalidRefreshTokenError();
     }
 
-    // Возвращаемся в ту оргу, где юзер работал в прошлый раз (§9.1). Fallback на
-    // личную оргу — на случай строк, созданных до появления lastActiveOrgId.
+    // Возвращаемся в ту оргу, где юзер работал в прошлый раз (§9.1), если членство в ней живо:
+    // оргу могли удалить, юзера исключить. Иначе — любая оставшаяся (она же fallback для строк,
+    // созданных до появления lastActiveOrgId).
+    const remembered = rotated.lastActiveOrgId;
     const orgId =
-      rotated.lastActiveOrgId ?? (await this.organizations.findDefaultOrgIdForUser(user.id));
+      remembered && (await this.organizations.findMembershipRole(user.id, remembered))
+        ? remembered
+        : await this.organizations.findDefaultOrgIdForUser(user.id);
     if (!orgId) {
       throw new Error(`User ${user.id} has no membership; cannot resolve activeOrgId`);
     }

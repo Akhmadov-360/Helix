@@ -84,6 +84,49 @@ describe("POST /v1/auth/refresh", () => {
     expect(orgIdFrom(res.body.data.accessToken)).toBe(orgIdFrom(accessToken));
   });
 
+  describe("активная организация, где членства больше нет", () => {
+    const signUpInSecondOrg = async () => {
+      const { cookie, accessToken } = await signUp();
+      const personalOrgId = orgIdFrom(accessToken);
+      const user = await prisma.user.findUniqueOrThrow({ where: { email: REGISTRATION.email } });
+      const secondOrg = await prisma.organization.create({ data: { name: "Second Org" } });
+      await prisma.membership.create({ data: { orgId: secondOrg.id, userId: user.id, role: "MEMBER" } });
+
+      await request(app.getHttpServer())
+        .post("/v1/auth/switch-org")
+        .set("Authorization", `Bearer ${accessToken}`)
+        .set("Cookie", cookie)
+        .send({ orgId: secondOrg.id })
+        .expect(200);
+
+      const beforeLoss = await request(app.getHttpServer()).post("/v1/auth/refresh").set("Cookie", cookie).expect(200);
+      expect(orgIdFrom(beforeLoss.body.data.accessToken)).toBe(secondOrg.id);
+
+      return { cookie: refreshCookieFrom(beforeLoss), personalOrgId, secondOrgId: secondOrg.id, userId: user.id };
+    };
+
+    it("после потери членства refresh возвращает токен на другую организацию пользователя", async () => {
+      const { cookie, personalOrgId, secondOrgId, userId } = await signUpInSecondOrg();
+      await prisma.membership.delete({ where: { orgId_userId: { orgId: secondOrgId, userId } } });
+
+      const res = await request(app.getHttpServer()).post("/v1/auth/refresh").set("Cookie", cookie).expect(200);
+
+      expect(orgIdFrom(res.body.data.accessToken)).toBe(personalOrgId);
+    });
+
+    it("выданный после потери членства токен проходит защищённую ручку, а не отдаёт 403", async () => {
+      const { cookie, secondOrgId, userId } = await signUpInSecondOrg();
+      await prisma.membership.delete({ where: { orgId_userId: { orgId: secondOrgId, userId } } });
+
+      const res = await request(app.getHttpServer()).post("/v1/auth/refresh").set("Cookie", cookie).expect(200);
+
+      await request(app.getHttpServer())
+        .get("/v1/auth/me")
+        .set("Authorization", `Bearer ${res.body.data.accessToken as string}`)
+        .expect(200);
+    });
+  });
+
   it("отдаёт свежий профиль из БД, а не из старого токена", async () => {
     const { cookie } = await signUp();
 
