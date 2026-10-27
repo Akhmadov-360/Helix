@@ -153,6 +153,18 @@ describe("Ротация refresh + reuse detection (§5)", () => {
       });
     });
 
+    it("reuse, когда организация сессии уже удалена: 401, цепочка отозвана, аудит не пишется", async () => {
+      const first = await signUp();
+      await refresh(first).expect(200);
+      const { orgId } = await prisma.membership.findFirstOrThrow();
+      await prisma.organization.delete({ where: { id: orgId } });
+
+      await refresh(first).expect(401);
+
+      expect(await prisma.refreshSession.count({ where: { revokedAt: null } })).toBe(0);
+      expect(await prisma.auditLog.count({ where: { action: "security.refresh_token_reuse_detected" } })).toBe(0);
+    });
+
     it("отзыв цепочки ПЕРЕЖИВАЕТ откат — kill family реально коммитится", async () => {
       const first = await signUp();
       await refresh(first).expect(200);

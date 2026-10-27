@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { apiErrorResponseSchema } from "@helix/api-schemas";
 import { getAccessToken } from "./access-token";
+import { isLostOrgResponse, recoverFromLostOrg } from "./org-recovery";
 import { awaitPendingRefresh, refreshAccessToken, skipsAuthFlow } from "./refresh";
 import { TransportError, transportKindForStatus } from "./transport-error";
 
@@ -123,6 +124,10 @@ export async function request<S extends z.ZodTypeAny>(opts: RequestOptions<S>): 
     await refreshAccessToken();
     const retried = await send(opts);
     return parse(retried, opts);
+  }
+
+  if (!bypassAuthFlow && (await isLostOrgResponse(res)) && (await recoverFromLostOrg())) {
+    return new Promise<never>(() => undefined);
   }
 
   return parse(res, opts);

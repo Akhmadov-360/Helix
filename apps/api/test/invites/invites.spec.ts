@@ -7,6 +7,10 @@ import { clearMailhog, waitForMailhogMessage, type MailhogMessage } from "../hel
 
 let counter = 0;
 
+function orgIdFrom(accessToken: string): string {
+  return (JSON.parse(Buffer.from(accessToken.split(".")[1] ?? "", "base64url").toString()) as { activeOrgId: string }).activeOrgId;
+}
+
 async function signUp(app: INestApplication): Promise<{ token: string; orgId: string; userId: string }> {
   const email = `inv${counter++}@example.com`;
   const res = await request(app.getHttpServer())
@@ -149,6 +153,27 @@ describe("Invites (invites.md)", () => {
       expect(memberships).toHaveLength(1); // §9.1: ровно одна Membership, БЕЗ личной организации
       expect(memberships[0]!.orgId).toBe(owner.orgId);
       expect(memberships[0]!.role).toBe("MEMBER");
+    });
+
+    it("REGISTER-ветка: новый пользователь сразу попадает в приглашённую организацию и остаётся в ней после refresh", async () => {
+      const owner = await signUp(app);
+      await createInvite(owner.token, "landing@example.com", "MEMBER").expect(201);
+      const rawToken = extractToken(await waitForMailhogMessage({ to: "landing@example.com" }));
+
+      const res = await accept(rawToken, { name: "Landing", password: "correct horse battery staple" }).expect(200);
+
+      expect(orgIdFrom(res.body.data.accessToken as string)).toBe(owner.orgId);
+      await request(app.getHttpServer())
+        .get("/v1/auth/me")
+        .set("Authorization", `Bearer ${res.body.data.accessToken as string}`)
+        .expect(200);
+
+      const cookie = (res.headers["set-cookie"] as unknown as string[]).find((c) => c.startsWith("helix_refresh="));
+      const refreshed = await request(app.getHttpServer())
+        .post("/v1/auth/refresh")
+        .set("Cookie", cookie!.split(";")[0]!)
+        .expect(200);
+      expect(orgIdFrom(refreshed.body.data.accessToken as string)).toBe(owner.orgId);
     });
 
     it("REGISTER-ветка без name/password → 400 (InviteAcceptRequiresProfileError)", async () => {

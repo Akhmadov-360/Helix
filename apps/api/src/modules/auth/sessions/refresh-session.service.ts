@@ -205,6 +205,12 @@ export class RefreshSessionService {
   ): Promise<void> {
     if (!session.lastActiveOrgId) return;
 
+    const orgStillExists = await tx.organization.findUnique({
+      where: { id: session.lastActiveOrgId },
+      select: { id: true },
+    });
+    if (!orgStillExists) return;
+
     await this.audit.record(tx, {
       orgId: session.lastActiveOrgId,
       actorId: null,
