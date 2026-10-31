@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
+import { Route as NoOrganizationRouteImport } from './routes/no-organization'
 import { Route as AuthForgotPasswordRouteImport } from './routes/_auth/forgot-password'
 import { Route as AuthLoginRouteImport } from './routes/_auth/login'
 import { Route as AuthRegisterRouteImport } from './routes/_auth/register'
@@ -46,6 +47,11 @@ const AuthRoute = AuthRouteImport.update({
 } as any)
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NoOrganizationRoute = NoOrganizationRouteImport.update({
+  id: '/no-organization',
+  path: '/no-organization',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthForgotPasswordRoute = AuthForgotPasswordRouteImport.update({
@@ -212,6 +218,7 @@ const AuthenticatedProjectsProjectIdPagesIndexRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
+  '/no-organization': typeof NoOrganizationRoute
   '/forgot-password': typeof AuthForgotPasswordRoute
   '/login': typeof AuthLoginRoute
   '/register': typeof AuthRegisterRoute
@@ -242,6 +249,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof AuthenticatedIndexRoute
+  '/no-organization': typeof NoOrganizationRoute
   '/forgot-password': typeof AuthForgotPasswordRoute
   '/login': typeof AuthLoginRoute
   '/register': typeof AuthRegisterRoute
@@ -273,6 +281,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_auth': typeof AuthRouteWithChildren
   '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/no-organization': typeof NoOrganizationRoute
   '/_auth/forgot-password': typeof AuthForgotPasswordRoute
   '/_auth/login': typeof AuthLoginRoute
   '/_auth/register': typeof AuthRegisterRoute
@@ -306,6 +315,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/no-organization'
     | '/forgot-password'
     | '/login'
     | '/register'
@@ -336,6 +346,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/no-organization'
     | '/forgot-password'
     | '/login'
     | '/register'
@@ -366,6 +377,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_auth'
     | '/_authenticated'
+    | '/no-organization'
     | '/_auth/forgot-password'
     | '/_auth/login'
     | '/_auth/register'
@@ -399,6 +411,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AuthRoute: typeof AuthRouteWithChildren
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
+  NoOrganizationRoute: typeof NoOrganizationRoute
   InviteAcceptRoute: typeof InviteAcceptRoute
 }
 
@@ -416,6 +429,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/no-organization': {
+      id: '/no-organization'
+      path: '/no-organization'
+      fullPath: '/no-organization'
+      preLoaderRoute: typeof NoOrganizationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_auth/forgot-password': {
@@ -715,6 +735,7 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRouteWithChildren,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
+  NoOrganizationRoute: NoOrganizationRoute,
   InviteAcceptRoute: InviteAcceptRoute,
 }
 export const routeTree = rootRouteImport

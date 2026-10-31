@@ -897,5 +897,9 @@
   "aiChat.error.providerNotConfigured": "Ushbu tashkilot uchun AI sozlanmagan",
   "aiChat.error.providerNotImplemented": "Ushbu AI provayderi hali qo'llab-quvvatlanmaydi",
   "aiChat.error.notPending": "Bu amal endi dolzarb emas — holat o'zgardi",
-  "aiChat.error.unexpected": "Amalni bajarib bo'lmadi. Qayta urinib ko'ring"
+  "aiChat.error.unexpected": "Amalni bajarib bo'lmadi. Qayta urinib ko'ring",
+  "noOrg.title": "Sizda tashkilot yo'q",
+  "noOrg.description": "Siz tashkilotdan chiqarildingiz yoki u o'chirildi. Akkaunt va kirish saqlanib qoladi, ammo CRM ma'lumotlari faqat tashkilot ichida mavjud.",
+  "noOrg.inviteHint": "O'z tashkilotingizni yarating yoki {email} manziliga yuborilgan taklif xatidagi havolani oching.",
+  "noOrg.create": "Tashkilot yaratish"
 }

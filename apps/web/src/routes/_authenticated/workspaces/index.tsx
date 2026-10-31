@@ -8,11 +8,11 @@ import { CreateWorkspaceDialog } from "../../../features/workspaces/create-works
 import { WorkspaceMenu } from "../../../features/workspaces/workspace-menu";
 import { useCan } from "../../../shared/auth/ability";
 import { useLocaleStore, useT } from "../../../shared/i18n";
-import { meQueryOptions, useMe } from "../../../shared/auth/session";
+import { ensureOrgScopedMe, useMe } from "../../../shared/auth/session";
 
 export const Route = createFileRoute("/_authenticated/workspaces/")({
   loader: async ({ context }) => {
-    const me = await context.queryClient.ensureQueryData(meQueryOptions);
+    const me = await ensureOrgScopedMe(context.queryClient);
     await context.queryClient.ensureQueryData(workspacesQueryOptions(me.activeOrgId));
   },
   component: WorkspacesPage,

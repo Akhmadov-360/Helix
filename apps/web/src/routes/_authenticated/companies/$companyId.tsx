@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { CompanyDetailView } from "../../../features/companies/company-detail-view";
 import { companyQueryOptions } from "../../../features/companies/queries";
-import { meQueryOptions, useMe } from "../../../shared/auth/session";
+import { ensureOrgScopedMe, useMe } from "../../../shared/auth/session";
 
 export const Route = createFileRoute("/_authenticated/companies/$companyId")({
   loader: async ({ context, params }) => {
-    const me = await context.queryClient.ensureQueryData(meQueryOptions);
+    const me = await ensureOrgScopedMe(context.queryClient);
     await context.queryClient.ensureQueryData(companyQueryOptions(me.activeOrgId, params.companyId));
   },
   component: CompanyDetailPage,

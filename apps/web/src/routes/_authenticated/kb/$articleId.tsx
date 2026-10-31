@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { KbDetailView } from "../../../features/kb/kb-detail-view";
 import { kbArticleQueryOptions } from "../../../features/kb/queries";
-import { meQueryOptions, useMe } from "../../../shared/auth/session";
+import { ensureOrgScopedMe, useMe } from "../../../shared/auth/session";
 
 export const Route = createFileRoute("/_authenticated/kb/$articleId")({
   loader: async ({ context, params }) => {
-    const me = await context.queryClient.ensureQueryData(meQueryOptions);
+    const me = await ensureOrgScopedMe(context.queryClient);
     await context.queryClient.ensureQueryData(kbArticleQueryOptions(me.activeOrgId, params.articleId));
   },
   component: KbArticlePage,

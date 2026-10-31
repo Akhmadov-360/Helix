@@ -3,7 +3,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { companiesListQueryOptions } from "../../../features/companies/queries";
 import { projectAssigneesQueryOptions, projectQueryOptions } from "../../../features/project-detail/queries";
 import { ProjectDetailShell } from "../../../features/project-detail/project-detail-shell";
-import { meQueryOptions, useMe } from "../../../shared/auth/session";
+import { ensureOrgScopedMe, useMe } from "../../../shared/auth/session";
 import { orgMembersQueryOptions } from "../../../shared/org/queries";
 
 // Persistent layout (как _authenticated.tsx) — ProjectDetailShell (сайдбар + табы) больше не
@@ -13,7 +13,7 @@ import { orgMembersQueryOptions } from "../../../shared/org/queries";
 // данные (co-workers, участники орги, компании), листовые роуты грузят только своё.
 export const Route = createFileRoute("/_authenticated/projects/$projectId")({
   loader: async ({ context, params }) => {
-    const me = await context.queryClient.ensureQueryData(meQueryOptions);
+    const me = await ensureOrgScopedMe(context.queryClient);
     await context.queryClient.ensureQueryData(projectQueryOptions(me.activeOrgId, params.projectId));
     await Promise.all([
       context.queryClient.ensureQueryData(projectAssigneesQueryOptions(me.activeOrgId, params.projectId)),

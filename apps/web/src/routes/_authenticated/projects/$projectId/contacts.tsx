@@ -5,13 +5,13 @@ import { projectContactsQueryOptions } from "../../../../features/contacts/queri
 import { companiesListQueryOptions } from "../../../../features/companies/queries";
 import { workspaceQueryOptions } from "../../../../features/phases/queries";
 import { projectQueryOptions } from "../../../../features/project-detail/queries";
-import { meQueryOptions, useMe } from "../../../../shared/auth/session";
+import { ensureOrgScopedMe, useMe } from "../../../../shared/auth/session";
 
 // Project/co-workers/участники-орги/компании уже прогреты родительским layout-роутом
 // ($projectId.tsx) — здесь только своё: workspace (ради audience) и контакты сделки.
 export const Route = createFileRoute("/_authenticated/projects/$projectId/contacts")({
   loader: async ({ context, params }) => {
-    const me = await context.queryClient.ensureQueryData(meQueryOptions);
+    const me = await ensureOrgScopedMe(context.queryClient);
     const project = await context.queryClient.ensureQueryData(
       projectQueryOptions(me.activeOrgId, params.projectId),
     );

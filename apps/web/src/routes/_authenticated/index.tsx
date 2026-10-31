@@ -1,13 +1,13 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { workspacesQueryOptions } from "../../features/workspaces/queries";
-import { meQueryOptions } from "../../shared/auth/session";
+import { ensureOrgScopedMe } from "../../shared/auth/session";
 import { clearLastWorkspaceId, getLastWorkspaceId } from "../../shared/lib/last-workspace";
 
 // "/" не рендерится — только редирект (§5 карты URL): на последний открытый воркспейс
 // (localStorage-хинт), иначе на первый из списка, иначе на пустой /workspaces.
 export const Route = createFileRoute("/_authenticated/")({
   loader: async ({ context }) => {
-    const me = await context.queryClient.ensureQueryData(meQueryOptions);
+    const me = await ensureOrgScopedMe(context.queryClient);
     const workspaces = await context.queryClient.ensureQueryData(workspacesQueryOptions(me.activeOrgId));
 
     // Хинт валиден, только если это воркспейс ТЕКУЩЕЙ орги (last-workspace.ts: "не доверенный
