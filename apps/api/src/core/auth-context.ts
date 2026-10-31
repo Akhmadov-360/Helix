@@ -17,12 +17,33 @@ export interface AuthContext {
   role: Role;
 }
 
+// Контекст маршрутов уровня аккаунта (AccountGuard): личность подтверждена, активной орги может не быть.
+// Репозитории тенантных данных принимают orgId: string — получить его из AccountContext без явной
+// проверки на null нельзя, поэтому «аккаунт без орги» не может протечь в тенантные запросы.
+export interface AccountContext {
+  userId: string;
+  activeOrgId: string | null;
+  role: Role | null;
+}
+
 export interface AuthenticatedRequest extends Request {
   auth?: AuthContext;
+  account?: AccountContext;
 }
 
 // Достаёт auth из request в контроллере. Нет auth = эндпоинт забыли закрыть guard'ом → ошибка,
 // а не молчаливый undefined, который упадёт где-то дальше.
+export const CurrentAccount = createParamDecorator(
+  (_data: unknown, ctx: ExecutionContext): AccountContext => {
+    const request = ctx.switchToHttp().getRequest<AuthenticatedRequest>();
+
+    if (!request.account) {
+      throw new InvalidTokenError("Route is not protected by AccountGuard");
+    }
+    return request.account;
+  },
+);
+
 export const CurrentAuth = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext): AuthContext => {
     const request = ctx.switchToHttp().getRequest<AuthenticatedRequest>();

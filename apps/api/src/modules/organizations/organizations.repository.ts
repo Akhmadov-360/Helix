@@ -206,11 +206,6 @@ export class OrganizationsRepository {
     return (tx ?? this.prisma.client).membership.count({ where: { orgId, role: "OWNER" } });
   }
 
-  /** В скольких оргах состоит юзер — guard против «удалили единственное членство». */
-  async countOrgsForUser(userId: string, tx?: Prisma.TransactionClient): Promise<number> {
-    return (tx ?? this.prisma.client).membership.count({ where: { userId } });
-  }
-
   async updateMemberRole(
     orgId: string,
     userId: string,

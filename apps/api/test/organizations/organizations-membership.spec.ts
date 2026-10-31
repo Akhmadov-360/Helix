@@ -224,10 +224,8 @@ describe("Organizations — membership management (Appendix B)", () => {
         .expect(409);
     });
 
-    it("удалить участника, у которого это единственная орга → 409", async () => {
+    it("удалить участника, у которого это единственная орга → 200, аккаунт остаётся", async () => {
       const owner = await signUpAs(app);
-      // solo регистрируется (заводит личную орга), затем присоединяется к owner.orgId —
-      // теперь у неё 2 членства. Убираем личное — остаётся ровно одно: owner.orgId.
       const solo = await signUpAs(app);
       await addToOrg(owner.orgId, solo.userId, "MEMBER");
       await prisma.membership.deleteMany({ where: { userId: solo.userId, orgId: solo.orgId } });
@@ -235,7 +233,10 @@ describe("Organizations — membership management (Appendix B)", () => {
       await request(app.getHttpServer())
         .delete(`/v1/organizations/members/${solo.userId}`)
         .set("Authorization", `Bearer ${owner.token}`)
-        .expect(409);
+        .expect(200);
+
+      expect(await prisma.user.findUnique({ where: { id: solo.userId } })).not.toBeNull();
+      expect(await prisma.membership.count({ where: { userId: solo.userId } })).toBe(0);
     });
 
     it("чужой userId (не член орги) → 404", async () => {

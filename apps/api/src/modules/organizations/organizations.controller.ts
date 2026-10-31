@@ -1,16 +1,12 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Query, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import {
   auditLogQuerySchema,
   changeMemberRoleSchema,
-  createOrganizationSchema,
   updateOrganizationSettingsSchema,
   type AuditLogListResponse,
   type AuditLogQuery,
   type ChangeMemberRoleInput,
-  type CreateOrganizationInput,
-  type MyOrgListResponse,
-  type MyOrgResponse,
   type OrganizationSettingsResponse,
   type OrgMemberDetailedListResponse,
   type OrgMemberListResponse,
@@ -44,23 +40,6 @@ export class OrganizationsController {
   ): Promise<OrgMemberListResponse | OrgMemberDetailedListResponse> {
     if (stats === "true") return this.organizations.listMembersDetailed(auth.activeOrgId);
     return this.organizations.listMembers(auth.activeOrgId);
-  }
-
-  // FR-ORG-2: список орг ТЕКУЩЕГО пользователя (не activeOrgId) — под org-switcher.
-  @Get("mine")
-  listMine(@CurrentAuth() auth: AuthContext): Promise<MyOrgListResponse> {
-    return this.organizations.listMine(auth.userId);
-  }
-
-  // FR-ORG-2: дополнительная организация для существующего юзера. Без @CheckPolicy —
-  // это не действие НАД текущей оргой (не Membership.create), а создание НОВОЙ, где
-  // создатель сам становится OWNER; роль в activeOrgId тут ни при чём.
-  @Post()
-  create(
-    @CurrentAuth() auth: AuthContext,
-    @Body(new ZodValidationPipe(createOrganizationSchema)) dto: CreateOrganizationInput,
-  ): Promise<MyOrgResponse> {
-    return this.organizations.create(auth.userId, dto.name);
   }
 
   // Appendix B «Manage members & roles» = O/A only.

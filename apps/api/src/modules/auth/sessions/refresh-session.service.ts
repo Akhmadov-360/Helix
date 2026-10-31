@@ -52,7 +52,7 @@ export class RefreshSessionService {
    * отдельная цепочка, и reuse-detection на одной не должна убивать другие.
    */
   async issue(
-    params: { userId: string; activeOrgId: string; metadata?: SessionMetadata },
+    params: { userId: string; activeOrgId: string | null; metadata?: SessionMetadata },
     tx?: Prisma.TransactionClient,
   ): Promise<string> {
     const rawToken = generateRefreshToken();

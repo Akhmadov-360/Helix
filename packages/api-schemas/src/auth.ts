@@ -70,8 +70,8 @@ export type SwitchOrgInput = z.infer<typeof switchOrgSchema>;
  * а не в токене, — она читается из Membership на каждом запросе и всегда актуальна.
  */
 export const currentUserSchema = userProfileSchema.extend({
-  activeOrgId: z.string(),
-  role: roleSchema,
+  activeOrgId: z.string().nullable(),
+  role: roleSchema.nullable(),
   // Плоская проекция CASL-ability (§8.2 frontend-architecture.md) — UI решает, что показать;
   // сервер по-прежнему единственный энфорсер (@CheckPolicy на каждом мутаторе).
   capabilities: capabilitiesSchema,

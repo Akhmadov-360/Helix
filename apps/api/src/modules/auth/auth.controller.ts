@@ -27,9 +27,9 @@ import { listCapabilities } from "../../core/authz/capabilities";
 import { InvalidRefreshTokenError, InvalidTokenError } from "../../core/errors/domain-error";
 import { ZodValidationPipe } from "../../core/pipes/zod-validation.pipe";
 import { UsersRepository } from "../users/users.repository";
-import { CurrentAuth, type AuthContext } from "../../core/auth-context";
+import { CurrentAccount, type AccountContext } from "../../core/auth-context";
 import { AuthService } from "./auth.service";
-import { JwtAuthGuard } from "./jwt-auth.guard";
+import { AccountGuard } from "./jwt-auth.guard";
 import { PasswordResetService } from "./password-reset/password-reset.service";
 import { REFRESH_COOKIE_NAME, RefreshCookieService } from "./sessions/refresh-cookie.service";
 import { sessionMetadataFrom } from "./sessions/refresh-session.service";
@@ -146,14 +146,14 @@ export class AuthController {
    */
   @Post("logout-all")
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(AccountGuard)
   @ApiBearerAuth()
   @ApiOkResponse({ description: "Все сессии пользователя завершены" })
   async logoutAll(
-    @CurrentAuth() auth: AuthContext,
+    @CurrentAccount() account: AccountContext,
     @Res({ passthrough: true }) response: Response,
   ): Promise<null> {
-    await this.auth.logoutAll(auth.userId);
+    await this.auth.logoutAll(account.userId);
 
     // Текущая сессия тоже отозвана — убираем и её cookie.
     this.refreshCookie.clear(response);
@@ -166,11 +166,11 @@ export class AuthController {
    * данные там протухли бы на срок жизни access-токена.
    */
   @Get("me")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(AccountGuard)
   @ApiBearerAuth()
   @ApiOkResponse({ description: "Профиль и контекст текущего запроса" })
-  async me(@CurrentAuth() auth: AuthContext): Promise<CurrentUser> {
-    const profile = await this.users.findProfileById(auth.userId);
+  async me(@CurrentAccount() account: AccountContext): Promise<CurrentUser> {
+    const profile = await this.users.findProfileById(account.userId);
 
     if (!profile) {
       // Подпись валидна, но юзера нет — учётку удалили, пока токен жил.
@@ -182,9 +182,9 @@ export class AuthController {
     // не отдельное чтение: не может разойтись с role в одном ответе.
     return {
       ...profile,
-      activeOrgId: auth.activeOrgId,
-      role: auth.role,
-      capabilities: listCapabilities(auth.role),
+      activeOrgId: account.activeOrgId,
+      role: account.role,
+      capabilities: account.role ? listCapabilities(account.role) : [],
     };
   }
 
@@ -197,18 +197,18 @@ export class AuthController {
    */
   @Post("switch-org")
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(AccountGuard)
   @ApiBearerAuth()
   @ApiOkResponse({ description: "Выдан access-токен для другой организации" })
   async switchOrg(
     @Body(new ZodValidationPipe(switchOrgSchema)) dto: SwitchOrgInput,
-    @CurrentAuth() auth: AuthContext,
+    @CurrentAccount() account: AccountContext,
     @Req() request: Request,
   ): Promise<AuthResult> {
     const rawToken: unknown = request.cookies?.[REFRESH_COOKIE_NAME];
 
     return this.auth.switchOrg(
-      auth.userId,
+      account.userId,
       dto.orgId,
       typeof rawToken === "string" && rawToken.length > 0 ? rawToken : undefined,
     );
