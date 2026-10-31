@@ -741,6 +741,7 @@ prefetch (нет водопадов), React Compiler (нет лишних ре-�
 | AUTH-1     | одна refresh-cookie → один одновременный refresh (single-flight)                            | auth      |
 | AUTH-2     | capabilities с сервера (не packRules); UI косметичен, сервер энфорсит — бэк готов (H0), FE (H1) в работе | auth      |
 | AUTH-3     | 403 `NOT_ORG_MEMBER` → refresh + полная перезагрузка (не тост); не чаще 1 раза за 10 с          | auth      |
+| AUTH-4     | `me.activeOrgId === null` → `/no-organization`; внутри `_authenticated` `useMe()` строгий (org гарантирована loader'ом: `ensureOrgScopedMe`) | auth      |
 | FE-3       | action authorization ≠ data visibility                                                      | auth      |
 | ERR-1      | ошибка на своём уровне; boundary только для непредвиденного                                 | слой 4    |
 | PERF-1     | оптимизация только после измеренного bottleneck                                             | слой 4    |
