@@ -146,9 +146,6 @@ export class AuthService {
       remembered && (await this.organizations.findMembershipRole(user.id, remembered))
         ? remembered
         : await this.organizations.findDefaultOrgIdForUser(user.id);
-    if (!orgId) {
-      throw new Error(`User ${user.id} has no membership; cannot resolve activeOrgId`);
-    }
 
     return {
       accessToken: await this.tokens.issueAccessToken(user.id, orgId),
@@ -165,12 +162,6 @@ export class AuthService {
   async issueFor(user: UserProfile, options: IssueOptions = {}): Promise<IssuedAuth> {
     const orgId =
       options.activeOrgId ?? (await this.organizations.findDefaultOrgIdForUser(user.id));
-
-    if (!orgId) {
-      // Нарушен инвариант §9.1 «у каждого User есть ≥1 Membership». Это дефект данных,
-      // а не пользовательская ошибка, — маскировать его под 401 нельзя.
-      throw new Error(`User ${user.id} has no membership; cannot resolve activeOrgId`);
-    }
 
     const accessToken = await this.tokens.issueAccessToken(user.id, orgId);
     const refreshToken = await this.refreshSessions.issue(

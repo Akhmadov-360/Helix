@@ -4,7 +4,7 @@ import { companiesListQueryOptions } from "../../../../features/companies/querie
 import { boardQueryOptions } from "../../../../features/board/queries";
 import { BoardShell, type BoardDisplayMode } from "../../../../features/board/board-shell";
 import { workspaceQueryOptions } from "../../../../features/phases/queries";
-import { meQueryOptions, useMe } from "../../../../shared/auth/session";
+import { ensureOrgScopedMe, useMe } from "../../../../shared/auth/session";
 
 export interface BoardSearch {
   view?: BoardDisplayMode;
@@ -19,7 +19,7 @@ export const Route = createFileRoute("/_authenticated/workspaces/$workspaceId/bo
     view: search.view === "table" ? "table" : undefined,
   }),
   loader: async ({ context, params }) => {
-    const me = await context.queryClient.ensureQueryData(meQueryOptions);
+    const me = await ensureOrgScopedMe(context.queryClient);
     await Promise.all([
       context.queryClient.ensureQueryData(boardQueryOptions(me.activeOrgId, params.workspaceId)),
       context.queryClient.ensureQueryData(companiesListQueryOptions(me.activeOrgId)),

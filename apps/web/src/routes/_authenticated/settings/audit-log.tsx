@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AuditLogPage } from "../../../features/settings/audit-log-page";
 import { auditLogQueryOptions } from "../../../features/settings/queries";
-import { meQueryOptions, useMe } from "../../../shared/auth/session";
+import { ensureOrgScopedMe, useMe } from "../../../shared/auth/session";
 
 export const Route = createFileRoute("/_authenticated/settings/audit-log")({
   loader: async ({ context }) => {
-    const me = await context.queryClient.ensureQueryData(meQueryOptions);
+    const me = await ensureOrgScopedMe(context.queryClient);
     // limit совпадает с дефолтным pageSize в AuditLogPage — иначе прогретый здесь ключ кэша не
     // совпадёт с первым реальным запросом компонента, и прогрев окажется бесполезным.
     await context.queryClient.ensureQueryData(auditLogQueryOptions(me.activeOrgId, { limit: 25 }));

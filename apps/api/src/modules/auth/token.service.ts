@@ -15,7 +15,8 @@ import { InvalidTokenError } from "../../core/errors/domain-error";
 export interface AccessTokenPayload {
   /** userId (стандартное имя claim'а). */
   sub: string;
-  activeOrgId: string;
+  /** null — аккаунт без организации: доступны только маршруты уровня аккаунта. */
+  activeOrgId: string | null;
   /** Уникален на каждый токен: задел под audit/tracing/отзыв. */
   jti: string;
 }
@@ -27,7 +28,7 @@ export class TokenService {
   constructor(private readonly jwt: JwtService) {}
 
   /** Секрет и TTL приходят из JwtModule (сконфигурирован из валидированного env). */
-  async issueAccessToken(userId: string, activeOrgId: string): Promise<string> {
+  async issueAccessToken(userId: string, activeOrgId: string | null): Promise<string> {
     const payload: AccessTokenPayload = {
       sub: userId,
       activeOrgId,

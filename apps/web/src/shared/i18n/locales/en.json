@@ -897,5 +897,9 @@
   "aiChat.error.providerNotConfigured": "AI is not configured for this organization",
   "aiChat.error.providerNotImplemented": "This AI provider isn't supported yet",
   "aiChat.error.notPending": "This action is no longer valid — the state has changed",
-  "aiChat.error.unexpected": "Couldn't complete the action. Try again"
+  "aiChat.error.unexpected": "Couldn't complete the action. Try again",
+  "noOrg.title": "You don't belong to an organization",
+  "noOrg.description": "You were removed from your organization or it was deleted. Your account and sign-in are intact, but CRM data is only available inside an organization.",
+  "noOrg.inviteHint": "Create your own organization or open the link from an invitation email sent to {email}.",
+  "noOrg.create": "Create organization"
 }

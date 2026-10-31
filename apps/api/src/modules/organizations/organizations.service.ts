@@ -17,7 +17,6 @@ import {
   InsufficientRoleRankError,
   LastOwnerError,
   ResourceNotFoundError,
-  SoleOrganizationMembershipError,
 } from "../../core/errors/domain-error";
 import { PrismaService } from "../../core/prisma/prisma.service";
 import { AuditRecorder } from "../audit/audit.recorder";
@@ -130,24 +129,20 @@ export class OrganizationsService {
 
   /**
    * Удаление участника из орги (Appendix B, O/A only). Те же два инварианта, что и
-   * смена роли, плюс третий: у User по auth.md §9.1 всегда ≥1 Membership — если это
-   * членство единственное, удаление сломало бы резолюцию activeOrgId на логине.
+   * смена роли. Последнее членство удалить МОЖНО: аккаунт без организации — штатное состояние.
    */
   async removeMember(orgId: string, actorId: string, actorRole: Role, targetUserId: string): Promise<void> {
     const membership = await this.orgs.findMembership(orgId, targetUserId);
     if (!membership) throw new ResourceNotFoundError("Membership not found");
 
     // Иерархия: тот же чек, что в changeMemberRole, с тем же self-исключением (self-remove =
-    // "покинуть организацию", валидный сценарий; инварианты "последний Owner" и "единственная
-    // орга" ниже — реальные ограничители).
+    // "покинуть организацию", валидный сценарий; инварианты "последний Owner" ниже — реальный
+    // ограничитель).
     const isSelf = actorId === targetUserId;
     if (!isSelf && !canManageMember(actorRole, membership.role)) throw new InsufficientRoleRankError();
 
     if (membership.role === "OWNER" && (await this.orgs.countOwners(orgId)) <= 1) {
       throw new LastOwnerError();
-    }
-    if ((await this.orgs.countOrgsForUser(targetUserId)) <= 1) {
-      throw new SoleOrganizationMembershipError();
     }
 
     await this.prisma.client.$transaction(async (tx) => {

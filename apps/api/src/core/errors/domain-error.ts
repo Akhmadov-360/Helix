@@ -261,6 +261,19 @@ export class NotOrgMemberError extends ForbiddenError {
   }
 }
 
+/**
+ * Токен валиден, но аккаунт сейчас не состоит ни в одной организации (вышел, исключён, орга удалена).
+ * Отличается от NOT_ORG_MEMBER: там активная орга названа, но членства в ней нет; здесь активной нет
+ * вовсе, и клиенту нужен экран «создать организацию / принять приглашение», а не переавторизация.
+ */
+export class NoActiveOrgError extends ForbiddenError {
+  readonly code = "NO_ACTIVE_ORG";
+
+  constructor() {
+    super("Your account is not a member of any organization");
+  }
+}
+
 /** Член орги, но роль не позволяет действие (CASL-политика отказала). */
 export class ForbiddenActionError extends ForbiddenError {
   readonly code = "FORBIDDEN";
@@ -311,19 +324,6 @@ export class LastOwnerError extends ConflictError {
 
   constructor() {
     super("Organization must have at least one OWNER");
-  }
-}
-
-/**
- * Удаляемое членство — единственное у пользователя (auth.md §9.1: каждый User
- * состоит хотя бы в одной Org всегда). Удалить его значило бы сломать инвариант,
- * от которого зависит резолюция activeOrgId на логине/refresh.
- */
-export class SoleOrganizationMembershipError extends ConflictError {
-  readonly code = "SOLE_ORGANIZATION_MEMBERSHIP";
-
-  constructor() {
-    super("Cannot remove a member's only organization membership");
   }
 }
 

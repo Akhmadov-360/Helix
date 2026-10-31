@@ -8,7 +8,7 @@ import { OrganizationsModule } from "../organizations/organizations.module";
 import { UsersModule } from "../users/users.module";
 import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
-import { JwtAuthGuard } from "./jwt-auth.guard";
+import { AccountGuard, JwtAuthGuard } from "./jwt-auth.guard";
 import { PasswordModule } from "./password.module";
 import { PasswordResetRepository } from "./password-reset/password-reset.repository";
 import { PasswordResetService } from "./password-reset/password-reset.service";
@@ -16,6 +16,7 @@ import { RefreshCookieService } from "./sessions/refresh-cookie.service";
 import { RefreshSessionService } from "./sessions/refresh-session.service";
 import { RefreshSessionsRepository } from "./sessions/refresh-sessions.repository";
 import { TokenService } from "./token.service";
+import { MyOrganizationsController } from "../organizations/my-organizations.controller";
 import { OrganizationsController } from "../organizations/organizations.controller";
 import { OrganizationsService } from "../organizations/organizations.service";
 
@@ -45,11 +46,12 @@ import { OrganizationsService } from "../organizations/organizations.service";
   // OrganizationsController — здесь, не в OrganizationsModule (см. её комментарий):
   // избегаем цикла OrganizationsModule↔AuthModule, а AuthModule уже импортирует
   // OrganizationsModule (за OrganizationsRepository) и сам содержит JwtAuthGuard.
-  controllers: [AuthController, OrganizationsController],
+  controllers: [AuthController, OrganizationsController, MyOrganizationsController],
   providers: [
     AuthService,
     TokenService,
     JwtAuthGuard,
+    AccountGuard,
     RefreshSessionService,
     RefreshSessionsRepository,
     RefreshCookieService,
@@ -59,6 +61,6 @@ import { OrganizationsService } from "../organizations/organizations.service";
   ],
   // AuthService нужен RegistrationService'у (§9.1: регистрация просит токены у auth),
   // RefreshCookieService — её контроллеру; JwtAuthGuard — другим модулям (@UseGuards).
-  exports: [AuthService, TokenService, RefreshCookieService, JwtAuthGuard],
+  exports: [AuthService, TokenService, RefreshCookieService, JwtAuthGuard, AccountGuard],
 })
 export class AuthModule {}
